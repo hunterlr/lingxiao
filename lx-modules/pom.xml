@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      lx-modules：业务模块聚合
+      =====================================================================
+      v1.0 建五个：
+        lx-module-system     系统管理（用户 / 角色 / 菜单 / 部门 / 字典 / 日志 / 认证）
+        lx-module-file       文件中心（存储抽象 / 上传 / 下载 / 文件库）
+        lx-module-job        定时任务（Spring Task + 数据库锁 / 执行日志）
+        lx-module-generator  代码生成器（导入表 / 配置字段 / 预览 / 下载）
+        lx-module-demo       可选模块契约验证（生产不打包）
+
+      不建 cms / member / portal；它们按 docs/20-cms-embed-plan.md 后续嵌入。
+    -->
+    <parent>
+        <groupId>com.lingxiao</groupId>
+        <artifactId>lingxiao</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>lx-modules</artifactId>
+    <packaging>pom</packaging>
+    <name>lx-modules</name>
+    <description>业务模块聚合</description>
+
+    <modules>
+        <module>lx-module-system</module>
+        <module>lx-module-file</module>
+        <module>lx-module-job</module>
+        <module>lx-module-generator</module>
+        <module>lx-module-demo</module>
+    </modules>
+
+    <dependencies>
+        <!-- 单元测试依赖由所有业务模块共享；test scope 不进运行时包 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

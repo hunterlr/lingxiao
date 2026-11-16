@@ -1,0 +1,338 @@
+<template>
+  <div class="page-container">
+    <div class="page-card">
+#if($queryColumns.size() > 0)
+      <el-form :inline="true" :model="query" class="search-form" @submit.prevent>
+#foreach($col in $queryColumns)
+        <el-form-item label="${col.htmlLabel}">
+#if($col.javaType == 'LocalDate')
+          <el-date-picker
+            v-model="query.${col.javaField}"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="选择${col.htmlLabel}"
+            clearable
+            style="width: 180px"
+          />
+#elseif($col.javaType == 'LocalDateTime')
+          <el-date-picker
+            v-model="query.${col.javaField}"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            placeholder="选择${col.htmlLabel}"
+            clearable
+            style="width: 200px"
+          />
+#elseif($col.javaType == 'LocalTime')
+          <el-time-picker
+            v-model="query.${col.javaField}"
+            value-format="HH:mm:ss"
+            placeholder="选择${col.htmlLabel}"
+            clearable
+            style="width: 150px"
+          />
+#elseif($col.dictType && $col.dictType != '')
+          <DictSelect v-model="query.${col.javaField}" dict-type="${col.dictType}" placeholder="全部" width="160px" />
+#else
+          <el-input
+            v-model="query.${col.javaField}"
+            placeholder="${col.htmlLabel}"
+            clearable
+            style="width: 170px"
+            @keyup.enter="handleSearch"
+            @clear="handleSearch"
+          />
+#end
+        </el-form-item>
+#end
+        <el-form-item>
+          <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
+          <el-button :icon="Refresh" @click="handleReset">重置</el-button>
+        </el-form-item>
+      </el-form>
+#end
+
+      <div class="table-toolbar">
+        <div class="toolbar-left">
+          <span class="text-secondary">${functionNameHtml}：由代码生成器生成，对应数据库表 ${tableName}。</span>
+        </div>
+        <div class="toolbar-right">
+          <el-button
+            v-hasPerm="'${permissionPrefix}:add'"
+            type="primary"
+            :icon="Plus"
+            @click="openAdd"
+          >
+            新增
+          </el-button>
+          <el-button :icon="Refresh" @click="loadList">刷新</el-button>
+        </div>
+      </div>
+
+      <el-table v-loading="loading" :data="rows" border stripe row-key="${pkField}">
+#foreach($col in $listColumns)
+#if($col.dictType && $col.dictType != '')
+        <el-table-column label="${col.htmlLabel}" min-width="120">
+          <template v-slot:default="{ row }">
+            <DictTag :value="row.${col.javaField}" dict-type="${col.dictType}" />
+          </template>
+        </el-table-column>
+#elseif($col.javaType == 'LocalDate' || $col.javaType == 'LocalDateTime')
+        <el-table-column prop="${col.javaField}" label="${col.htmlLabel}" width="170" />
+#else
+        <el-table-column prop="${col.javaField}" label="${col.htmlLabel}" min-width="130" show-overflow-tooltip />
+#end
+#end
+        <el-table-column label="操作" width="160" fixed="right">
+          <template v-slot:default="{ row }">
+            <div class="table-actions">
+              <el-button
+                v-hasPerm="'${permissionPrefix}:edit'"
+                link
+                type="primary"
+                @click="openEdit(row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                v-hasPerm="'${permissionPrefix}:remove'"
+                link
+                type="danger"
+                @click="handleDelete(row)"
+              >
+                删除
+              </el-button>
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="pagination-bar">
+        <el-pagination
+          v-model:current-page="query.pageNum"
+          v-model:page-size="query.pageSize"
+          :total="total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          background
+          @size-change="loadList"
+          @current-change="loadList"
+        />
+      </div>
+    </div>
+
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? '编辑${functionNameHtml}' : '新增${functionNameHtml}'"
+      width="640px"
+      append-to-body
+      destroy-on-close
+      @closed="handleDialogClosed"
+    >
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px">
+#foreach($col in $formColumns)
+        <el-form-item label="${col.htmlLabel}"#if($col.isRequired == '1') prop="${col.javaField}"#end>
+#if($col.htmlType == 'textarea')
+          <el-input
+            v-model="form.${col.javaField}"
+            type="textarea"
+            :rows="3"
+            maxlength="2000"
+            show-word-limit
+          />
+#elseif($col.javaType == 'LocalDate')
+          <el-date-picker
+            v-model="form.${col.javaField}"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="选择${col.htmlLabel}"
+            style="width: 100%"
+          />
+#elseif($col.javaType == 'LocalDateTime')
+          <el-date-picker
+            v-model="form.${col.javaField}"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            placeholder="选择${col.htmlLabel}"
+            style="width: 100%"
+          />
+#elseif($col.javaType == 'LocalTime')
+          <el-time-picker
+            v-model="form.${col.javaField}"
+            value-format="HH:mm:ss"
+            placeholder="选择${col.htmlLabel}"
+            style="width: 100%"
+          />
+#elseif($col.javaType == 'Boolean')
+          <el-switch v-model="form.${col.javaField}" />
+#elseif($col.dictType && $col.dictType != '')
+          <DictSelect v-model="form.${col.javaField}" dict-type="${col.dictType}" />
+#else
+          <el-input v-model="form.${col.javaField}" placeholder="请输入${col.htmlLabel}" />
+#end
+        </el-form-item>
+#end
+      </el-form>
+      <template v-slot:footer>
+        <div class="dialog-footer">
+          <el-button @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="saving" @click="submitForm">保存</el-button>
+        </div>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import { onMounted, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import {
+  add${className},
+  delete${className},
+  get${className},
+  list${className},
+  update${className}
+} from '@/api/${businessName}'
+#if($hasDict)
+import DictSelect from '@/components/DictSelect.vue'
+import DictTag from '@/components/DictTag.vue'
+#end
+
+/**
+ * ${functionNameHtml}管理。
+ *
+ * <p>由凌霄代码生成器生成；重新生成会覆盖本文件。
+ * 查询条件、列表列、表单控件都来自 gen_table_column 配置。</p>
+ */
+const loading = ref(false)
+const rows = ref([])
+const total = ref(0)
+
+const query = reactive({
+  pageNum: 1,
+  pageSize: 10,
+#foreach($col in $queryColumns)
+  ${col.javaField}: '',
+#end
+})
+
+async function loadList() {
+  loading.value = true
+  try {
+    const params = { pageNum: query.pageNum, pageSize: query.pageSize }
+    for (const key of Object.keys(query)) {
+      if (key === 'pageNum' || key === 'pageSize') continue
+      const value = query[key]
+      if (value !== '' && value !== null && value !== undefined) {
+        params[key] = value
+      }
+    }
+    const data = await list${className}(params)
+    rows.value = data.records || []
+    total.value = Number(data.total || 0)
+  } finally {
+    loading.value = false
+  }
+}
+
+function handleSearch() {
+  query.pageNum = 1
+  loadList()
+}
+
+function handleReset() {
+  query.pageNum = 1
+#foreach($col in $queryColumns)
+  query.${col.javaField} = ''
+#end
+  loadList()
+}
+
+onMounted(loadList)
+
+const dialogVisible = ref(false)
+const saving = ref(false)
+const isEdit = ref(false)
+const formRef = ref(null)
+let editingId = ''
+
+const emptyForm = () => ({
+#foreach($col in $formColumns)
+  ${col.javaField}: #if($col.javaType == 'String')''#elseif($col.javaType == 'Boolean')false#else null#end,
+#end
+})
+
+const form = reactive(emptyForm())
+
+const rules = {
+#foreach($col in $formColumns)
+#if($col.isRequired == '1')
+  ${col.javaField}: [{ required: true, message: '请输入${col.jsLabel}', trigger: 'change' }],
+#end
+#end
+}
+
+function resetForm() {
+  Object.assign(form, emptyForm())
+  editingId = ''
+  isEdit.value = false
+}
+
+function openAdd() {
+  resetForm()
+  dialogVisible.value = true
+}
+
+async function openEdit(row) {
+  resetForm()
+  isEdit.value = true
+  editingId = row.${pkField}
+  dialogVisible.value = true
+  const detail = await get${className}(row.${pkField})
+  for (const key of Object.keys(form)) {
+    if (detail[key] !== undefined && detail[key] !== null) {
+      form[key] = detail[key]
+    }
+  }
+}
+
+function handleDialogClosed() {
+  formRef.value && formRef.value.clearValidate()
+}
+
+async function submitForm() {
+  await formRef.value.validate(async (valid) => {
+    if (!valid) return
+    saving.value = true
+    try {
+      if (isEdit.value) {
+        await update${className}(editingId, { ...form })
+        ElMessage.success('保存成功')
+      } else {
+        await add${className}({ ...form })
+        ElMessage.success('新增成功')
+      }
+      dialogVisible.value = false
+      await loadList()
+    } finally {
+      saving.value = false
+    }
+  })
+}
+
+async function handleDelete(row) {
+  try {
+    await ElMessageBox.confirm('确认删除这条${functionNameJs}记录吗？', '删除确认', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    })
+  } catch (e) {
+    return
+  }
+  await delete${className}(row.${pkField})
+  ElMessage.success('删除成功')
+  await loadList()
+}
+</script>

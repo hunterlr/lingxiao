@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      lx-common-core：最底层的通用模型
+      =====================================================================
+      依赖原则：不依赖 Spring Web、不依赖数据库、不依赖 Sa-Token。
+      这样它才能被 api / modules / boot 任意引用而不引入副作用。
+    -->
+    <parent>
+        <groupId>com.lingxiao</groupId>
+        <artifactId>lx-common</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>lx-common-core</artifactId>
+    <name>lx-common-core</name>
+    <description>统一响应、错误码、业务异常、全局常量</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <!--
+          只引注解包（不是完整 Jackson 数据绑定）：
+          统一响应体 R 需要用 @JsonIgnore 隐藏 isSuccess()，避免响应里多出 success 字段。
+          jackson-annotations 无传递依赖，不会把 Web 相关能力带进 core。
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+    </dependencies>
+</project>

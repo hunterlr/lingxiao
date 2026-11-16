@@ -1,0 +1,106 @@
+package ${packageName}.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.lingxiao.common.core.domain.PageResult;
+import com.lingxiao.common.core.enums.ErrorCode;
+import com.lingxiao.common.core.exception.ServiceException;
+import ${packageName}.entity.${className};
+import ${packageName}.mapper.${className}Mapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+#if($hasStringQuery)
+import org.springframework.util.StringUtils;
+#end
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+
+/**
+ * ${functionName}业务。
+ *
+ * <p>由凌霄代码生成器生成，只包含单表 CRUD 骨架：</p>
+ * <ul>
+ *   <li>分页查询按 gen_table_column 里勾选的查询字段拼接条件；</li>
+ *   <li>新增 / 修改 / 删除都是物理操作，表里若有 del_flag 需要自行改成逻辑删除；</li>
+ *   <li>{@code updateById} 默认忽略 null 字段，做“清空某列”时要显式 set。</li>
+ * </ul>
+ *
+ * @author ${author}
+ * @since ${datetime}
+ */
+@Service
+@RequiredArgsConstructor
+public class ${className}Service {
+
+    private final ${className}Mapper ${businessName}Mapper;
+
+    public PageResult<${className}> page(long pageNum, long pageSize#foreach($col in $queryColumns), ${col.javaType} ${col.javaField}#end) {
+        long safePageNum = Math.max(pageNum, 1);
+        long safePageSize = Math.min(Math.max(pageSize, 1), 100);
+        LambdaQueryWrapper<${className}> wrapper = new LambdaQueryWrapper<>();
+#foreach($col in $queryColumns)
+#if($col.javaType == 'String')
+        if (StringUtils.hasText(${col.javaField})) {
+#else
+        if (${col.javaField} != null) {
+#end
+#if($col.queryType == 'LIKE')
+            wrapper.like(${className}::get${col.javaFieldCap}, ${col.javaField});
+#elseif($col.queryType == 'GT')
+            wrapper.gt(${className}::get${col.javaFieldCap}, ${col.javaField});
+#elseif($col.queryType == 'GE')
+            wrapper.ge(${className}::get${col.javaFieldCap}, ${col.javaField});
+#elseif($col.queryType == 'LT')
+            wrapper.lt(${className}::get${col.javaFieldCap}, ${col.javaField});
+#elseif($col.queryType == 'LE')
+            wrapper.le(${className}::get${col.javaFieldCap}, ${col.javaField});
+#else
+            wrapper.eq(${className}::get${col.javaFieldCap}, ${col.javaField});
+#end
+        }
+#end
+        wrapper.orderByDesc(${className}::get${pkFieldCap});
+
+        Page<${className}> page = ${businessName}Mapper.selectPage(new Page<>(safePageNum, safePageSize), wrapper);
+        PageResult<${className}> result = new PageResult<>();
+        result.setTotal(page.getTotal());
+        result.setPageNum(page.getCurrent());
+        result.setPageSize(page.getSize());
+        result.setRecords(page.getRecords());
+        return result;
+    }
+
+    public ${className} detail(${pkType} ${pkField}) {
+        ${className} entity = ${businessName}Mapper.selectById(${pkField});
+        if (entity == null) {
+            throw new ServiceException(ErrorCode.NOT_FOUND);
+        }
+        return entity;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public ${pkType} create(${className} entity) {
+        ${businessName}Mapper.insert(entity);
+        return entity.get${pkFieldCap}();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void update(${pkType} ${pkField}, ${className} entity) {
+        if (${businessName}Mapper.selectById(${pkField}) == null) {
+            throw new ServiceException(ErrorCode.NOT_FOUND);
+        }
+        entity.set${pkFieldCap}(${pkField});
+        ${businessName}Mapper.updateById(entity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(${pkType} ${pkField}) {
+        if (${businessName}Mapper.selectById(${pkField}) == null) {
+            throw new ServiceException(ErrorCode.NOT_FOUND);
+        }
+        ${businessName}Mapper.deleteById(${pkField});
+    }
+}

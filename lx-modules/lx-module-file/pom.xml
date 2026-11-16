@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      lx-module-file：文件中心（v1.0 必装）
+      =====================================================================
+      负责：
+        - 存储抽象 StorageService（v1.0 本地磁盘，后续 MinIO / OSS）
+        - 上传校验、SHA-256、秒传、文件主表
+        - 文件库：列表、搜索、改名、改名历史
+        - 图片基础处理：宽高识别、EXIF 剥离 / 方向纠正、缩略图 / 中图
+
+      数据边界：只操作 sys_file / sys_file_name_log；
+      CMS / 会员只通过 fileId 引用，不建自己的文件表。
+    -->
+    <parent>
+        <groupId>com.lingxiao</groupId>
+        <artifactId>lx-modules</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>lx-module-file</artifactId>
+    <name>lx-module-file</name>
+    <description>文件中心：存储抽象、上传、下载、文件库</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-mybatis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-log</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- 图片基础处理：缩略图 / 中图 / EXIF 方向纠正，版本由 lx-dependencies 统一锁定 -->
+        <dependency>
+            <groupId>net.coobird</groupId>
+            <artifactId>thumbnailator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

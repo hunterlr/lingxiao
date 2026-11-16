@@ -1,0 +1,42 @@
+package ${packageName}.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+import java.io.Serializable;
+#foreach($import in $javaImports)
+import ${import};
+#end
+
+/**
+ * ${tableComment}
+ *
+ * <p>对应数据库表 ${tableName}，由凌霄代码生成器生成。</p>
+ *
+ * <p>注意：本类刻意不继承 BaseEntity。生成器按表真实列生成字段，
+ * 不强行补 del_flag / version / create_by 等审计字段；
+ * 如果表里确实有这些列，它们会作为普通字段出现，行为由业务自行决定。</p>
+ *
+ * @author ${author}
+ * @since ${datetime}
+ */
+@Data
+@TableName("${tableName}")
+public class ${className} implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+#foreach($col in $columns)
+
+    /** ${col.columnComment} */
+#if($col.isPk == '1')
+#if($col.isIncrement == '1')
+    @TableId(value = "${col.columnName}", type = IdType.AUTO)
+#else
+    @TableId(value = "${col.columnName}", type = IdType.INPUT)
+#end
+#end
+    private ${col.javaType} ${col.javaField};
+#end
+}

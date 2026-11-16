@@ -1,0 +1,45 @@
+-- =====================================================================
+-- ${functionNameSql} · 菜单与按钮权限
+-- =====================================================================
+-- 由凌霄代码生成器生成，对应表 ${tableName}。
+--
+-- 使用方法：
+--   1. {parentMenuId} 替换为上级目录 ID（例如“系统工具”是 3）；
+--   2. {menuId} / {buttonAddId} / {buttonEditId} / {buttonRemoveId}
+--      替换为实际雪花 ID 或当前可用的菜单 ID；
+--   3. {roleId} 替换为要授权的角色 ID（超级管理员通常是 1）；
+--   4. 确认 menu_key 未被占用后再执行。
+--
+-- 不要依赖数据库自增函数取菜单 ID：菜单 ID 由应用侧生成，迁移脚本保持
+-- “逻辑 SQL + 占位符”，方便在 MySQL / PostgreSQL / 达梦 / 金仓上执行。
+-- =====================================================================
+
+INSERT INTO sys_menu
+  (menu_id, menu_key, parent_id, menu_name, menu_type, path, component, perms,
+   icon, order_num, visible, status, module_code, create_time, del_flag, version)
+VALUES
+  ({menuId}, '${moduleName}:${businessName}:list', {parentMenuId}, '${functionNameSql}',
+   'C', '${routePath}', '${viewPath}', '${permissionPrefix}:list',
+   'documentation', 1, '0', '0', '${moduleName}', NOW(3), '0', 0);
+
+INSERT INTO sys_menu
+  (menu_id, menu_key, parent_id, menu_name, menu_type, path, component, perms,
+   icon, order_num, visible, status, module_code, create_time, del_flag, version)
+VALUES
+  ({buttonAddId}, '${moduleName}:${businessName}:add', {menuId}, '新增',
+   'F', NULL, NULL, '${permissionPrefix}:add',
+   NULL, 1, '0', '0', '${moduleName}', NOW(3), '0', 0),
+  ({buttonEditId}, '${moduleName}:${businessName}:edit', {menuId}, '编辑',
+   'F', NULL, NULL, '${permissionPrefix}:edit',
+   NULL, 2, '0', '0', '${moduleName}', NOW(3), '0', 0),
+  ({buttonRemoveId}, '${moduleName}:${businessName}:remove', {menuId}, '删除',
+   'F', NULL, NULL, '${permissionPrefix}:remove',
+   NULL, 3, '0', '0', '${moduleName}', NOW(3), '0', 0);
+
+-- 可选：给角色授权。不需要时整段删除。
+INSERT INTO sys_role_menu (role_id, menu_id)
+VALUES
+  ({roleId}, {menuId}),
+  ({roleId}, {buttonAddId}),
+  ({roleId}, {buttonEditId}),
+  ({roleId}, {buttonRemoveId});

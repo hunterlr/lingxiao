@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      lx-common-mybatis：数据访问公共层
+      =====================================================================
+      负责：
+        - MyBatis-Plus 插件（分页、乐观锁、防全表更新）
+        - 审计字段自动填充（create_time / update_time）
+        - 所有实体共用的 BaseEntity
+
+      约束：
+        - 不写任何具体业务 Mapper；
+        - 不在 SQL 里写 MySQL 方言函数（为后续多库留路）。
+    -->
+    <parent>
+        <groupId>com.lingxiao</groupId>
+        <artifactId>lx-common</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>lx-common-mybatis</artifactId>
+    <name>lx-common-mybatis</name>
+    <description>MyBatis-Plus 配置、审计字段、基础实体</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

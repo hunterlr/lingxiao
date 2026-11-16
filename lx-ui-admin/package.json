@@ -1,0 +1,36 @@
+{
+  "name": "lx-ui-admin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "凌霄后台管理前端（Vue3 + Vite + Element Plus）",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "predev": "node scripts/sync-ueditor.mjs",
+    "prebuild": "node scripts/sync-ueditor.mjs",
+    "sync:ueditor": "node scripts/sync-ueditor.mjs"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "@wangeditor-next/editor": "^6.6.0",
+    "@wangeditor-next/editor-for-vue": "^6.6.0",
+    "axios": "^1.7.7",
+    "element-plus": "^2.8.8",
+    "pinia": "^2.2.6",
+    "ueditor-plus-main": "^4.5.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.4.5",
+    "vue-ueditor-wrap": "^3.0.8"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "vite": "^5.4.11"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true,
+    "vue-demi@0.14.10": true,
+    "es5-ext": false
+  }
+}

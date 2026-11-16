@@ -1,0 +1,105 @@
+# =====================================================================
+# 凌霄 · 生产环境配置示例（application-prod.yml）
+# =====================================================================
+# 用法：
+#   java -jar lingxiao.jar --spring.profiles.active=prod
+# 放到 jar 同级的 config/ 目录即可被 Spring Boot 自动加载：
+#   /opt/lingxiao/config/application-prod.yml
+#
+# 所有敏感项都从环境变量读取。不要把真实密码写进仓库。
+# 数据库地址、Redis、文件目录都可以用环境变量覆盖。
+# =====================================================================
+
+server:
+  port: ${SERVER_PORT:8080}
+  # 前面有 Nginx 时，按 X-Forwarded-* 还原协议 / 客户端 IP
+  forward-headers-strategy: framework
+  shutdown: graceful
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/plain,text/css,application/javascript
+    min-response-size: 1024
+
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:lingxiao}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useInformationSchema=true
+    username: ${DB_USER:lingxiao}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      minimum-idle: ${DB_MIN_IDLE:5}
+      connection-timeout: 30000
+      validation-timeout: 5000
+      max-lifetime: 1800000
+
+  # Redis 只在 lx.redis.enabled=true 时使用；单机可以不装
+  redis:
+    host: ${REDIS_HOST:127.0.0.1}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    database: ${REDIS_DB:0}
+    timeout: 3000ms
+
+# SpringDoc 是根级配置（springdoc.*），缩进到 spring: 下面会被整段忽略。
+# 生产关闭 OpenAPI 文档；与 lx.api-doc / knife4j 一起关。
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+mybatis-plus:
+  configuration:
+    # 生产不打印 SQL；排查问题时可临时改回 Slf4jImpl 并调高日志级别
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+
+knife4j:
+  enable: false
+  production: true
+
+lx:
+  captcha:
+    # 生产必须开启验证码（参数设置里的 sys.account.captchaEnabled 仍可在运行期控制）
+    enabled: true
+  api-doc:
+    enabled: false
+  redis:
+    enabled: ${LX_REDIS_ENABLED:false}
+  module:
+    modules:
+      # 生产关闭代码生成器：它会把整张表结构和代码暴露给有权限的人
+      generator:
+        enabled: false
+      demo:
+        enabled: false
+  file:
+    storage: local
+    # 相对路径按进程工作目录解析；start 脚本会把工作目录设为应用根目录
+    local-path: ${LX_FILE_PATH:./data/upload}
+    max-size-mb: 10
+    thumb-size: 160
+    medium-size: 800
+    max-pixels: 20000000
+
+logging:
+  file:
+    name: ${LX_LOG_FILE:./logs/lingxiao.log}
+  level:
+    root: info
+    com.lingxiao: info
+    com.lingxiao.modules.system.mapper: info
+    com.lingxiao.modules.file.mapper: info
+    com.lingxiao.modules.job.mapper: info
+    com.lingxiao.modules.generator.mapper: info
+  logback:
+    rollingpolicy:
+      max-file-size: 50MB
+      max-history: 30
+      total-size-cap: 2GB
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"

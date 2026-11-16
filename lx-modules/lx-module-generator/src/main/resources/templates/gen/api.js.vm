@@ -1,0 +1,28 @@
+import http from './request'
+
+/**
+ * ${functionName}接口，对应 /api/admin${apiPath}。
+ *
+ * <p>由凌霄代码生成器生成；重新生成会覆盖本文件。
+ * 基座 request.js 已经把响应解包成 data，这里不再判断 code。</p>
+ */
+
+export function list${className}(params) {
+  return http.get('/admin${apiPath}/list', { params })
+}
+
+export function get${className}(${pkField}) {
+  return http.get('/admin${apiPath}/' + ${pkField})
+}
+
+export function add${className}(data) {
+  return http.post('/admin${apiPath}', data)
+}
+
+export function update${className}(${pkField}, data) {
+  return http.put('/admin${apiPath}/' + ${pkField}, data)
+}
+
+export function delete${className}(${pkField}) {
+  return http.delete('/admin${apiPath}/' + ${pkField})
+}

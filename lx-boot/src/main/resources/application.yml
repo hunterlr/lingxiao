@@ -1,0 +1,168 @@
+server:
+  port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  application:
+    name: lingxiao
+  autoconfigure:
+    # sa-token-redis-jackson 自带 spring.factories，依赖在 classpath 上就会
+    # 无条件注册 SaTokenDaoRedisJackson。这里排除，改由 lx-common-redis 的
+    # SaTokenRedisConfig 按 lx.redis.enabled 显式注册，避免“开关关着还连 Redis”。
+    exclude: cn.dev33.satoken.dao.SaTokenDaoRedisJackson
+  datasource:
+    # useInformationSchema=true：代码生成器用 DatabaseMetaData 读表 / 列注释，
+    # MySQL 驱动默认走 SHOW TABLE STATUS，REMARKS 可能为空；打开后走 information_schema。
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3307}/${DB_NAME:lingxiao}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useInformationSchema=true
+    username: ${DB_USER:lingxiao}
+    password: ${DB_PASSWORD:lingxiao123}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+  flyway:
+    enabled: true
+    # 按模块分目录：system 先建，file / job / generator 后建；版本号全局递增（当前到 V12）
+    locations: classpath:db/migration/system,classpath:db/migration/file,classpath:db/migration/job,classpath:db/migration/generator
+    baseline-on-migrate: true
+    clean-disabled: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+
+  # 接口文档：由 Knife4j + SpringDoc 生成，访问 /doc.html
+  # 生产环境不需要对外暴露时：
+  #   springdoc.api-docs.enabled=false
+  #   springdoc.swagger-ui.enabled=false
+  #   knife4j.production=true
+  # 注意：springdoc 是根级配置，不能缩进到 spring: 下面（缩进后整段会被忽略）
+
+  # Redis 连接参数：只在 lx.redis.enabled=true 时真正被使用
+  redis:
+    host: ${REDIS_HOST:127.0.0.1}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    database: ${REDIS_DB:0}
+    timeout: 3000ms
+
+# SpringDoc 配置必须放在根级（springdoc.*），不要缩进到 spring: 下面
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  default-flat-param-object: true
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    # 开发期打印 SQL；生产改成 NoLoggingImpl
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: assign_id
+      logic-delete-field: delFlag
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+sa-token:
+  # 平台域 Token 名；租户 / 会员域将来各用各的名字
+  token-name: lx-platform-token
+  # 12 小时
+  timeout: 43200
+  # 允许同一账号多端登录
+  is-concurrent: true
+  # 每次登录发新 Token，不共用
+  is-share: false
+  token-style: uuid
+  # 只从请求头读取，减少 CSRF 面
+  is-read-cookie: false
+  is-log: false
+  is-print: false
+
+knife4j:
+  # 开关只控制增强界面；真正生成文档的是上面的 springdoc
+  enable: true
+  # true = 屏蔽 /doc.html（生产可打开），false = 正常访问
+  production: false
+  setting:
+    language: zh_cn
+    swagger-model-name: 数据模型
+    enable-footer: false
+    enable-footer-custom: true
+    footer-custom-content: 凌霄 · 后台管理接口
+
+lx:
+  # 接口文档元信息：只影响 /v3/api-docs 里展示的标题与说明
+  api-doc:
+    enabled: true
+    title: 凌霄后台管理接口
+    description: 平台后台域接口；会员域 /api/app/** 后续单独分组，不混在本分组里。
+    version: 1.0.0
+    group: 后台管理
+  # Redis 开关：基础设施开关，放配置文件而不是参数设置。
+  # false = Sa-Token 内存会话 + Caffeine 验证码（单机默认）
+  # true  = Sa-Token 会话与验证码都落 Redis（多实例部署）
+  # 改这个值必须重启，不能做成热开关：会话存储切一半会让用户莫名 401。
+  redis:
+    enabled: false
+  module:
+    modules:
+      # 定时任务模块：true = Bean 装配；false = 接口 404，菜单落到占位页
+      job:
+        enabled: true
+        name: 定时任务模块
+        description: Spring Task + 数据库锁；关闭后 /api/admin/monitor/job 接口不加载
+      # 演示模块默认关闭：基座必须能在关闭态启动
+      demo:
+        enabled: false
+        name: 演示模块
+        description: 验证可选模块关闭后 Bean 不加载、接口 404
+      # 代码生成器：true = Bean 装配；false = 接口 404，菜单落到占位页
+      # 生产环境建议关闭：生成器会把整张表结构和代码暴露给有权限的人
+      generator:
+        enabled: true
+        name: 代码生成器
+        description: 导入表 / 配置字段 / 预览 / 下载 ZIP；关闭后 /api/admin/tool/gen 接口不加载
+  # 定时任务运行参数（与业务参数分开：这些是基础设施，不放 sys_config）
+  job:
+    # 调度线程池大小：同一时刻最多并行跑几个任务
+    pool-size: 4
+    # 集群锁超时秒数：节点宕机后，其它节点最多等这么久就能接管
+    # 必须大于单个任务的最长执行时间，否则长任务会被误判为“死锁”而重复执行
+    lock-timeout-seconds: 600
+    # 关闭时是否让已经在执行的任务跑完（Spring 关闭阶段等待秒数）
+    shutdown-wait-seconds: 10
+  file:
+    storage: local
+    local-path: ./data/upload
+    max-size-mb: 10
+    # 图片变体最长边（px）：网格用 thumb，详情预览 / 富文本用 medium
+    thumb-size: 160
+    medium-size: 800
+    # 参与处理的最大像素数：超过只入库宽高，不生成变体，防止解压炸弹
+    max-pixels: 20000000
+
+logging:
+  level:
+    root: info
+    com.lingxiao: debug
+    com.lingxiao.modules.system.mapper: debug
+    com.lingxiao.modules.file.mapper: debug
+    com.lingxiao.modules.job.mapper: debug
+    com.lingxiao.modules.generator.mapper: debug
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"

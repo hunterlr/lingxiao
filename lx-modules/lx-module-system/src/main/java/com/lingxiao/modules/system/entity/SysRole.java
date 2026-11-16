@@ -1,0 +1,61 @@
+package com.lingxiao.modules.system.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.lingxiao.common.mybatis.domain.BaseEntity;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Size;
+import java.util.List;
+
+/**
+ * 角色（sys_role）。
+ *
+ * <p>平台域角色与租户域 / 会员域角色是三套独立表，不共用本表。</p>
+ *
+ * <p>{@code dataScope} 决定数据可见范围（1 全部 / 2 自定义 / 3 本部门 / 4 本部门及以下 / 5 仅本人）。
+ * v1.0 由 {@code DataScopeService} 在用户查询 / 写操作上落地；2 自定义因没有
+ * {@code sys_role_dept} 关联表，暂按“仅本人”降级处理。</p>
+ */
+@Data
+@EqualsAndHashCode(callSuper = true)
+@TableName("sys_role")
+public class SysRole extends BaseEntity {
+
+    @TableId(value = "role_id", type = IdType.ASSIGN_ID)
+    private Long roleId;
+
+    /** 角色标识，例如 admin / operator；权限判断用它 */
+    @NotBlank(message = "角色标识不能为空")
+    @Size(max = 64, message = "角色标识不能超过 64 个字符")
+    private String roleKey;
+
+    @NotBlank(message = "角色名称不能为空")
+    @Size(max = 64, message = "角色名称不能超过 64 个字符")
+    private String roleName;
+
+    /** 排序，越小越靠前 */
+    private Integer sort;
+
+    /**
+     * 数据范围：
+     * 1 全部 / 2 自定义 / 3 本部门 / 4 本部门及以下 / 5 仅本人
+     */
+    private String dataScope;
+
+    /** 0 正常 / 1 停用 */
+    private String status;
+
+    @Size(max = 500, message = "备注不能超过 500 个字符")
+    private String remark;
+
+    // ==================== 非数据库字段 ====================
+
+    /** 保存时一并授权的菜单；null 表示“不修改” */
+    @TableField(exist = false)
+    private List<Long> menuIds;
+}

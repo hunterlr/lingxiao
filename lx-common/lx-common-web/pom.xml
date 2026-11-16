@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      lx-common-web：Web 层公共能力
+      =====================================================================
+      负责：
+        - 全局异常处理（业务异常 / 参数校验 / 系统异常）
+        - Jackson 序列化规则（Long 转字符串，避免前端精度丢失）
+        - 跨域配置
+        - 请求工具（IP、Header）
+
+      不负责：登录鉴权（在 lx-common-security）、数据库（在 lx-common-mybatis）。
+    -->
+    <parent>
+        <groupId>com.lingxiao</groupId>
+        <artifactId>lx-common</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>lx-common-web</artifactId>
+    <name>lx-common-web</name>
+    <description>Web 配置、全局异常、Jackson、CORS</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

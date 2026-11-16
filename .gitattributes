@@ -1,0 +1,25 @@
+# =====================================================================
+# 凌霄 · 文本换行约定
+# =====================================================================
+# 目的：Windows 上开发、Linux 上部署时，不让 CRLF 破坏脚本执行。
+#   - 仓库里统一 LF（git 内部存储），检出时按下面规则转换；
+#   - .ps1 / .bat / .cmd 保持 CRLF，兼容 Windows PowerShell 5.1；
+#   - .sh 强制 LF，避免 Linux 报 "bad interpreter: /bin/bash^M"；
+#   - 图片 / 压缩包按二进制处理，不做换行转换。
+
+* text=auto eol=lf
+
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.sh  text eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.zip binary
+*.jar binary
+*.pdf binary

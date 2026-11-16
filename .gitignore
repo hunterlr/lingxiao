@@ -1,0 +1,40 @@
+# =====================================================================
+# 凌霄 · 本地开发忽略项
+# =====================================================================
+target/
+*.class
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# 本地运行时数据（隔离 MySQL、上传文件、日志）
+.local/
+data/
+logs/
+*.log
+
+# 发布包产物（deploy/package.* 生成）
+release/
+
+# 前端
+node_modules/
+dist/
+.nuxt/
+.output/
+# UEditor Plus 静态资源由 scripts/sync-ueditor.mjs 从 npm 包生成
+lx-ui-admin/public/ueditor-plus/
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 本地截图 / 工具产物
+shots/
+.workbuddy/

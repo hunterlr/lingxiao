@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      lx-module-job：定时任务模块（v1.0 必装，可通过开关关闭）
+      =====================================================================
+      选型：Spring Task + 数据库锁，不用 Quartz。
+
+      为什么不用 Quartz：
+        - Quartz 集群要 11~13 张 QRTZ_* 表，达梦 / 人大金仓没有官方方言；
+        - v1.0 只需要“建任务 / 启停 / 立即执行 / 看日志”，
+          cron 精度到秒、集群不重复执行，Spring Task 足够。
+
+      集群一致性靠 sys_job_lock 抢锁：
+        - 每次执行先 UPDATE ... WHERE lock_owner IS NULL OR lock_time < 过期时间；
+        - 抢到才执行，执行完释放；节点宕机后锁按超时自动失效。
+
+      依赖方向：只依赖 common / framework，不依赖 lx-module-system。
+      执行器 SPI 放在 lx-common-core 的 com.lingxiao.common.core.job，
+      这样系统模块（日志清理）可以在不反向依赖 job 模块的前提下贡献执行器。
+    -->
+    <parent>
+        <groupId>com.lingxiao</groupId>
+        <artifactId>lx-modules</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>lx-module-job</artifactId>
+    <name>lx-module-job</name>
+    <description>定时任务：Spring Task + 数据库锁、执行日志</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-mybatis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-log</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

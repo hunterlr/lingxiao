@@ -1,0 +1,18 @@
+package ${packageName}.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import ${packageName}.entity.${className};
+import org.apache.ibatis.annotations.Mapper;
+
+/**
+ * ${functionName} Mapper。
+ *
+ * <p>单表 CRUD 交给 BaseMapper；需要多表关联或复杂条件时，
+ * 在本接口旁新增 XML，不要把大段 SQL 塞进注解里。</p>
+ *
+ * @author ${author}
+ * @since ${datetime}
+ */
+@Mapper
+public interface ${className}Mapper extends BaseMapper<${className}> {
+}

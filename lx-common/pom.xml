@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      lx-common：与业务无关的通用能力
+      =====================================================================
+      这里只放“换任何后台项目都能用”的代码：
+        core     统一响应、错误码、异常、常量、工具
+        web      Web 配置、全局异常、Jackson（Long 转字符串）
+        security Sa-Token 平台域、登录上下文
+        mybatis  MyBatis-Plus 配置、审计字段自动填充
+        redis    Redis 配置（v1.0 可选，未装 Redis 时不启用）
+        log      操作日志注解与切面
+
+      禁止：放任何 CMS / 会员 / 文件业务代码。
+    -->
+    <parent>
+        <groupId>com.lingxiao</groupId>
+        <artifactId>lingxiao</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>lx-common</artifactId>
+    <packaging>pom</packaging>
+    <name>lx-common</name>
+    <description>凌霄通用能力聚合模块</description>
+
+    <modules>
+        <module>lx-common-core</module>
+        <module>lx-common-web</module>
+        <module>lx-common-security</module>
+        <module>lx-common-mybatis</module>
+        <module>lx-common-redis</module>
+        <module>lx-common-log</module>
+    </modules>
+
+    <dependencies>
+        <!--
+          单元测试依赖由所有 common 子模块共享：JUnit 5 + Mockito + AssertJ。
+          test scope 不会进入运行时 jar，也不会改变 docs/22-dependencies.md 的 102 个运行时 jar。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

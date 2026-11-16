@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      lx-common-redis：Redis 公共能力（v1.0 可选）
+      =====================================================================
+      本机开发没有 Redis，因此 v1.0 默认使用 Sa-Token 内存存储 + Caffeine 本地缓存，
+      本模块只在 lx.redis.enabled=true 时装配以下两项：
+        1. RedisTemplate（String Key + JSON Value）；
+        2. Sa-Token 的 SaTokenDaoRedisJackson（会话 / Token 落 Redis）。
+
+      为什么 Sa-Token 的自动装配要排除：sa-token-redis-jackson 自带
+      spring.factories，一旦依赖在 classpath 上就会无条件注册 DAO，
+      导致“开关是 false 却连了 Redis”。所以 application.yml 里用
+      spring.autoconfigure.exclude 排除它，再由 SaTokenRedisConfig
+      按 lx.redis.enabled 显式注册。
+
+      这样做的好处：第一天不被 Redis 卡住，但不把“内存实现”写死到业务代码里。
+    -->
+    <parent>
+        <groupId>com.lingxiao</groupId>
+        <artifactId>lx-common</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>lx-common-redis</artifactId>
+    <name>lx-common-redis</name>
+    <description>RedisTemplate 配置（可选启用）</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <!-- Sa-Token 的 Redis DAO 实现；自动装配已在 application.yml 排除 -->
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-redis-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

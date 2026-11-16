@@ -1,0 +1,93 @@
+name: CI
+
+# 凌霄 · 最小持续集成
+# ---------------------------------------------------------------------
+# 目标：不依赖 MySQL / Redis / Nginx，在干净机器上验证“代码能编译、单测能过、
+# 前端能打包”。真正需要数据库的 verify-*.ps1 属于发布前人工回归，不放进 CI。
+#
+# 触发：
+#   - 推送到 main / master
+#   - 任何 Pull Request
+#   - 手动触发（workflow_dispatch）
+#
+# 后端矩阵覆盖 JDK 8 / 11 / 17：与 docs/11-jdk-engineering.md 的兼容承诺一致。
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend / JDK ${{ matrix.java }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['8', '11', '17']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      - name: Unit tests
+        run: mvn -B -ntp test
+
+      # 只在 JDK 8 上打一次包：验证 Boot repackage 与最终 jar 结构，
+      # 其他 JDK 只跑测试，节省流水线时间。
+      - name: Package
+        if: matrix.java == '8'
+        run: mvn -B -ntp -DskipTests package
+
+      - name: Upload surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-jdk${{ matrix.java }}
+          path: '**/target/surefire-reports/**'
+          if-no-files-found: ignore
+          retention-days: 7
+
+  frontend:
+    name: Frontend / build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lx-ui-admin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: lx-ui-admin/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: lx-ui-admin-dist
+          path: lx-ui-admin/dist
+          retention-days: 7

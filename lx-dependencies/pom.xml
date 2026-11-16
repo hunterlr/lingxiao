@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      lx-dependencies：项目唯一依赖版本入口（BOM）
+      =====================================================================
+      为什么需要它：
+        - 多模块工程里最容易失控的是“每个模块各写一个版本号”；
+        - 所有第三方版本集中在这里，升级只改一处；
+        - 内部模块（lx-common-* / lx-modules-* / lx-api-*）也在这里声明版本，
+          子模块引用时不用写 <version>。
+
+      注意：
+        - 本模块只做 dependencyManagement，不写实际依赖；
+        - 版本升级必须同步 docs/11-jdk-engineering.md 的依赖矩阵；
+        - 它不能继承根 pom（否则根 pom import 它会形成循环），所以这里独立声明坐标。
+    -->
+    <groupId>com.lingxiao</groupId>
+    <artifactId>lx-dependencies</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>lx-dependencies</name>
+    <description>凌霄依赖版本 BOM</description>
+
+    <properties>
+        <lingxiao.version>1.0.0-SNAPSHOT</lingxiao.version>
+        <mybatis-plus.version>3.5.3.2</mybatis-plus.version>
+        <sa-token.version>1.37.0</sa-token.version>
+        <hutool.version>5.8.22</hutool.version>
+        <caffeine.version>2.9.3</caffeine.version>
+        <jsoup.version>1.17.2</jsoup.version>
+        <mysql.version>8.0.33</mysql.version>
+        <lombok.version>1.18.30</lombok.version>
+        <!-- SpringDoc 1.7.x 是兼容 Spring Boot 2.7 的最后一组 1.x 版本 -->
+        <springdoc.version>1.7.0</springdoc.version>
+        <!-- Knife4j 4.4.0 对应 Spring Boot 2.7 + OpenAPI 3 -->
+        <knife4j.version>4.4.0</knife4j.version>
+        <!-- Velocity 2.3：代码生成器的模板引擎；只用 core，不引入 tools / Spring 适配 -->
+        <velocity.version>2.3</velocity.version>
+        <!-- Thumbnailator：图片缩略图 / 中图与 EXIF 方向纠正；0.4.8 已兼容 JDK 8 -->
+        <thumbnailator.version>0.4.8</thumbnailator.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring Boot 官方 BOM：Web / Validation / JDBC / Flyway / Jackson 等版本由它锁定 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>2.7.18</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- ==================== 内部模块 ==================== -->
+            <dependency>
+                <groupId>com.lingxiao</groupId>
+                <artifactId>lx-common-core</artifactId>
+                <version>${lingxiao.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.lingxiao</groupId>
+                <artifactId>lx-common-web</artifactId>
+                <version>${lingxiao.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.lingxiao</groupId>
+                <artifactId>lx-common-security</artifactId>
+                <version>${lingxiao.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.lingxiao</groupId>
+                <artifactId>lx-common-mybatis</artifactId>
+                <version>${lingxiao.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.lingxiao</groupId>
+                <artifactId>lx-common-redis</artifactId>
+                <version>${lingxiao.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.lingxiao</groupId>
+                <artifactId>lx-common-log</artifactId>
+                <version>${lingxiao.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.lingxiao</groupId>
+                <artifactId>lx-framework</artifactId>
+                <version>${lingxiao.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.lingxiao</groupId>
+                <artifactId>lx-admin-api</artifactId>
+                <version>${lingxiao.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.lingxiao</groupId>
+                <artifactId>lx-module-system</artifactId>
+                <version>${lingxiao.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.lingxiao</groupId>
+                <artifactId>lx-module-file</artifactId>
+                <version>${lingxiao.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.lingxiao</groupId>
+                <artifactId>lx-module-job</artifactId>
+                <version>${lingxiao.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.lingxiao</groupId>
+                <artifactId>lx-module-generator</artifactId>
+                <version>${lingxiao.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.lingxiao</groupId>
+                <artifactId>lx-module-demo</artifactId>
+                <version>${lingxiao.version}</version>
+            </dependency>
+
+            <!-- ==================== 第三方 ==================== -->
+            <!-- MyBatis-Plus：只增强 CRUD 与分页，不接管事务 -->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-boot-starter</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+
+            <!-- Sa-Token：三套 StpLogic 的基础，v1.0 只启用平台域 -->
+            <dependency>
+                <groupId>cn.dev33</groupId>
+                <artifactId>sa-token-spring-boot-starter</artifactId>
+                <version>${sa-token.version}</version>
+            </dependency>
+
+            <!-- Sa-Token + Redis：会话存 Redis（lx.redis.enabled=true 时才装配） -->
+            <dependency>
+                <groupId>cn.dev33</groupId>
+                <artifactId>sa-token-redis-jackson</artifactId>
+                <version>${sa-token.version}</version>
+            </dependency>
+
+            <!-- Hutool：只用于验证码、IP、字符串等小工具，不把它当业务框架 -->
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-captcha</artifactId>
+                <version>${hutool.version}</version>
+            </dependency>
+
+            <!-- Caffeine：v1.0 无 Redis 时的本地缓存，后续可替换为 Redis -->
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
+                <version>${caffeine.version}</version>
+            </dependency>
+
+            <!-- Jsoup：富文本白名单清洗（公告 / 后续 CMS），禁止用正则处理 HTML -->
+            <dependency>
+                <groupId>org.jsoup</groupId>
+                <artifactId>jsoup</artifactId>
+                <version>${jsoup.version}</version>
+            </dependency>
+
+            <!-- MySQL 驱动：8.x 驱动可连接 MySQL 5.7 / 8.0 -->
+            <dependency>
+                <groupId>com.mysql</groupId>
+                <artifactId>mysql-connector-j</artifactId>
+                <version>${mysql.version}</version>
+            </dependency>
+
+            <!-- SpringDoc：按 Controller 生成 OpenAPI 3 文档；Knife4j 的底层实现 -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+
+            <!-- Knife4j：增强版 Swagger UI（/doc.html），只在 lx-boot 引入 -->
+            <dependency>
+                <groupId>com.github.xiaoymin</groupId>
+                <artifactId>knife4j-openapi3-spring-boot-starter</artifactId>
+                <version>${knife4j.version}</version>
+            </dependency>
+
+            <!-- Velocity：代码生成器模板引擎（本地仓库已缓存 2.3，离线可用） -->
+            <dependency>
+                <groupId>org.apache.velocity</groupId>
+                <artifactId>velocity-engine-core</artifactId>
+                <version>${velocity.version}</version>
+            </dependency>
+
+            <!-- Thumbnailator：纯 Java 图片缩放，基于 ImageIO，不依赖本地图形库 -->
+            <dependency>
+                <groupId>net.coobird</groupId>
+                <artifactId>thumbnailator</artifactId>
+                <version>${thumbnailator.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      lx-framework：模块机制与自动装配
+      =====================================================================
+      负责：
+        - 读取 lx.module.* 开关，生成模块注册表；
+        - 提供 /api/admin/modules，让前端知道哪些模块启用；
+        - 后续放模块契约解析（module.yaml）、全局装配、领域事件总线。
+
+      约束：
+        - 不 import 任何 lx-module-* 的类；
+        - 基座只认“模块编码 + 开关”，模块自己决定 Bean 是否装配。
+    -->
+    <parent>
+        <groupId>com.lingxiao</groupId>
+        <artifactId>lingxiao</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>lx-framework</artifactId>
+    <name>lx-framework</name>
+    <description>模块注册表、自动装配、模块开关</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

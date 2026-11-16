@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      lx-api：对外契约层
+      =====================================================================
+      这里只放“跨模块共享的接口模型”，不放实现、不放 Mapper、不放 Controller。
+      好处：模块之间只依赖契约，后续拆进程时这些 DTO 可以直接复用。
+
+      v1.0 只有 lx-admin-api（后台接口契约）；/api/portal、/api/app 先占位不建。
+    -->
+    <parent>
+        <groupId>com.lingxiao</groupId>
+        <artifactId>lingxiao</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>lx-api</artifactId>
+    <packaging>pom</packaging>
+    <name>lx-api</name>
+    <description>接口契约聚合模块</description>
+
+    <modules>
+        <module>lx-admin-api</module>
+    </modules>
+</project>

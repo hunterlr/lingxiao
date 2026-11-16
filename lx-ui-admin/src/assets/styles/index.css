@@ -1,0 +1,223 @@
+/* =====================================================================
+ * 凌霄后台 · 全局样式
+ * ---------------------------------------------------------------------
+ * 只做三件事：
+ *   1. 重置基础元素，避免浏览器默认边距干扰布局；
+ *   2. 定义设计变量（侧边栏宽、主色、间距），页面不写魔法数字；
+ *   3. 提供管理页通用类（page-container / search-form / table-toolbar / pagination），
+ *      让 8 个 CRUD 页面保持同一密度与节奏。
+ *
+ * 主题切换约定（详见 docs/24-theme-switch.md）：
+ *   - 亮色变量放 :root；暗色覆盖放 html.dark；
+ *   - 主色由 utils/theme.js 写到 --lx-primary 与 --el-color-primary，
+ *     页面只准用变量，不准再写死蓝色；
+ *   - 侧边栏浅色放 html.lx-sidebar-light，只覆盖 --lx-sidebar-* 一组。
+ * ===================================================================== */
+
+:root {
+  --lx-primary: #2f6fed;
+  --lx-primary-dark: #1f56c4;
+  --lx-primary-light: #5a8cf2;
+  --lx-sidebar-bg: #131c31;
+  --lx-sidebar-bg-hover: #1c2946;
+  --lx-sidebar-text: #b8c4dc;
+  --lx-sidebar-text-active: #ffffff;
+  --lx-sidebar-muted: rgba(184, 196, 220, 0.45);
+  --lx-sidebar-divider: rgba(255, 255, 255, 0.06);
+  --lx-sidebar-active-bg: linear-gradient(90deg, var(--lx-primary), var(--lx-primary-light));
+  --lx-sidebar-active-text: #ffffff;
+  --lx-sidebar-width: 220px;
+  --lx-sidebar-collapsed-width: 64px;
+  --lx-header-height: 56px;
+  --lx-content-bg: #f2f4f8;
+  --lx-card-bg: #ffffff;
+  --lx-border: #e4e8f0;
+  --lx-text: #1f2a44;
+  --lx-text-secondary: #6b7891;
+  --lx-hover-bg: #f1f4f9;
+  --lx-fill-bg: #f6f8fb;
+  --lx-fill-strong: #eef1f7;
+  --lx-panel-muted: #fbfcfe;
+  --lx-code-bg: #f7f8fa;
+  --lx-radius: 8px;
+  --lx-shadow: 0 1px 2px rgba(15, 26, 51, 0.04), 0 4px 16px rgba(15, 26, 51, 0.06);
+}
+
+/* 暗色主题：只覆盖颜色，布局尺寸与亮色共用 */
+html.dark {
+  --lx-content-bg: #11151d;
+  --lx-card-bg: #1a1f29;
+  --lx-border: #2b3242;
+  --lx-text: #e6e9f2;
+  --lx-text-secondary: #98a3b8;
+  --lx-hover-bg: #232b3a;
+  --lx-fill-bg: #202634;
+  --lx-fill-strong: #232a38;
+  --lx-panel-muted: #1c222d;
+  --lx-code-bg: #151a23;
+  --lx-shadow: 0 1px 2px rgba(0, 0, 0, 0.32), 0 4px 16px rgba(0, 0, 0, 0.36);
+  --lx-sidebar-bg: #0c1018;
+  --lx-sidebar-bg-hover: #1a2333;
+  --lx-sidebar-text: #aab6cc;
+  --lx-sidebar-text-active: #ffffff;
+  --lx-sidebar-muted: rgba(170, 182, 204, 0.5);
+  --lx-sidebar-divider: rgba(255, 255, 255, 0.06);
+}
+
+/* 浅色侧边栏：暗色模式下卡片是深灰，会自动跟随，不会突兀变白 */
+html.lx-sidebar-light {
+  --lx-sidebar-bg: var(--lx-card-bg);
+  --lx-sidebar-bg-hover: var(--lx-hover-bg);
+  --lx-sidebar-text: var(--lx-text-secondary);
+  --lx-sidebar-text-active: var(--lx-primary);
+  --lx-sidebar-muted: var(--lx-text-secondary);
+  --lx-sidebar-divider: var(--lx-border);
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(150, 165, 190, 0.35);
+}
+
+/* 折叠后的一级菜单浮层被 teleport 到 body，拿不到 .sidebar 作用域，需全局补色 */
+.el-menu--popup {
+  --el-menu-bg-color: var(--lx-sidebar-bg);
+  --el-menu-text-color: var(--lx-sidebar-text);
+  --el-menu-hover-bg-color: var(--lx-sidebar-bg-hover);
+  --el-menu-active-color: var(--lx-sidebar-text-active);
+  background-color: var(--lx-sidebar-bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    Arial, sans-serif;
+  font-size: 14px;
+  color: var(--lx-text);
+  background: var(--lx-content-bg);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+a {
+  color: var(--lx-primary);
+  text-decoration: none;
+}
+
+/* 滚动条：侧边栏与内容区统一为细条，避免 Windows 默认粗条破坏视觉 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 135, 160, 0.35);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ==================== 页面通用骨架 ==================== */
+
+.page-container {
+  padding: 16px;
+}
+
+.page-card {
+  background: var(--lx-card-bg);
+  border-radius: var(--lx-radius);
+  box-shadow: var(--lx-shadow);
+  padding: 16px;
+}
+
+.page-card + .page-card {
+  margin-top: 16px;
+}
+
+.search-form {
+  margin-bottom: 4px;
+}
+
+.search-form .el-form-item {
+  margin-bottom: 12px;
+}
+
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.table-toolbar .toolbar-left,
+.table-toolbar .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pagination-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.text-secondary {
+  color: var(--lx-text-secondary);
+}
+
+.text-mono {
+  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--lx-text-secondary);
+  word-break: break-all;
+}
+
+.form-tip {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--lx-text-secondary);
+  line-height: 1.5;
+}
+
+.section-title {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--lx-text);
+}
+
+/* 表格里的操作列不换行，避免窄屏把按钮拆成两行 */
+.el-table .cell .table-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+/* 对话框底部按钮统一右对齐 */
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* 让表格空状态不显得太空 */
+.el-table__empty-block {
+  min-height: 160px;
+}

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      lx-module-generator：代码生成器（v1.0 必装，可通过开关关闭）
+      =====================================================================
+      目标：导入数据库表 → 配字段 → 预览 → 下载 ZIP，生成物能直接编译。
+
+      选型与边界：
+        - 表元数据用 JDBC DatabaseMetaData 读取，不用 information_schema，
+          这样 MySQL / PostgreSQL / 达梦 / 人大金仓走同一套代码；
+        - 模板引擎用 Velocity 2.3：语法简单、不需要编译期注解处理、
+          模板文件就是普通文本，改模板不用重启；
+        - v1.0 只做单表、单主键；无主键 / 复合主键在导入时直接拒绝，
+          避免生成一堆“看起来能跑、实际更新错行”的代码；
+        - 生成器只做“预览 + 下载 ZIP”，不直接往工程目录写文件。
+          不写文件就没有路径穿越风险，也不存在覆盖用户代码的问题。
+          “生成到指定模块并编译”留给后续版本，见 docs/12-api-codegen.md。
+
+      依赖方向：只依赖 common / framework，不依赖 lx-module-system。
+      “生成物作者”通过 common-core 的 ConfigProvider 读取 sys.gen.author，
+      没有系统模块时回退到当前登录用户 / default。
+    -->
+    <parent>
+        <groupId>com.lingxiao</groupId>
+        <artifactId>lx-modules</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>lx-module-generator</artifactId>
+    <name>lx-module-generator</name>
+    <description>代码生成器：导入表元数据、字段配置、Velocity 模板预览与下载</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-mybatis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-log</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- 模板引擎：只引 core；tools / spring 适配用不上 -->
+        <dependency>
+            <groupId>org.apache.velocity</groupId>
+            <artifactId>velocity-engine-core</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

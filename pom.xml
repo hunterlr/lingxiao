@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      凌霄（LingXiao）根工程
+      =====================================================================
+      这是整个项目的 Maven 聚合工程，只负责两件事：
+        1. 聚合所有子模块（common / framework / modules / api / boot）；
+        2. 统一 Java 版本、编码、插件与依赖版本（通过 lx-dependencies BOM）。
+
+      设计约束（与 docs/17-v1-plan.md 对齐）：
+        - 主线 Spring Boot 2.7.18 + JDK 8 字节码，同一个 jar 兼容 JDK 8/11/17；
+        - v1.0 只做后台基座，不建 CMS / 会员 / 门户模块；
+        - 模块之间只通过 api 包或领域事件通信，禁止直接依赖对方 Mapper。
+    -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.7.18</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.lingxiao</groupId>
+    <artifactId>lingxiao</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>lingxiao</name>
+    <description>凌霄后台基座：模块化单体、可插拔模块、私有化部署</description>
+
+    <modules>
+        <module>lx-dependencies</module>
+        <module>lx-common</module>
+        <module>lx-framework</module>
+        <module>lx-api</module>
+        <module>lx-modules</module>
+        <module>lx-boot</module>
+    </modules>
+
+    <properties>
+        <!-- JDK 8 字节码：即使使用 JDK 11/17 构建，产物也保持 8 兼容 -->
+        <java.version>1.8</java.version>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- 项目内统一版本号，子模块引用内部依赖时不再逐个写版本 -->
+        <lingxiao.version>1.0.0-SNAPSHOT</lingxiao.version>
+
+        <!-- 第三方组件版本（详细说明见 lx-dependencies/pom.xml） -->
+        <mybatis-plus.version>3.5.3.2</mybatis-plus.version>
+        <sa-token.version>1.37.0</sa-token.version>
+        <hutool.version>5.8.22</hutool.version>
+        <caffeine.version>2.9.3</caffeine.version>
+        <mysql.version>8.0.33</mysql.version>
+        <lombok.version>1.18.30</lombok.version>
+        <!--
+          本机开发库是 MySQL 5.7，Flyway 8.x Community 已不再支持 5.7（要求 Teams 或 MySQL 8）。
+          这里固定 Flyway 7.15（支持 5.7 / 8.0 与 JDK 8）；生产升级 MySQL 8 后可再升 Flyway。
+        -->
+        <flyway.version>7.15.0</flyway.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- 项目自有 BOM：统一内部模块与第三方版本 -->
+            <dependency>
+                <groupId>com.lingxiao</groupId>
+                <artifactId>lx-dependencies</artifactId>
+                <version>${lingxiao.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <configuration>
+                        <encoding>UTF-8</encoding>
+                        <parameters>true</parameters>
+                    </configuration>
+                </plugin>
+                <!--
+                  单元测试统一入口：
+                    - 测试类只允许依赖 test scope（spring-boot-starter-test）；
+                    - 固定 UTF-8 与控制台编码，避免 Windows 下中文断言/报告乱码；
+                    - 单元测试不连 MySQL / Redis，CI 不需要外部服务。
+                -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <argLine>-Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai</argLine>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

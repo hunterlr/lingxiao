@@ -23,12 +23,12 @@ export const EDITOR_ENGINES = [
   {
     value: 'wangeditor-next',
     label: 'wangEditor Next',
-    hint: '默认，轻量，粘贴干净'
+    hintKey: 'wangHint'
   },
   {
     value: 'ueditor-plus',
     label: 'UEditor Plus',
-    hint: '备用，Word 粘贴与表格更强'
+    hintKey: 'ueditorHint'
   }
 ]
 

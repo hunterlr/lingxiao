@@ -2,38 +2,38 @@
   <div class="page-container">
     <div class="page-card">
       <el-form :inline="true" :model="query" class="search-form" @submit.prevent>
-        <el-form-item label="角色名称">
+        <el-form-item :label="t('page.role.roleName')">
           <el-input
             v-model="query.roleName"
-            placeholder="角色名称"
+            :placeholder="t('page.role.namePlaceholder')"
             clearable
             style="width: 160px"
             @keyup.enter="handleSearch"
             @clear="handleSearch"
           />
         </el-form-item>
-        <el-form-item label="角色标识">
+        <el-form-item :label="t('page.role.roleKey')">
           <el-input
             v-model="query.roleKey"
-            placeholder="如 admin"
+            :placeholder="t('page.role.keyPlaceholder')"
             clearable
             style="width: 160px"
             @keyup.enter="handleSearch"
             @clear="handleSearch"
           />
         </el-form-item>
-        <el-form-item label="状态">
-          <DictSelect v-model="query.status" dict-type="sys_common_status" width="130px" placeholder="全部状态" />
+        <el-form-item :label="t('common.status')">
+          <DictSelect v-model="query.status" dict-type="sys_common_status" width="130px" :placeholder="t('common.allStatus')" />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
-          <el-button :icon="Refresh" @click="handleReset">重置</el-button>
+          <el-button type="primary" :icon="Search" @click="handleSearch">{{ t('common.search') }}</el-button>
+          <el-button :icon="Refresh" @click="handleReset">{{ t('common.reset') }}</el-button>
         </el-form-item>
       </el-form>
 
       <div class="table-toolbar">
         <div class="toolbar-left">
-          <span class="text-secondary">共 {{ total }} 个角色</span>
+          <span class="text-secondary">{{ t('page.role.total', { total }) }}</span>
         </div>
         <div class="toolbar-right">
           <el-button
@@ -42,38 +42,38 @@
             :icon="Plus"
             @click="openAdd"
           >
-            新增角色
+            {{ t('page.role.add') }}
           </el-button>
-          <el-button :icon="Refresh" @click="loadList">刷新</el-button>
+          <el-button :icon="Refresh" @click="loadList">{{ t('common.refresh') }}</el-button>
         </div>
       </div>
 
       <el-table v-loading="loading" :data="rows" border stripe row-key="roleId">
-        <el-table-column prop="roleName" label="角色名称" min-width="150">
+        <el-table-column prop="roleName" :label="t('page.role.roleName')" min-width="150">
           <template #default="{ row }">
             {{ row.roleName }}
-            <el-tag v-if="isBuiltin(row)" size="small" type="warning" style="margin-left: 6px">内置</el-tag>
+            <el-tag v-if="isBuiltin(row)" size="small" type="warning" style="margin-left: 6px">{{ t('page.role.builtin') }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="roleKey" label="角色标识" min-width="130">
+        <el-table-column prop="roleKey" :label="t('page.role.roleKey')" min-width="130">
           <template #default="{ row }">
             <span class="text-mono">{{ row.roleKey }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="dataScope" label="数据范围" width="140">
+        <el-table-column prop="dataScope" :label="t('page.role.dataScope')" width="140">
           <template #default="{ row }">{{ dataScopeLabel(row.dataScope) }}</template>
         </el-table-column>
-        <el-table-column prop="sort" label="排序" width="80" align="center" />
-        <el-table-column prop="status" label="状态" width="90" align="center">
+        <el-table-column prop="sort" :label="t('common.sort')" width="80" align="center" />
+        <el-table-column prop="status" :label="t('common.status')" width="90" align="center">
           <template #default="{ row }">
             <DictTag :value="row.status" dict-type="sys_common_status" />
           </template>
         </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip>
+        <el-table-column prop="remark" :label="t('common.remark')" min-width="160" show-overflow-tooltip>
           <template #default="{ row }">{{ row.remark || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="160" />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column prop="createTime" :label="t('common.createTime')" width="160" />
+        <el-table-column :label="t('common.operation')" width="200" fixed="right">
           <template #default="{ row }">
             <div class="table-actions">
               <el-button
@@ -82,7 +82,7 @@
                 type="primary"
                 @click="openEdit(row)"
               >
-                编辑 / 授权
+                {{ t('page.role.editGrant') }}
               </el-button>
               <el-button
                 v-hasPerm="'platform:system:role:remove'"
@@ -91,7 +91,7 @@
                 :disabled="isBuiltin(row)"
                 @click="handleDelete(row)"
               >
-                删除
+                {{ t('common.delete') }}
               </el-button>
             </div>
           </template>
@@ -114,7 +114,7 @@
 
     <el-dialog
       v-model="dialogVisible"
-      :title="isEdit ? '编辑角色 / 菜单授权' : '新增角色'"
+      :title="isEdit ? t('page.role.edit') : t('page.role.add')"
       width="760px"
       append-to-body
       destroy-on-close
@@ -129,28 +129,28 @@
       >
         <el-row :gutter="16">
           <el-col :span="12">
-            <el-form-item label="角色名称" prop="roleName">
+            <el-form-item :label="t('page.role.roleName')" prop="roleName">
               <el-input v-model="form.roleName" maxlength="64" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="角色标识" prop="roleKey">
+            <el-form-item :label="t('page.role.roleKey')" prop="roleKey">
               <el-input
                 v-model="form.roleKey"
                 maxlength="64"
                 :disabled="isBuiltinRole"
-                placeholder="如 operator"
+                :placeholder="t('page.role.keyPlaceholderEdit')"
               />
-              <div v-if="isBuiltinRole" class="form-tip">内置角色不允许修改标识。</div>
+              <div v-if="isBuiltinRole" class="form-tip">{{ t('page.role.builtinKeyTip') }}</div>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="排序" prop="sort">
+            <el-form-item :label="t('common.sort')" prop="sort">
               <el-input-number v-model="form.sort" :min="0" :max="9999" style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="数据范围" prop="dataScope">
+            <el-form-item :label="t('page.role.dataScope')" prop="dataScope">
               <el-select v-model="form.dataScope" style="width: 100%">
                 <el-option
                   v-for="item in dataScopeOptions"
@@ -163,30 +163,30 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="状态">
+            <el-form-item :label="t('common.status')">
               <DictSelect
                 v-model="form.status"
                 dict-type="sys_common_status"
                 :disabled="isBuiltinRole"
               />
-              <div v-if="isBuiltinRole" class="form-tip">内置超级管理员不允许停用。</div>
+              <div v-if="isBuiltinRole" class="form-tip">{{ t('page.role.builtinDisableTip') }}</div>
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="备注">
+            <el-form-item :label="t('common.remark')">
               <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" show-word-limit />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="菜单权限">
+            <el-form-item :label="t('page.role.menuPerm')">
               <div class="menu-tree-box">
                 <div class="menu-tree-toolbar">
                   <span class="text-secondary">
-                    勾选该角色可见的菜单与可用的按钮权限；目录不会单独生效。
+                    {{ t('page.role.menuPermTip') }}
                   </span>
                   <div>
-                    <el-button link type="primary" @click="toggleAll(true)">全选</el-button>
-                    <el-button link type="primary" @click="toggleAll(false)">清空</el-button>
+                    <el-button link type="primary" @click="toggleAll(true)">{{ t('page.role.selectAll') }}</el-button>
+                    <el-button link type="primary" @click="toggleAll(false)">{{ t('page.role.clearAll') }}</el-button>
                   </div>
                 </div>
                 <el-scrollbar height="280px">
@@ -198,7 +198,7 @@
                     check-strictly
                     default-expand-all
                     :props="{ label: 'label', children: 'children' }"
-                    empty-text="暂无菜单数据"
+                    :empty-text="t('page.role.emptyMenu')"
                   >
                     <template #default="{ data }">
                       <span class="tree-node">
@@ -223,8 +223,8 @@
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="saving" @click="submitForm">保存</el-button>
+          <el-button @click="dialogVisible = false">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="saving" @click="submitForm">{{ t('common.save') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -239,6 +239,7 @@ import DictSelect from '@/components/DictSelect.vue'
 import DictTag from '@/components/DictTag.vue'
 import { addRole, deleteRole, getRole, listRoles, updateRole } from '@/api/role'
 import { getMenuTree } from '@/api/menu'
+import { useI18n } from 'vue-i18n'
 
 /**
  * 角色管理。
@@ -250,12 +251,14 @@ import { getMenuTree } from '@/api/menu'
  * <p>菜单树用 {@code check-strictly}（父子不联动）：
  * 角色可能只被授权某个子菜单而不包含父目录，联动勾选会强行放大权限。</p>
  */
+const { t } = useI18n()
+
 const dataScopeOptions = [
-  { value: '1', label: '全部数据' },
-  { value: '2', label: '自定义数据（未启用）', disabled: true },
-  { value: '3', label: '本部门数据' },
-  { value: '4', label: '本部门及以下' },
-  { value: '5', label: '仅本人数据' }
+  { value: '1', label: t('page.role.scopeAll') },
+  { value: '2', label: t('page.role.scopeCustom'), disabled: true },
+  { value: '3', label: t('page.role.scopeDept') },
+  { value: '4', label: t('page.role.scopeDeptChild') },
+  { value: '5', label: t('page.role.scopeSelf') }
 ]
 
 const loading = ref(false)
@@ -310,9 +313,9 @@ function typeTag(type) {
 }
 
 function typeLabel(type) {
-  if (type === 'M') return '目录'
-  if (type === 'C') return '菜单'
-  return '按钮'
+  if (type === 'M') return t('page.role.typeDir')
+  if (type === 'C') return t('page.role.typeMenu')
+  return t('page.role.typeButton')
 }
 
 onMounted(async () => {
@@ -342,12 +345,12 @@ const emptyForm = () => ({
 const form = reactive(emptyForm())
 
 const rules = {
-  roleName: [{ required: true, message: '请输入角色名称', trigger: 'blur' }],
+  roleName: [{ required: true, message: t('page.role.nameRequired'), trigger: 'blur' }],
   roleKey: [
-    { required: true, message: '请输入角色标识', trigger: 'blur' },
+    { required: true, message: t('page.role.keyRequired'), trigger: 'blur' },
     {
       pattern: /^[a-zA-Z][a-zA-Z0-9_:-]*$/,
-      message: '以字母开头，只能包含字母、数字、下划线、冒号、短横线',
+      message: t('page.role.keyPattern'),
       trigger: 'blur'
     }
   ]
@@ -438,10 +441,10 @@ async function submitForm() {
       }
       if (!isEdit.value) {
         await addRole(payload)
-        ElMessage.success('新增成功')
+        ElMessage.success(t('common.addSuccess'))
       } else {
         await updateRole(editingId.value, payload)
-        ElMessage.success('保存成功')
+        ElMessage.success(t('common.saveSuccess'))
       }
       dialogVisible.value = false
       await loadList()
@@ -454,15 +457,15 @@ async function submitForm() {
 async function handleDelete(row) {
   try {
     await ElMessageBox.confirm(
-      `确认删除角色「${row.roleName}」吗？删除后已关联该角色的用户将失去对应权限。`,
-      '删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+      t('page.role.deleteConfirm', { name: row.roleName }),
+      t('common.deleteTitle'),
+      { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel') }
     )
   } catch (e) {
     return
   }
   await deleteRole(row.roleId)
-  ElMessage.success('删除成功')
+  ElMessage.success(t('common.deleteSuccess'))
   await loadList()
 }
 </script>

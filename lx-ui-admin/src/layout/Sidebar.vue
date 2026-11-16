@@ -3,7 +3,7 @@
     <div class="logo">
       <div class="logo-mark">LX</div>
       <transition name="logo-fade">
-        <span v-show="!appStore.sidebarCollapsed" class="logo-text">凌霄后台</span>
+        <span v-show="!appStore.sidebarCollapsed" class="logo-text">{{ t('layout.brand') }}</span>
       </transition>
     </div>
 
@@ -17,7 +17,7 @@
       >
         <el-menu-item index="/dashboard">
           <el-icon><HomeFilled /></el-icon>
-          <template #title>首页</template>
+          <template #title>{{ t('layout.home') }}</template>
         </el-menu-item>
 
         <SidebarItem v-for="menu in visibleMenus" :key="menu.id" :item="menu" />
@@ -25,7 +25,7 @@
     </el-scrollbar>
 
     <div v-show="!appStore.sidebarCollapsed" class="sidebar-footer">
-      v1.0 · 后台基座
+      v1.0 · {{ t('layout.brand') }}
     </div>
   </aside>
 </template>
@@ -33,6 +33,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { HomeFilled } from '@element-plus/icons-vue'
 import { useAppStore } from '@/store/app'
 import { useAuthStore } from '@/store/auth'
@@ -45,6 +46,7 @@ import SidebarItem from './SidebarItem.vue'
  * 隐藏菜单（visible=1）不展示，但仍然可以按 URL 访问（受后端权限保护）。</p>
  */
 const route = useRoute()
+const { t } = useI18n()
 const appStore = useAppStore()
 const auth = useAuthStore()
 

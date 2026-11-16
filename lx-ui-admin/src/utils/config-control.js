@@ -14,20 +14,25 @@
  * 真正的拒绝发生在保存时（后端校验）。</p>
  */
 
+import i18n from '@/i18n'
+
 export const CONTROL_TYPES = [
-  { value: 'text', label: '文本' },
-  { value: 'number', label: '数字' },
-  { value: 'switch', label: '开关' },
-  { value: 'select', label: '下拉' }
+  { value: 'text' },
+  { value: 'number' },
+  { value: 'switch' },
+  { value: 'select' }
 ]
 
-const CONTROL_LABELS = CONTROL_TYPES.reduce((acc, item) => {
-  acc[item.value] = item.label
-  return acc
-}, {})
-
+/**
+ * 控件类型文案走语言包（{@code configControl.*}）。
+ *
+ * <p>不在模块加载时把 label 固化进数组：那样切换语言后下拉框还是旧语言。
+ * 这里每次调用都读当前语言。</p>
+ */
 export function controlTypeLabel(type) {
-  return CONTROL_LABELS[type] || '文本'
+  const { t, te } = i18n.global
+  const key = `configControl.${type || 'text'}`
+  return te(key) ? t(key) : type || ''
 }
 
 /** 解析下拉选项，返回 [{ value, label }]；空值与重复值跳过。 */
@@ -89,8 +94,9 @@ export function displayConfigValue(config) {
   const type = config.controlType || 'text'
   if (type === 'switch') {
     const { on, off } = parseSwitchValues(config.configOptions)
-    if (value === on) return '开启'
-    if (value === off) return '关闭'
+    const { t } = i18n.global
+    if (value === on) return t('configControl.on')
+    if (value === off) return t('configControl.off')
     return value
   }
   if (type === 'select') {

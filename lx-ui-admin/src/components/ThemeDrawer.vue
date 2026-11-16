@@ -1,13 +1,13 @@
 <template>
   <el-drawer
     v-model="appStore.themeDrawerVisible"
-    title="主题设置"
+    :title="t('theme.title')"
     size="340px"
     append-to-body
     class="theme-drawer"
   >
     <div class="theme-block">
-      <p class="theme-label">外观模式</p>
+      <p class="theme-label">{{ t('theme.mode') }}</p>
       <div class="mode-grid">
         <button
           v-for="item in modes"
@@ -18,16 +18,16 @@
           @click="appStore.setThemeMode(item.value)"
         >
           <el-icon :size="18"><component :is="item.icon" /></el-icon>
-          <span>{{ item.label }}</span>
+          <span>{{ t('theme.' + item.key) }}</span>
         </button>
       </div>
-      <p class="theme-hint">「跟随系统」读取操作系统深浅色设置，系统切换时页面自动跟随。</p>
+      <p class="theme-hint">{{ t('theme.modeHint') }}</p>
     </div>
 
     <el-divider />
 
     <div class="theme-block">
-      <p class="theme-label">主题色</p>
+      <p class="theme-label">{{ t('theme.primary') }}</p>
       <div class="color-grid">
         <button
           v-for="preset in THEME_PRESETS"
@@ -36,7 +36,7 @@
           class="color-dot"
           :class="{ active: appStore.theme.primaryColor === preset.value }"
           :style="{ background: preset.value }"
-          :title="preset.name"
+          :title="t('theme.color.' + preset.key)"
           @click="appStore.setPrimaryColor(preset.value)"
         >
           <el-icon v-if="appStore.theme.primaryColor === preset.value" :size="14">
@@ -49,13 +49,13 @@
           @change="appStore.setPrimaryColor"
         />
       </div>
-      <p class="theme-hint">主色会同步到按钮、链接、菜单选中态与 Element Plus 派生色。</p>
+      <p class="theme-hint">{{ t('theme.primaryHint') }}</p>
     </div>
 
     <el-divider />
 
     <div class="theme-block">
-      <p class="theme-label">侧边栏风格</p>
+      <p class="theme-label">{{ t('theme.sidebar') }}</p>
       <div class="sidebar-grid">
         <button
           v-for="item in sidebarStyles"
@@ -71,7 +71,7 @@
               <i /><i /><i />
             </span>
           </span>
-          <span>{{ item.label }}</span>
+          <span>{{ t('theme.' + item.key) }}</span>
         </button>
       </div>
     </div>
@@ -79,9 +79,9 @@
     <el-divider />
 
     <div class="theme-footer">
-      <el-button plain @click="appStore.resetTheme()">恢复默认</el-button>
+      <el-button plain @click="appStore.resetTheme()">{{ t('theme.reset') }}</el-button>
       <p class="theme-note">
-        偏好仅保存在当前浏览器（localStorage），不写入账号。清除浏览器数据后会回到默认主题。
+        {{ t('theme.note') }}
       </p>
     </div>
   </el-drawer>
@@ -89,6 +89,7 @@
 
 <script setup>
 import { Check, Monitor, Moon, Sunny } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/store/app'
 import { THEME_PRESETS } from '@/utils/theme'
 
@@ -102,16 +103,17 @@ import { THEME_PRESETS } from '@/utils/theme'
  * 避免“抽屉里改了颜色，却忘了改 Element Plus 变量”这类漏改。</p>
  */
 const appStore = useAppStore()
+const { t } = useI18n()
 
 const modes = [
-  { label: '亮色', value: 'light', icon: Sunny },
-  { label: '暗色', value: 'dark', icon: Moon },
-  { label: '跟随系统', value: 'auto', icon: Monitor }
+  { key: 'light', value: 'light', icon: Sunny },
+  { key: 'dark', value: 'dark', icon: Moon },
+  { key: 'auto', value: 'auto', icon: Monitor }
 ]
 
 const sidebarStyles = [
-  { label: '深色侧栏', value: 'dark' },
-  { label: '浅色侧栏', value: 'light' }
+  { key: 'sidebarDark', value: 'dark' },
+  { key: 'sidebarLight', value: 'light' }
 ]
 </script>
 

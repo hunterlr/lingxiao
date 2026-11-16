@@ -3911,3 +3911,106 @@ X-Lang: en-US  {"code":0,"msg":"Success","data":{"tokenName":"lx-platform-token"
 - 前端：`vue-i18n@9`、`store/locale.js`、`ElConfigProvider`、顶栏语言切换、`X-Lang` 请求头；
 - `MenuVO` 补 `menuKey`，侧边栏 `t('menu.'+key, name)`；
 - 18 个业务页文案替换，按 `docs/23` 3.4 清单验收。
+
+---
+
+## 41. 第二十四轮：前端界面双语（L1 第二轮）
+
+后端契约在第一轮已经稳定（`R.messageKey` + `error.<code>`），本轮把 18 个业务页、
+登录页、错误页和公共组件全部接上 `vue-i18n`，并按 `docs/23` 3.4 逐项验收。
+
+### 41.1 基础设施
+
+| 文件 | 内容 |
+|---|---|
+| `package.json` / `package-lock.json` | 新增 `vue-i18n@^9.14.4`（锁定 9.14.4），不引 `@intlify/unplugin-vue-i18n`——语言包是普通 JS 对象，不需要编译期提取 |
+| `src/i18n/index.js` | `createI18n({ legacy: false, globalInjection: true })`；`fallbackLocale = zh-CN`；`missingWarn/fallbackWarn = false`；导出 `LOCALE_STORAGE_KEY` / `DEFAULT_LOCALE` / `SUPPORTED_LOCALES` / `resolveInitialLocale()` |
+| `src/i18n/zh-CN.js` / `en-US.js` | 当前各 **897 键**，键集合必须完全一致（`scripts/check-i18n-keys.mjs` 断言） |
+| `src/store/locale.js` | Pinia 存 `locale`；`init()` 回写 i18n 与 `html.lang`；`setLocale()` 立即生效 + 落 `localStorage['lx-admin-locale']` |
+| `src/main.js` | `app.use(i18n)` + `localeStore.init()` |
+| `src/App.vue` | `ElConfigProvider :locale` 绑定响应式值；`watch(locale)` 同步 `document.title` |
+| `src/api/request.js` | 每个请求带 `X-Lang`；拦截器兜底文案改 `t('common.*')` |
+
+初始语言顺序与 `docs/23` 一致：`localStorage` → `navigator.language`（`en*` 归到 `en-US`）
+→ `zh-CN`。日文、法文等一律回退中文，只维护两套。
+
+### 41.2 菜单、面包屑、页面标题
+
+- 后端 `MenuVO` 增加 `menuKey`，`AuthService.toVO` 从 `sys_menu.menu_key` 填充并下发；
+- `Sidebar.vue` / `SidebarItem.vue` / `Breadcrumb.vue` 统一 `te('menu.'+menuKey) ? t(...) : menu.name`
+  ——新加菜单即使前端没译文也不会显示键名；
+- `router/dynamic.js` 生成路由时写 `meta.titleKey = 'menu.'+menuKey`；
+- `router/index.js` 静态路由（登录 / 403 / 404 / 占位页）写死 `titleKey`；
+- `router/guard.js` 的 `afterEach` 与 `App.vue` 的 `watch` 都用 `titleKey` 取标题。
+
+### 41.3 页面与公共组件
+
+| 范围 | 做法 |
+|---|---|
+| 18 个业务页 + 登录 / 403 / 404 / 占位 / 个人中心 | 文案统一走 `t('page.<页面>.*')`、`common.*`；表格列、表单 label、按钮、确认框、toast 全量替换 |
+| `FileLibrary.vue` | `fileLib.*`（搜索、上传、改名、详情、改名历史、复制链接） |
+| `DictTag.vue` / `DictSelect.vue` | 运行时 `dict.<type>.<value>`，缺项回退数据库 `label`/`dictLabel` |
+| `utils/config-control.js` | `config.<config_key>` 与 `configControl.*`，缺项回退数据库 `config_name`/`remark` |
+| `ThemeDrawer.vue` + `utils/theme.js` | `THEME_PRESETS` 的 `name` 改 `key`，运行时 `t('theme.color.'+key)` |
+| `RichEditor.vue` / `useEditorEngine.js` | 引擎名、切换提示走 `editor.*`，`hintKey` 字段替代写死文案 |
+| `UEditorPlus.vue` / `WangEditorNext.vue` | 占位符默认值、上传失败提示、文件中心 `remark` 按当前语言写 |
+| `store/auth.js` | `displayName` / `roleLabel` getter 里 `void i18n.global.locale.value`，保证切语言时重算 |
+
+字典 / 参数文案是**运行时**取 key 的，不在模块加载时固化 label，
+所以切语言后表格里已渲染的字典标签也会跟着变（这是 L1 唯一“翻译数据库文本”的地方，
+且只翻译“标签”，不翻译业务数据本身）。
+
+### 41.4 顶栏语言切换
+
+`Navbar.vue` 在主题按钮旁加语言胶囊（`中` / `EN`），点击弹 `简体中文 / English`，
+选中项禁用。原实现用 `el-tooltip` 包 `el-dropdown` 触发器，Element Plus 2.14 会报
+`Invalid prop: validation failed for prop "role"`（tooltip 给触发器塞 `role="button"`，
+而 dropdown 只接受 `menu/navigation/...`），改为原生 `title` 提示。
+
+### 41.5 后端顺带修正
+
+`CacheMonitorService` 的 `note` / `warnings` / Redis uptime 原来硬编码中文，
+英文界面下这一页会残留中文。改为 `MessageUtils.message(...)`，新增
+`monitor.cache.note.*`、`monitor.cache.warning.*`、`monitor.cache.duration.*` 共 11 个键，
+中英 properties 同步。业务日志（`log.info`）仍保持中文，符合“日志内容不翻译”的约定。
+
+### 41.6 踩坑
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `el-tooltip` 包 `el-dropdown` 触发器时控制台报 `role` 校验失败 | tooltip 给子节点注入 `role="button"`，dropdown 只接受 menu 系列 | 语言胶囊改用原生 `title`，不再套 tooltip |
+| 中文下 `auth.displayName` 切英文后不更新 | Pinia getter 依赖的是 i18n 全局单例，不是响应式 state | getter 内 `void i18n.global.locale.value` 建立依赖 |
+| 主题预设名写死中文，切英文仍显示“凌霄蓝” | `THEME_PRESETS.name` 是数据不是文案 | 改成 `key`，模板里 `t('theme.color.'+key)` |
+| 生成器 / 任务页的“动态拼接键”切语言不更新 | 模板里 `t('page.job.'+preset.key)` 依赖响应式 preset | preset 内置 `key`，模板运行时再 `t`，不缓存结果 |
+| 语言包两边容易只改一边 | 两份 JS 手工维护 | `scripts/check-i18n-keys.mjs` 断言键集合一致 + 列出 missing/unused |
+| dev server 偶发 chokidar `EBUSY` 崩溃 | `dist/` 被外部进程（预览 / 缩略图缓存）占用，热更新仍去读 | `vite.config.js` 加 `server.watch.ignored: ['**/dist/**', '**/dist-*/**']` |
+| UI 冒烟脚本“退出登录”步骤等 `.el-dropdown-menu` 可见超时 | 顶栏现在有两个下拉，Element Plus 把未打开的那个也渲染成 `display:block` 的 0×0 节点，`waitForSelector({visible:true})` 命中的是它 | 回归脚本改成等“任意 `.el-dropdown-menu__item` 有实际高度” |
+
+### 41.7 验证
+
+```text
+node scripts/check-i18n-keys.mjs      zh=897 en=897，键集合一致，missing=none
+npx vite build --outDir <临时目录>     built in 5.61s，exit=0
+mvn -B -ntp test                      BUILD SUCCESS，84 项（16 个测试类）
+.local/uitest/smoke.mjs               pass=22 fail=0，浏览器控制台 0 error
+.local/uitest/theme.mjs               12 项全 PASS
+```
+
+浏览器逐页（Chrome，admin/admin123，`en-US`）：
+
+- 登录页、侧边栏、面包屑、`document.title` 全英文；刷新后仍保持 `en-US`；
+- 18 个业务页静态 UI 全英文，剩余中文只有数据库内容（菜单名、字典 label、参数名 /
+  说明、部门 / 岗位 / 公告 / 任务名、文件备注、日志内容），符合 L1 范围；
+- Element Plus：分页 `Total 1 | 10/page | 1 | Go to`、日期区间 `Start time / End time / to`、
+  确认框 `Notice / Sign out now? / Cancel / Sign out` 均为英文；
+- 表单校验：任务新增空提交提示 `Please enter the job name / Please select an executor`；
+- 后端错误：`error.2001` 英文 `Incorrect username or password`、中文 `用户名或密码错误`；
+  空参数校验英文 `password: Password must not be empty; username: Username must not be empty`；
+- 控制台无 `[intlify]` missing key 警告、无 Vue prop 警告。
+
+### 41.8 下一轮
+
+- L1 收尾：`docs/23` 3.4 清单已全部勾选，可直接进入 L2 设计评审；
+- L2（v1.2）才引入 `i18n_*` 表翻译业务数据；L1 不新增数据库列，语言只存浏览器；
+- 若后续要“个人语言偏好跨设备”，在 `sys_user` 加 `language` 列并在登录后回填即可，
+  不影响本轮前端结构。

@@ -2,20 +2,20 @@
   <div class="page-container">
     <div class="page-card">
       <el-form :inline="true" :model="query" class="search-form" @submit.prevent>
-        <el-form-item label="账号">
+        <el-form-item :label="t('page.user.username')">
           <el-input
             v-model="query.username"
-            placeholder="登录账号"
+            :placeholder="t('page.user.usernamePlaceholder')"
             clearable
             style="width: 150px"
             @keyup.enter="handleSearch"
             @clear="handleSearch"
           />
         </el-form-item>
-        <el-form-item label="登录 IP">
+        <el-form-item :label="t('common.loginIp')">
           <el-input
             v-model="query.ip"
-            placeholder="如 192.168.1"
+            :placeholder="t('page.online.ipPlaceholder')"
             clearable
             style="width: 160px"
             @keyup.enter="handleSearch"
@@ -23,17 +23,17 @@
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
-          <el-button :icon="Refresh" @click="handleReset">重置</el-button>
+          <el-button type="primary" :icon="Search" @click="handleSearch">{{ t('common.search') }}</el-button>
+          <el-button :icon="Refresh" @click="handleReset">{{ t('common.reset') }}</el-button>
         </el-form-item>
       </el-form>
 
       <div class="table-toolbar">
         <div class="toolbar-left">
           <span class="text-secondary">
-            每个 Token 一行：同一账号多端登录会显示多行，可只强退其中一个。
+            {{ t('page.online.hint') }}
           </span>
-          <el-checkbox v-model="autoRefresh" style="margin-left: 8px">自动刷新</el-checkbox>
+          <el-checkbox v-model="autoRefresh" style="margin-left: 8px">{{ t('common.autoRefresh') }}</el-checkbox>
         </div>
         <div class="toolbar-right">
           <el-button
@@ -44,9 +44,9 @@
             :disabled="!selectedRows.length"
             @click="handleBatchKickout"
           >
-            批量强退{{ selectedRows.length ? `（${selectedRows.length}）` : '' }}
+            {{ t('page.online.batchKickout') }}{{ selectedRows.length ? t('page.online.batchCount', { count: selectedRows.length }) : '' }}
           </el-button>
-          <el-button :icon="Refresh" @click="loadList">刷新</el-button>
+          <el-button :icon="Refresh" @click="loadList">{{ t('common.refresh') }}</el-button>
         </div>
       </div>
 
@@ -60,30 +60,30 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="46" :selectable="(row) => row.kickable" />
-        <el-table-column prop="username" label="账号" width="130" show-overflow-tooltip />
-        <el-table-column prop="nickname" label="昵称" width="130" show-overflow-tooltip />
-        <el-table-column label="部门" width="130" show-overflow-tooltip>
+        <el-table-column prop="username" :label="t('page.user.username')" width="130" show-overflow-tooltip />
+        <el-table-column prop="nickname" :label="t('page.user.nickname')" width="130" show-overflow-tooltip />
+        <el-table-column :label="t('page.user.dept')" width="130" show-overflow-tooltip>
           <template #default="{ row }">{{ row.deptName || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="loginIp" label="登录 IP" width="130" show-overflow-tooltip />
-        <el-table-column label="浏览器 / 客户端" min-width="220" show-overflow-tooltip>
+        <el-table-column prop="loginIp" :label="t('common.loginIp')" width="130" show-overflow-tooltip />
+        <el-table-column :label="t('page.online.client')" min-width="220" show-overflow-tooltip>
           <template #default="{ row }">{{ row.browser || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="loginTime" label="登录时间" width="170" />
-        <el-table-column prop="lastActiveTime" label="最后活动" width="170" />
-        <el-table-column label="剩余有效期" width="120" align="center">
+        <el-table-column prop="loginTime" :label="t('common.loginTime')" width="170" />
+        <el-table-column prop="lastActiveTime" :label="t('page.online.lastActive')" width="170" />
+        <el-table-column :label="t('page.online.remaining')" width="120" align="center">
           <template #default="{ row }">{{ formatRemaining(row.timeoutSeconds) }}</template>
         </el-table-column>
-        <el-table-column label="状态" width="120" align="center">
+        <el-table-column :label="t('common.status')" width="120" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.current" type="success" size="small">当前会话</el-tag>
+            <el-tag v-if="row.current" type="success" size="small">{{ t('page.online.currentSession') }}</el-tag>
             <el-tag v-else-if="!row.kickable" type="warning" size="small">
-              {{ row.kickableReason || '不可强退' }}
+              {{ row.kickableReason || t('page.online.cannotKick') }}
             </el-tag>
-            <el-tag v-else type="info" size="small" effect="plain">在线</el-tag>
+            <el-tag v-else type="info" size="small" effect="plain">{{ t('common.online') }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right" align="center">
+        <el-table-column :label="t('common.operation')" width="100" fixed="right" align="center">
           <template #default="{ row }">
             <el-button
               v-if="row.kickable"
@@ -92,7 +92,7 @@
               type="danger"
               @click="handleKickout(row)"
             >
-              强退
+              {{ t('page.online.kickout') }}
             </el-button>
             <span v-else class="text-secondary">-</span>
           </template>
@@ -120,6 +120,7 @@ import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Search, SwitchButton } from '@element-plus/icons-vue'
 import { kickoutOnlineUsers, listOnlineUsers } from '@/api/monitor'
+import { useI18n } from 'vue-i18n'
 
 /**
  * 在线用户（/monitor/online）。
@@ -134,6 +135,8 @@ import { kickoutOnlineUsers, listOnlineUsers } from '@/api/monitor'
  *   <li>真实 Token 不下发，列表里的 {@code tokenId} 是脱敏值，只能用于强退。</li>
  * </ul>
  */
+const { t } = useI18n()
+
 const loading = ref(false)
 const rows = ref([])
 const total = ref(0)
@@ -153,14 +156,14 @@ const query = reactive({
 function formatRemaining(seconds) {
   const value = Number(seconds)
   if (!Number.isFinite(value) || value <= 0) {
-    return '已失效'
+    return t('page.online.expired')
   }
   const hours = Math.floor(value / 3600)
   const minutes = Math.floor((value % 3600) / 60)
   if (hours > 0) {
-    return `${hours} 小时 ${minutes} 分`
+    return t('page.online.hoursMinutes', { hours, minutes })
   }
-  return `${Math.max(minutes, 1)} 分`
+  return t('page.online.minutesOnly', { minutes: Math.max(minutes, 1) })
 }
 
 async function loadList() {
@@ -219,10 +222,10 @@ onBeforeUnmount(() => {
 /* ==================== 强退 ==================== */
 async function confirmKickout(message) {
   try {
-    await ElMessageBox.confirm(message, '强制下线', {
+    await ElMessageBox.confirm(message, t('page.online.kickoutTitle'), {
       type: 'warning',
-      confirmButtonText: '确认强退',
-      cancelButtonText: '取消'
+      confirmButtonText: t('page.online.confirmKickout'),
+      cancelButtonText: t('common.cancel')
     })
     return true
   } catch (e) {
@@ -234,23 +237,23 @@ function reportResult(result, count) {
   const success = Number(result?.successCount || 0)
   const failures = result?.failures || []
   if (success > 0) {
-    ElMessage.success(`已强制下线 ${success} 个会话`)
+    ElMessage.success(t('page.online.kickoutSuccess', { count: success }))
   }
   if (failures.length) {
     ElMessage.warning({
-      message: `部分会话未处理：${failures.join('；')}`,
+      message: t('page.online.kickoutPartial', { failures: failures.join('; ') }),
       duration: 6000
     })
   }
   if (success === 0 && failures.length === 0) {
-    ElMessage.info(`没有可强退的会话（选中 ${count} 个）`)
+    ElMessage.info(t('page.online.kickoutNone', { count }))
   }
   loadList()
 }
 
 async function handleKickout(row) {
   const ok = await confirmKickout(
-    `确定让「${row.nickname || row.username}」在 ${row.loginIp || '未知 IP'} 的会话立即下线吗？`
+    t('page.online.kickoutMsg', { name: row.nickname || row.username, ip: row.loginIp || t('page.online.unknownIp') })
   )
   if (!ok) return
   const result = await kickoutOnlineUsers([row.tokenId])
@@ -260,7 +263,7 @@ async function handleKickout(row) {
 async function handleBatchKickout() {
   const ids = selectedRows.value.map((row) => row.tokenId)
   if (!ids.length) return
-  const ok = await confirmKickout(`确定强制下线选中的 ${ids.length} 个会话吗？`)
+  const ok = await confirmKickout(t('page.online.kickoutBatchMsg', { count: ids.length }))
   if (!ok) return
   const result = await kickoutOnlineUsers(ids)
   reportResult(result, ids.length)

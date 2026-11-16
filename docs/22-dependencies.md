@@ -221,7 +221,7 @@
 
 ## 3. 前端依赖
 
-### 3.1 直接依赖（12）
+### 3.1 直接依赖（13）
 
 | 包 | package.json 声明 | 实际锁定 | 作用 |
 |---|---|---|---|
@@ -231,6 +231,7 @@
 | `element-plus` | `^2.8.8` | 2.14.8 | UI 组件库 |
 | `@element-plus/icons-vue` | `^2.3.1` | 2.3.2 | 图标 |
 | `axios` | `^1.7.7` | 1.21.1 | HTTP 客户端 |
+| `vue-i18n` | `^9.14.4` | 9.14.4 | 界面多语言（L1，见 `docs/23`） |
 | `@wangeditor-next/editor` | `^6.6.0` | 6.6.0 | 富文本编辑器（默认） |
 | `@wangeditor-next/editor-for-vue` | `^6.6.0` | 6.6.0 | wangEditor 的 Vue3 封装 |
 | `vue-ueditor-wrap` | `^3.0.8` | 3.0.8 | UEditor Plus 的 Vue3 封装 |
@@ -274,7 +275,7 @@
 | Spring Security 全家桶 | 只需要 BCrypt，单独引 `spring-security-crypto` 即可，避免过滤器链与 Sa-Token 打架 |
 | Redis 客户端 Redisson | 当前只有会话/验证码缓存，Lettuce 已随 Boot 带入 |
 | 前端 UI 二次封装库（如 vue-element-plus-x） | 组件封装要可控，避免版本升级被第三方绑架 |
-| 国际化运行时（vue-i18n） | v1.0 只做中文；方案见 `docs/23-i18n-plan.md`，等真要双语再引 |
+| 国际化运行时（vue-i18n） | L1 已按 `docs/23-i18n-plan.md` 引入 `vue-i18n@9`（`src/i18n/`）。**没有**引 `@intlify/unplugin-vue-i18n`：语言包是普通 JS 对象，不需要编译期提取，少一个构建插件 |
 | 图表库（ECharts） | 首页/监控没有 Chart 需求，避免 1MB 级体积 |
 | H2 内存库 | 方言与 MySQL 差异大，用它测 SQL 会“假通过”；真实 SQL 仍由 `verify-*.ps1` 验证 |
 | Testcontainers | 需要 Docker，会把最小 CI 变重；等做 Mapper / Flyway 集成测试时再引 |

@@ -3,16 +3,15 @@
     <div class="page-card apidoc-card">
       <div class="api-header">
         <div class="api-title">
-          <h3 class="section-title">接口文档</h3>
+          <h3 class="section-title">{{ t('page.apidoc.title') }}</h3>
           <p class="text-secondary">
-            由后端 SpringDoc 扫描 Controller 生成，Knife4j 负责展示。文档内容随代码变化，
-            不维护手工 YAML，避免“文档和实现两张皮”。
+            {{ t('page.apidoc.hint') }}
           </p>
         </div>
         <div class="api-actions">
-          <el-button :icon="CopyDocument" @click="copyToken">复制当前 Token</el-button>
-          <el-button :icon="Refresh" @click="reload">刷新</el-button>
-          <el-button type="primary" :icon="TopRight" @click="openNewWindow">新窗口打开</el-button>
+          <el-button :icon="CopyDocument" @click="copyToken">{{ t('page.apidoc.copyToken') }}</el-button>
+          <el-button :icon="Refresh" @click="reload">{{ t('common.refresh') }}</el-button>
+          <el-button type="primary" :icon="TopRight" @click="openNewWindow">{{ t('page.apidoc.newWindow') }}</el-button>
         </div>
       </div>
 
@@ -21,16 +20,16 @@
         :closable="false"
         show-icon
         class="api-tip"
-        title="在线调试需要先注入 Token"
-        description="在文档页右上角「全局参数设置」中新增请求头：参数名填当前 Token 名，参数值粘贴下方复制的 Token。Token 默认 12 小时过期，过期后请重新登录再复制。"
+        :title="t('page.apidoc.tipTitle')"
+        :description="t('page.apidoc.tipDesc')"
       />
 
       <div class="token-row">
-        <span class="token-label">Token 名</span>
+        <span class="token-label">{{ t('page.apidoc.tokenName') }}</span>
         <el-tag size="small" effect="plain" class="text-mono">{{ auth.tokenName || 'lx-platform-token' }}</el-tag>
-        <span class="token-label">Token 值</span>
+        <span class="token-label">{{ t('page.apidoc.tokenValue') }}</span>
         <span class="token-value text-mono">{{ maskedToken }}</span>
-        <span class="text-secondary">（只显示前 8 位，复制请点按钮，避免截图泄露）</span>
+        <span class="text-secondary">{{ t('page.apidoc.maskedHint') }}</span>
       </div>
 
       <div class="api-frame-wrap">
@@ -38,7 +37,7 @@
           :key="frameKey"
           class="api-frame"
           :src="docUrl"
-          title="Knife4j 接口文档"
+          :title="t('page.apidoc.docTitle')"
           referrerpolicy="no-referrer"
         />
       </div>
@@ -48,6 +47,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { CopyDocument, Refresh, TopRight } from '@element-plus/icons-vue'
 import { getToken } from '@/utils/auth'
@@ -63,6 +63,8 @@ import { useAuthStore } from '@/store/auth'
  * <p>文档接口本身不走 /api/admin/**，因此不受平台域拦截器约束；
  * 如果以后把文档挪到 /api/admin 下，必须在 SaTokenConfigure 里放行。</p>
  */
+const { t } = useI18n()
+
 const auth = useAuthStore()
 
 // 可用环境变量覆盖，默认同源 /doc.html
@@ -71,19 +73,19 @@ const frameKey = ref(0)
 
 const maskedToken = computed(() => {
   const token = getToken()
-  if (!token) return '未登录'
+  if (!token) return t('page.apidoc.notLoggedIn')
   return `${token.slice(0, 8)}${'*'.repeat(Math.max(4, Math.min(token.length - 8, 16)))}`
 })
 
 async function copyToken() {
   const token = getToken()
   if (!token) {
-    ElMessage.warning('当前没有 Token，请先登录')
+    ElMessage.warning(t('page.apidoc.noToken'))
     return
   }
   try {
     await navigator.clipboard.writeText(token)
-    ElMessage.success('Token 已复制')
+    ElMessage.success(t('page.apidoc.copied'))
   } catch (e) {
     // 非 HTTPS / 浏览器拒绝剪贴板权限时降级为 textarea + execCommand
     const textarea = document.createElement('textarea')
@@ -95,9 +97,9 @@ async function copyToken() {
     const copied = document.execCommand('copy')
     document.body.removeChild(textarea)
     if (copied) {
-      ElMessage.success('Token 已复制')
+      ElMessage.success(t('page.apidoc.copied'))
     } else {
-      ElMessage.error('复制失败，请检查浏览器剪贴板权限')
+      ElMessage.error(t('page.apidoc.copyFailed'))
     }
   }
 }

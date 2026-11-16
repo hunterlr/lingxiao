@@ -1,22 +1,23 @@
 <template>
   <div class="error-page">
     <div class="error-code">403</div>
-    <h2>没有权限访问这个页面</h2>
+    <h2>{{ t('errorPage.forbiddenTitle') }}</h2>
     <p class="error-desc">
-      当前账号缺少该页面所需的权限码。请联系管理员在「角色管理」里授权，
-      或换一个有权限的账号登录。
+      {{ t('errorPage.forbiddenTip') }}
     </p>
     <div class="error-actions">
-      <el-button type="primary" @click="router.replace('/')">返回首页</el-button>
-      <el-button @click="router.back()">返回上一页</el-button>
+      <el-button type="primary" @click="router.replace('/')">{{ t('errorPage.backHome') }}</el-button>
+      <el-button @click="router.back()">{{ t('errorPage.backPrev') }}</el-button>
     </div>
   </div>
 </template>
 
 <script setup>
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
+const { t } = useI18n()
 </script>
 
 <style scoped>

@@ -14,7 +14,7 @@ export const staticRoutes = [
     path: '/login',
     name: 'Login',
     component: () => import('@/views/login/index.vue'),
-    meta: { title: '登录', public: true }
+    meta: { title: '登录', titleKey: 'login.title', public: true }
   },
   {
     path: '/',
@@ -26,7 +26,7 @@ export const staticRoutes = [
         path: '/dashboard',
         name: 'Dashboard',
         component: () => import('@/views/dashboard/index.vue'),
-        meta: { title: '首页', icon: 'HomeFilled', affix: true }
+        meta: { title: '首页', titleKey: 'layout.home', icon: 'HomeFilled', affix: true }
       }
     ]
   },
@@ -34,19 +34,19 @@ export const staticRoutes = [
     path: '/403',
     name: 'Forbidden',
     component: () => import('@/views/error/403.vue'),
-    meta: { title: '没有权限', public: true }
+    meta: { title: '没有权限', titleKey: 'errorPage.forbidden', public: true }
   },
   {
     path: '/404',
     name: 'NotFoundPage',
     component: () => import('@/views/error/404.vue'),
-    meta: { title: '页面不存在', public: true }
+    meta: { title: '页面不存在', titleKey: 'errorPage.notFound', public: true }
   },
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/views/error/404.vue'),
-    meta: { title: '页面不存在' }
+    meta: { title: '页面不存在', titleKey: 'errorPage.notFound' }
   }
 ]
 

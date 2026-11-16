@@ -13,14 +13,14 @@
  *     否则按钮 / 链接 / 表格选中态会出现“一半新色、一半旧色”。
  */
 
-/** 主题色预设：够用即可，用户仍可用取色器选任意颜色 */
+/** 主题色预设：够用即可，用户仍可用取色器选任意颜色；名称走 theme.color.<key> 译文 */
 export const THEME_PRESETS = [
-  { name: '凌霄蓝', value: '#2f6fed' },
-  { name: '翡翠绿', value: '#0e9f6e' },
-  { name: '紫罗兰', value: '#7c3aed' },
-  { name: '玫瑰红', value: '#e11d48' },
-  { name: '琥珀橙', value: '#f59e0b' },
-  { name: '青碧', value: '#0ea5e9' }
+  { key: 'blue', value: '#2f6fed' },
+  { key: 'green', value: '#0e9f6e' },
+  { key: 'violet', value: '#7c3aed' },
+  { key: 'rose', value: '#e11d48' },
+  { key: 'amber', value: '#f59e0b' },
+  { key: 'cyan', value: '#0ea5e9' }
 ]
 
 /** 默认偏好：与 v1.0 现有视觉保持一致，老用户升级后无感 */

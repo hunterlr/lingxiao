@@ -2,28 +2,28 @@
   <div class="page-container">
     <div class="page-card">
       <el-form :inline="true" :model="query" class="search-form" @submit.prevent>
-        <el-form-item label="模块">
+        <el-form-item :label="t('common.module')">
           <el-input
             v-model="query.title"
-            placeholder="如 用户管理"
+            :placeholder="t('page.operlog.titlePlaceholder')"
             clearable
             style="width: 150px"
             @keyup.enter="handleSearch"
             @clear="handleSearch"
           />
         </el-form-item>
-        <el-form-item label="操作人">
+        <el-form-item :label="t('page.operlog.operator')">
           <el-input
             v-model="query.operName"
-            placeholder="登录账号"
+            :placeholder="t('page.user.usernamePlaceholder')"
             clearable
             style="width: 140px"
             @keyup.enter="handleSearch"
             @clear="handleSearch"
           />
         </el-form-item>
-        <el-form-item label="类型">
-          <el-select v-model="query.businessType" clearable placeholder="全部" style="width: 120px">
+        <el-form-item :label="t('common.type')">
+          <el-select v-model="query.businessType" clearable :placeholder="t('common.all')" style="width: 120px">
             <el-option
               v-for="item in businessTypes"
               :key="item.value"
@@ -32,34 +32,34 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="query.status" clearable placeholder="全部" style="width: 110px">
-            <el-option label="成功" value="0" />
-            <el-option label="失败" value="1" />
+        <el-form-item :label="t('common.status')">
+          <el-select v-model="query.status" clearable :placeholder="t('common.all')" style="width: 110px">
+            <el-option :label="t('common.successStatus')" value="0" />
+            <el-option :label="t('common.failStatus')" value="1" />
           </el-select>
         </el-form-item>
-        <el-form-item label="时间">
+        <el-form-item :label="t('common.time')">
           <el-date-picker
             v-model="timeRange"
             type="datetimerange"
-            range-separator="至"
-            start-placeholder="开始时间"
-            end-placeholder="结束时间"
+            :range-separator="t('common.to')"
+            :start-placeholder="t('common.startTime')"
+            :end-placeholder="t('common.endTime')"
             value-format="YYYY-MM-DD HH:mm:ss"
             :default-time="defaultTime"
             style="width: 340px"
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
-          <el-button :icon="Refresh" @click="handleReset">重置</el-button>
+          <el-button type="primary" :icon="Search" @click="handleSearch">{{ t('common.search') }}</el-button>
+          <el-button :icon="Refresh" @click="handleReset">{{ t('common.reset') }}</el-button>
         </el-form-item>
       </el-form>
 
       <div class="table-toolbar">
         <div class="toolbar-left">
           <span class="text-secondary">
-            只记录写操作；请求参数里的密码 / Token 已脱敏，单字段超过 2000 字符会被截断。
+            {{ t('page.operlog.hint') }}
           </span>
         </div>
         <div class="toolbar-right">
@@ -70,43 +70,43 @@
             :icon="Delete"
             @click="handleClean"
           >
-            清空日志
+            {{ t('common.clearLog') }}
           </el-button>
-          <el-button :icon="Refresh" @click="loadList">刷新</el-button>
+          <el-button :icon="Refresh" @click="loadList">{{ t('common.refresh') }}</el-button>
         </div>
       </div>
 
       <el-table v-loading="loading" :data="rows" border stripe row-key="operId">
-        <el-table-column prop="operTime" label="操作时间" width="170" />
-        <el-table-column prop="title" label="模块" width="130" show-overflow-tooltip />
-        <el-table-column label="类型" width="90" align="center">
+        <el-table-column prop="operTime" :label="t('page.operlog.operTime')" width="170" />
+        <el-table-column prop="title" :label="t('common.module')" width="130" show-overflow-tooltip />
+        <el-table-column :label="t('common.type')" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="typeTag(row.businessType)" size="small" effect="plain">
               {{ typeLabel(row.businessType) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="requestMethod" label="请求" width="80" align="center" />
-        <el-table-column prop="operName" label="操作人" width="120" show-overflow-tooltip />
-        <el-table-column label="请求地址" min-width="200" show-overflow-tooltip>
+        <el-table-column prop="requestMethod" :label="t('page.operlog.request')" width="80" align="center" />
+        <el-table-column prop="operName" :label="t('page.operlog.operator')" width="120" show-overflow-tooltip />
+        <el-table-column :label="t('page.operlog.requestUrl')" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">
             <span class="text-mono">{{ row.operUrl || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="operIp" label="IP" width="130" show-overflow-tooltip />
-        <el-table-column label="状态" width="80" align="center">
+        <el-table-column prop="operIp" :label="t('common.ip')" width="130" show-overflow-tooltip />
+        <el-table-column :label="t('common.status')" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === '0' ? 'success' : 'danger'" size="small">
-              {{ row.status === '0' ? '成功' : '失败' }}
+              {{ row.status === '0' ? t('common.successStatus') : t('common.failStatus') }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="耗时" width="90" align="right">
+        <el-table-column :label="t('page.operlog.cost')" width="90" align="right">
           <template #default="{ row }">{{ row.costTime }} ms</template>
         </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right">
+        <el-table-column :label="t('common.operation')" width="80" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openDetail(row)">详情</el-button>
+            <el-button link type="primary" @click="openDetail(row)">{{ t('common.detail') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -125,39 +125,39 @@
       </div>
     </div>
 
-    <el-dialog v-model="detailVisible" title="操作日志详情" width="760px" append-to-body>
+    <el-dialog v-model="detailVisible" :title="t('page.operlog.detailTitle')" width="760px" append-to-body>
       <el-descriptions v-if="detail" :column="2" border label-width="90px">
-        <el-descriptions-item label="模块">{{ detail.title }}</el-descriptions-item>
-        <el-descriptions-item label="类型">
+        <el-descriptions-item :label="t('common.module')">{{ detail.title }}</el-descriptions-item>
+        <el-descriptions-item :label="t('common.type')">
           {{ typeLabel(detail.businessType) }}
         </el-descriptions-item>
-        <el-descriptions-item label="操作人">{{ detail.operName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="IP">{{ detail.operIp || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="请求方法">{{ detail.requestMethod || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="耗时">{{ detail.costTime }} ms</el-descriptions-item>
-        <el-descriptions-item label="操作时间">{{ detail.operTime }}</el-descriptions-item>
-        <el-descriptions-item label="状态">
-          {{ detail.status === '0' ? '成功' : '失败' }}
+        <el-descriptions-item :label="t('page.operlog.operator')">{{ detail.operName || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="t('common.ip')">{{ detail.operIp || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="t('page.operlog.requestMethod')">{{ detail.requestMethod || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="t('page.operlog.cost')">{{ detail.costTime }} ms</el-descriptions-item>
+        <el-descriptions-item :label="t('page.operlog.operTime')">{{ detail.operTime }}</el-descriptions-item>
+        <el-descriptions-item :label="t('common.status')">
+          {{ detail.status === '0' ? t('common.successStatus') : t('common.failStatus') }}
         </el-descriptions-item>
-        <el-descriptions-item label="请求地址" :span="2">
+        <el-descriptions-item :label="t('page.operlog.requestUrl')" :span="2">
           <span class="text-mono">{{ detail.operUrl || '-' }}</span>
         </el-descriptions-item>
-        <el-descriptions-item label="方法" :span="2">
+        <el-descriptions-item :label="t('page.operlog.method')" :span="2">
           <span class="text-mono">{{ detail.method || '-' }}</span>
         </el-descriptions-item>
-        <el-descriptions-item label="请求参数" :span="2">
+        <el-descriptions-item :label="t('page.operlog.requestParam')" :span="2">
           <pre class="log-pre">{{ pretty(detail.operParam) }}</pre>
         </el-descriptions-item>
-        <el-descriptions-item label="返回结果" :span="2">
+        <el-descriptions-item :label="t('page.operlog.responseResult')" :span="2">
           <pre class="log-pre">{{ pretty(detail.jsonResult) }}</pre>
         </el-descriptions-item>
-        <el-descriptions-item v-if="detail.errorMsg" label="异常信息" :span="2">
+        <el-descriptions-item v-if="detail.errorMsg" :label="t('page.operlog.errorMsg')" :span="2">
           <pre class="log-pre log-pre--error">{{ detail.errorMsg }}</pre>
         </el-descriptions-item>
       </el-descriptions>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="detailVisible = false">关闭</el-button>
+          <el-button @click="detailVisible = false">{{ t('common.close') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -169,6 +169,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Refresh, Search } from '@element-plus/icons-vue'
 import { cleanOperLogs, getOperLog, listOperLogs } from '@/api/log'
+import { useI18n } from 'vue-i18n'
 
 /**
  * 操作日志（/monitor/oper-log）。
@@ -177,19 +178,20 @@ import { cleanOperLogs, getOperLog, listOperLogs } from '@/api/log'
  * 页面只做查询与清空。业务类型存的是枚举序号，这里负责翻译成中文，
  * 与后端 {@code BusinessType} 保持一致，新增类型两端一起改。</p>
  */
-const businessTypes = [
-  { value: 0, label: '其他' },
-  { value: 1, label: '新增' },
-  { value: 2, label: '修改' },
-  { value: 3, label: '删除' },
-  { value: 4, label: '授权' },
-  { value: 5, label: '导出' },
-  { value: 6, label: '导入' },
-  { value: 7, label: '强退' },
-  { value: 8, label: '清空' }
-]
+const { t } = useI18n()
 
-const typeMap = new Map(businessTypes.map((item) => [item.value, item.label]))
+/** 存的是枚举序号，译文按 page.operlog.<key> 取；新增类型时与后端 BusinessType 一起改。 */
+const businessTypes = [
+  { value: 0, key: 'other' },
+  { value: 1, key: 'insert' },
+  { value: 2, key: 'update' },
+  { value: 3, key: 'delete' },
+  { value: 4, key: 'grant' },
+  { value: 5, key: 'export' },
+  { value: 6, key: 'import' },
+  { value: 7, key: 'kickout' },
+  { value: 8, key: 'clean' }
+]
 const tagMap = { 1: 'success', 2: 'primary', 3: 'danger', 4: 'warning', 8: 'danger' }
 
 const loading = ref(false)
@@ -207,7 +209,8 @@ const query = reactive({
 })
 
 function typeLabel(value) {
-  return typeMap.get(value) ?? '其他'
+  const item = businessTypes.find((entry) => entry.value === value)
+  return t(`page.operlog.${item ? item.key : 'other'}`)
 }
 
 function typeTag(value) {
@@ -278,15 +281,15 @@ async function openDetail(row) {
 async function handleClean() {
   try {
     await ElMessageBox.confirm(
-      '清空会删除全部操作日志，且不可恢复。审计数据仅在确认无需追溯时清空。',
-      '清空操作日志',
-      { type: 'warning', confirmButtonText: '确认清空', cancelButtonText: '取消' }
+      t('page.operlog.cleanConfirm'),
+      t('page.operlog.cleanTitle'),
+      { type: 'warning', confirmButtonText: t('page.operlog.cleanConfirmBtn'), cancelButtonText: t('common.cancel') }
     )
   } catch (e) {
     return
   }
   const count = await cleanOperLogs()
-  ElMessage.success(`已清空 ${count ?? 0} 条操作日志`)
+  ElMessage.success(t('page.operlog.cleanSuccess', { count: count ?? 0 }))
   query.pageNum = 1
   loadList()
 }

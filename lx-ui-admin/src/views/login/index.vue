@@ -3,13 +3,13 @@
     <div class="login-brand">
       <div class="brand-inner">
         <div class="brand-logo">LX</div>
-        <h1>凌霄 LingXiao</h1>
-        <p class="brand-sub">后台管理基座 · v1.0</p>
+        <h1>{{ t('login.brandTitle') }}</h1>
+        <p class="brand-sub">{{ t('login.brandSub') }}</p>
         <ul class="brand-points">
-          <li>平台 / 租户 / 会员三域隔离，v1.0 先实装平台域</li>
-          <li>RBAC 权限到按钮，权限码由后端菜单统一下发</li>
-          <li>文件中心保留原名、现名与改名历史</li>
-          <li>模块可插拔：关闭即不加载、接口 404</li>
+          <li>{{ t('login.point1') }}</li>
+          <li>{{ t('login.point2') }}</li>
+          <li>{{ t('login.point3') }}</li>
+          <li>{{ t('login.point4') }}</li>
         </ul>
       </div>
       <div class="brand-footer">Spring Boot 2.7 · Sa-Token · Vue 3 · Element Plus</div>
@@ -17,19 +17,19 @@
 
     <div class="login-panel">
       <div class="login-card">
-        <h2>登录后台</h2>
-        <p class="login-tip">请使用管理员账号登录</p>
+        <h2>{{ t('login.title') }}</h2>
+        <p class="login-tip">{{ t('login.tip') }}</p>
 
         <el-form ref="formRef" :model="form" :rules="rules" size="large" @keyup.enter="submit">
           <el-form-item prop="username">
-            <el-input v-model="form.username" placeholder="用户名" :prefix-icon="User" clearable />
+            <el-input v-model="form.username" :placeholder="t('login.username')" :prefix-icon="User" clearable />
           </el-form-item>
 
           <el-form-item prop="password">
             <el-input
               v-model="form.password"
               type="password"
-              placeholder="密码"
+              :placeholder="t('login.password')"
               :prefix-icon="Lock"
               show-password
             />
@@ -39,31 +39,31 @@
             <div class="captcha-row">
               <el-input
                 v-model="form.captchaCode"
-                placeholder="验证码"
+                :placeholder="t('login.captcha')"
                 maxlength="8"
                 :prefix-icon="Key"
                 clearable
               />
-              <div class="captcha-image" title="点击刷新验证码" @click="refreshCaptcha">
-                <img v-if="captcha.image" :src="captcha.image" alt="验证码" />
-                <span v-else class="captcha-loading">加载中…</span>
+              <div class="captcha-image" :title="t('login.captchaRefresh')" @click="refreshCaptcha">
+                <img v-if="captcha.image" :src="captcha.image" :alt="t('login.captcha')" />
+                <span v-else class="captcha-loading">{{ t('common.loading') }}</span>
               </div>
             </div>
           </el-form-item>
-          <p v-else class="captcha-off-tip">验证码已由平台关闭</p>
+          <p v-else class="captcha-off-tip">{{ t('login.captchaOff') }}</p>
 
           <el-button type="primary" class="login-button" :loading="loading" @click="submit">
-            {{ loading ? '登录中…' : '登 录' }}
+            {{ loading ? t('login.submitting') : t('login.submit') }}
           </el-button>
         </el-form>
 
         <div class="login-extra">
-          <el-checkbox v-model="remember">记住用户名</el-checkbox>
-          <span class="text-secondary">默认账号 admin / admin123</span>
+          <el-checkbox v-model="remember">{{ t('login.remember') }}</el-checkbox>
+          <span class="text-secondary">{{ t('login.defaultAccount') }}</span>
         </div>
       </div>
 
-      <div class="login-copyright">© 2026 凌霄 · 后台管理</div>
+      <div class="login-copyright">{{ t('login.copyright') }}</div>
     </div>
   </div>
 </template>
@@ -72,6 +72,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { Key, Lock, User } from '@element-plus/icons-vue'
 import { getCaptcha } from '@/api/auth'
 import { useAuthStore } from '@/store/auth'
@@ -89,6 +90,7 @@ import { useAuthStore } from '@/store/auth'
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const { t } = useI18n()
 
 const formRef = ref(null)
 const loading = ref(false)
@@ -105,11 +107,11 @@ const captcha = reactive({ enabled: true, image: '', key: '' })
 
 const rules = computed(() => {
   const base = {
-    username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-    password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
+    username: [{ required: true, message: t('login.usernameRequired'), trigger: 'blur' }],
+    password: [{ required: true, message: t('login.passwordRequired'), trigger: 'blur' }]
   }
   if (captcha.enabled) {
-    base.captchaCode = [{ required: true, message: '请输入验证码', trigger: 'blur' }]
+    base.captchaCode = [{ required: true, message: t('login.captchaRequired'), trigger: 'blur' }]
   }
   return base
 })
@@ -133,7 +135,7 @@ async function refreshCaptcha() {
   } catch (e) {
     // 取不到就按“开启”处理：宁可多填一次，也不能把登录页变成免验证码
     captcha.enabled = true
-    ElMessage.error('验证码加载失败，请检查后端服务')
+    ElMessage.error(t('login.captchaLoadFailed'))
   }
 }
 
@@ -156,7 +158,7 @@ async function submit() {
         localStorage.removeItem('lx-admin-username')
         localStorage.setItem('lx-admin-remember', '0')
       }
-      ElMessage.success('登录成功')
+      ElMessage.success(t('login.success'))
       const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
       await router.replace(redirect)
     } catch (e) {

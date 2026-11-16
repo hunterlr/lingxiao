@@ -23,6 +23,11 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       port: Number(env.VITE_PORT || 5173),
       open: false,
+      // 构建产物不参与热更新：dist 里的文件被外部进程（预览 / 缩略图缓存）占用时，
+      // chokidar 读取会抛 EBUSY，直接把 dev server 带崩。
+      watch: {
+        ignored: ['**/dist/**', '**/dist-*/**']
+      },
       proxy: {
         '/api': {
           target,

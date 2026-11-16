@@ -2,27 +2,27 @@
   <div class="page-container">
     <div class="page-card">
       <el-form :inline="true" :model="query" class="search-form" @submit.prevent>
-        <el-form-item label="账号">
+        <el-form-item :label="t('page.user.username')">
           <el-input
             v-model="query.username"
-            placeholder="登录账号"
+            :placeholder="t('page.user.usernamePlaceholder')"
             clearable
             style="width: 150px"
             @keyup.enter="handleSearch"
             @clear="handleSearch"
           />
         </el-form-item>
-        <el-form-item label="昵称">
+        <el-form-item :label="t('page.user.nickname')">
           <el-input
             v-model="query.nickname"
-            placeholder="显示名称"
+            :placeholder="t('page.user.nicknamePlaceholder')"
             clearable
             style="width: 150px"
             @keyup.enter="handleSearch"
             @clear="handleSearch"
           />
         </el-form-item>
-        <el-form-item label="部门">
+        <el-form-item :label="t('page.user.dept')">
           <el-tree-select
             v-model="query.deptId"
             :data="deptTree"
@@ -30,26 +30,26 @@
             :props="treeProps"
             check-strictly
             clearable
-            placeholder="全部部门"
+            :placeholder="t('page.user.allDepts')"
             style="width: 180px"
             @clear="handleSearch"
           />
         </el-form-item>
-        <el-form-item label="状态">
-          <DictSelect v-model="query.status" dict-type="sys_common_status" width="130px" placeholder="全部状态" />
+        <el-form-item :label="t('common.status')">
+          <DictSelect v-model="query.status" dict-type="sys_common_status" width="130px" :placeholder="t('common.allStatus')" />
         </el-form-item>
         <el-form-item>
-          <el-checkbox v-model="query.includeSubDept" :disabled="!query.deptId">含下级部门</el-checkbox>
+          <el-checkbox v-model="query.includeSubDept" :disabled="!query.deptId">{{ t('page.user.includeSubDept') }}</el-checkbox>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
-          <el-button :icon="Refresh" @click="handleReset">重置</el-button>
+          <el-button type="primary" :icon="Search" @click="handleSearch">{{ t('common.search') }}</el-button>
+          <el-button :icon="Refresh" @click="handleReset">{{ t('common.reset') }}</el-button>
         </el-form-item>
       </el-form>
 
       <div class="table-toolbar">
         <div class="toolbar-left">
-          <span class="text-secondary">共 {{ total }} 个账号</span>
+          <span class="text-secondary">{{ t('page.user.total', { total }) }}</span>
         </div>
         <div class="toolbar-right">
           <el-button
@@ -58,14 +58,14 @@
             :icon="Plus"
             @click="openAdd"
           >
-            新增用户
+            {{ t('page.user.add') }}
           </el-button>
-          <el-button :icon="Refresh" @click="loadList">刷新</el-button>
+          <el-button :icon="Refresh" @click="loadList">{{ t('common.refresh') }}</el-button>
         </div>
       </div>
 
       <el-table v-loading="loading" :data="rows" border stripe row-key="userId">
-        <el-table-column prop="username" label="账号" min-width="130">
+        <el-table-column prop="username" :label="t('page.user.username')" min-width="130">
           <template #default="{ row }">
             <div class="user-cell">
               <el-avatar :size="26" :src="row.avatar ? `/api/file/${row.avatar}` : ''">
@@ -75,22 +75,22 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="nickname" label="昵称" min-width="110" show-overflow-tooltip />
-        <el-table-column prop="deptName" label="部门" min-width="120" show-overflow-tooltip>
+        <el-table-column prop="nickname" :label="t('page.user.nickname')" min-width="110" show-overflow-tooltip />
+        <el-table-column prop="deptName" :label="t('page.user.dept')" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">{{ row.deptName || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="phone" label="手机号" min-width="120">
+        <el-table-column prop="phone" :label="t('page.user.phone')" min-width="120">
           <template #default="{ row }">{{ row.phone || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="email" label="邮箱" min-width="160" show-overflow-tooltip>
+        <el-table-column prop="email" :label="t('page.dept.email')" min-width="160" show-overflow-tooltip>
           <template #default="{ row }">{{ row.email || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="sex" label="性别" width="80" align="center">
+        <el-table-column prop="sex" :label="t('page.user.sex')" width="80" align="center">
           <template #default="{ row }">
             <DictTag :value="row.sex" dict-type="sys_user_sex" />
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="90" align="center">
+        <el-table-column prop="status" :label="t('common.status')" width="90" align="center">
           <template #default="{ row }">
             <el-switch
               :model-value="row.status"
@@ -101,14 +101,14 @@
             />
           </template>
         </el-table-column>
-        <el-table-column label="锁定" width="90" align="center">
+        <el-table-column :label="t('page.user.locked')" width="90" align="center">
           <template #default="{ row }">
-            <el-tag v-if="isLocked(row)" type="danger" effect="plain" size="small">已锁定</el-tag>
+            <el-tag v-if="isLocked(row)" type="danger" effect="plain" size="small">{{ t('page.user.isLocked') }}</el-tag>
             <span v-else class="text-secondary">-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="160" />
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column prop="createTime" :label="t('common.createTime')" width="160" />
+        <el-table-column :label="t('common.operation')" width="280" fixed="right">
           <template #default="{ row }">
             <div class="table-actions">
               <el-button
@@ -117,7 +117,7 @@
                 type="primary"
                 @click="openEdit(row)"
               >
-                编辑
+                {{ t('common.edit') }}
               </el-button>
               <el-button
                 v-hasPerm="'platform:system:user:resetPwd'"
@@ -125,7 +125,7 @@
                 type="primary"
                 @click="openResetPwd(row)"
               >
-                重置密码
+                {{ t('page.user.resetPwd') }}
               </el-button>
               <el-button
                 v-if="isLocked(row)"
@@ -134,7 +134,7 @@
                 type="warning"
                 @click="handleUnlock(row)"
               >
-                解锁
+                {{ t('page.user.unlock') }}
               </el-button>
               <el-button
                 v-hasPerm="'platform:system:user:remove'"
@@ -143,7 +143,7 @@
                 :disabled="isBuiltin(row)"
                 @click="handleDelete(row)"
               >
-                删除
+                {{ t('common.delete') }}
               </el-button>
             </div>
           </template>
@@ -167,7 +167,7 @@
     <!-- 新增 / 编辑 -->
     <el-dialog
       v-model="dialogVisible"
-      :title="isEdit ? '编辑用户' : '新增用户'"
+      :title="isEdit ? t('page.user.edit') : t('page.user.add')"
       width="720px"
       append-to-body
       destroy-on-close
@@ -182,29 +182,29 @@
       >
         <el-row :gutter="16">
           <el-col :span="12">
-            <el-form-item label="用户名" prop="username">
-              <el-input v-model="form.username" :disabled="isEdit" maxlength="64" placeholder="登录账号" />
+            <el-form-item :label="t('page.user.username')" prop="username">
+              <el-input v-model="form.username" :disabled="isEdit" maxlength="64" :placeholder="t('page.user.usernamePlaceholder')" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="昵称" prop="nickname">
-              <el-input v-model="form.nickname" maxlength="64" placeholder="显示名称" />
+            <el-form-item :label="t('page.user.nickname')" prop="nickname">
+              <el-input v-model="form.nickname" maxlength="64" :placeholder="t('page.user.nicknamePlaceholder')" />
             </el-form-item>
           </el-col>
           <el-col v-if="!isEdit" :span="12">
-            <el-form-item label="初始密码" prop="password">
+            <el-form-item :label="t('page.user.initialPassword')" prop="password">
               <el-input
                 v-model="form.password"
                 type="password"
                 show-password
                 maxlength="64"
-                placeholder="至少 8 位，含字母和数字"
+                :placeholder="t('page.user.passwordPlaceholder')"
               />
-              <div class="form-tip">实际规则以「参数设置 → 密码复杂度策略」为准</div>
+              <div class="form-tip">{{ t('page.user.passwordTip') }}</div>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="所属部门" prop="deptId">
+            <el-form-item :label="t('page.user.dept')" prop="deptId">
               <el-tree-select
                 v-model="form.deptId"
                 :data="deptTree"
@@ -212,34 +212,34 @@
                 :props="treeProps"
                 check-strictly
                 clearable
-                placeholder="请选择部门"
+                :placeholder="t('page.user.selectDept')"
                 style="width: 100%"
               />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="手机号" prop="phone">
+            <el-form-item :label="t('page.user.phone')" prop="phone">
               <el-input v-model="form.phone" maxlength="32" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="邮箱" prop="email">
+            <el-form-item :label="t('page.dept.email')" prop="email">
               <el-input v-model="form.email" maxlength="128" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="性别">
+            <el-form-item :label="t('page.user.sex')">
               <DictSelect v-model="form.sex" dict-type="sys_user_sex" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="状态">
+            <el-form-item :label="t('common.status')">
               <DictSelect v-model="form.status" dict-type="sys_common_status" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="角色">
-              <el-select v-model="form.roleIds" multiple clearable placeholder="请选择角色" style="width: 100%">
+            <el-form-item :label="t('page.user.role')">
+              <el-select v-model="form.roleIds" multiple clearable :placeholder="t('page.user.selectRole')" style="width: 100%">
                 <el-option
                   v-for="role in roleOptions"
                   :key="role.roleId"
@@ -250,8 +250,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="岗位">
-              <el-select v-model="form.postIds" multiple clearable placeholder="请选择岗位" style="width: 100%">
+            <el-form-item :label="t('page.user.post')">
+              <el-select v-model="form.postIds" multiple clearable :placeholder="t('page.user.selectPost')" style="width: 100%">
                 <el-option
                   v-for="post in postOptions"
                   :key="post.postId"
@@ -262,7 +262,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="备注">
+            <el-form-item :label="t('common.remark')">
               <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" show-word-limit />
             </el-form-item>
           </el-col>
@@ -270,38 +270,38 @@
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="saving" @click="submitForm">保存</el-button>
+          <el-button @click="dialogVisible = false">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="saving" @click="submitForm">{{ t('common.save') }}</el-button>
         </div>
       </template>
     </el-dialog>
 
     <!-- 重置密码 -->
-    <el-dialog v-model="pwdVisible" title="重置密码" width="440px" append-to-body>
+    <el-dialog v-model="pwdVisible" :title="t('page.user.resetPwdTitle')" width="440px" append-to-body>
       <el-alert
         type="warning"
         :closable="false"
         show-icon
-        :title="`即将重置账号「${pwdTarget.username}」的密码`"
-        description="重置后该账号的旧密码立即失效，请通过安全渠道告知本人。"
+        :title="t('page.user.resetPwdTarget', { name: pwdTarget.username })"
+        :description="t('page.user.resetPwdDesc')"
         style="margin-bottom: 16px"
       />
       <el-form ref="pwdFormRef" :model="pwdForm" :rules="pwdRules" label-width="80px">
-        <el-form-item label="新密码" prop="newPassword">
+        <el-form-item :label="t('page.user.newPassword')" prop="newPassword">
           <el-input
             v-model="pwdForm.newPassword"
             type="password"
             show-password
             maxlength="64"
-            placeholder="至少 8 位，含字母和数字"
+            :placeholder="t('page.user.passwordPlaceholder')"
           />
-          <div class="form-tip">重置后该账号的失败次数与锁定状态会一并清除</div>
+          <div class="form-tip">{{ t('page.user.resetPwdTip') }}</div>
         </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="pwdVisible = false">取消</el-button>
-          <el-button type="primary" :loading="pwdSaving" @click="submitResetPwd">确定重置</el-button>
+          <el-button @click="pwdVisible = false">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="pwdSaving" @click="submitResetPwd">{{ t('page.user.confirmReset') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -310,6 +310,7 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import DictSelect from '@/components/DictSelect.vue'
@@ -335,6 +336,8 @@ import { listPostOptions } from '@/api/post'
  * 内置管理员（user_id=1）的停用与删除按钮直接置灰，但真正的保护在后端：
  * 前端禁用只是让用户少走一步。</p>
  */
+const { t } = useI18n()
+
 const treeProps = { label: 'label', children: 'children' }
 
 const loading = ref(false)
@@ -425,22 +428,22 @@ const form = reactive(emptyForm())
 
 const rules = {
   username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { max: 64, message: '不能超过 64 个字符', trigger: 'blur' }
+    { required: true, message: t('page.user.usernameRequired'), trigger: 'blur' },
+    { max: 64, message: t('page.user.maxLength64'), trigger: 'blur' }
   ],
   nickname: [
-    { required: true, message: '请输入昵称', trigger: 'blur' },
-    { max: 64, message: '不能超过 64 个字符', trigger: 'blur' }
+    { required: true, message: t('page.user.nicknameRequired'), trigger: 'blur' },
+    { max: 64, message: t('page.user.maxLength64'), trigger: 'blur' }
   ],
   password: [
     {
       validator: (rule, value, callback) => {
         if (!isEdit.value && !value) {
-          callback(new Error('请输入初始密码'))
+          callback(new Error(t('page.user.passwordRequired')))
           return
         }
         if (value && (value.length < 8 || value.length > 64)) {
-          callback(new Error('密码长度必须在 8~64 之间'))
+          callback(new Error(t('page.user.passwordLength')))
           return
         }
         callback()
@@ -448,7 +451,7 @@ const rules = {
       trigger: 'blur'
     }
   ],
-  email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }]
+  email: [{ type: 'email', message: t('page.dept.emailInvalid'), trigger: 'blur' }]
 }
 
 function resetForm() {
@@ -523,10 +526,10 @@ async function submitForm() {
       if (!isEdit.value) {
         payload.password = form.password
         await addUser(payload)
-        ElMessage.success('新增成功')
+        ElMessage.success(t('common.addSuccess'))
       } else {
         await updateUser(editingId.value, payload)
-        ElMessage.success('保存成功')
+        ElMessage.success(t('common.saveSuccess'))
       }
       dialogVisible.value = false
       await loadList()
@@ -544,7 +547,7 @@ function isBuiltin(row) {
 async function handleStatusChange(row, value) {
   try {
     await changeUserStatus(row.userId, value)
-    ElMessage.success(value === '0' ? '已启用' : '已停用')
+    ElMessage.success(value === '0' ? t('page.user.enabledToast') : t('page.user.disabledToast'))
     await loadList()
   } catch (e) {
     // 失败时重新拉列表，把开关状态恢复成服务端的真实值
@@ -568,30 +571,30 @@ function isLocked(row) {
 async function handleUnlock(row) {
   try {
     await ElMessageBox.confirm(
-      `确认解锁用户「${row.nickname || row.username}」吗？解锁后失败次数会清零。`,
-      '解锁确认',
-      { type: 'warning', confirmButtonText: '解锁', cancelButtonText: '取消' }
+      t('page.user.unlockConfirm', { name: row.nickname || row.username }),
+      t('page.user.unlockTitle'),
+      { type: 'warning', confirmButtonText: t('page.user.unlock'), cancelButtonText: t('common.cancel') }
     )
   } catch (e) {
     return
   }
   await unlockUser(row.userId)
-  ElMessage.success('已解锁')
+  ElMessage.success(t('page.user.unlocked'))
   await loadList()
 }
 
 async function handleDelete(row) {
   try {
     await ElMessageBox.confirm(
-      `确认删除用户「${row.nickname || row.username}」吗？该操作不可恢复。`,
-      '删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+      t('page.user.deleteConfirm', { name: row.nickname || row.username }),
+      t('common.deleteTitle'),
+      { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel') }
     )
   } catch (e) {
     return
   }
   await deleteUser(row.userId)
-  ElMessage.success('删除成功')
+  ElMessage.success(t('common.deleteSuccess'))
   await loadList()
 }
 
@@ -603,9 +606,9 @@ const pwdTarget = reactive({ userId: '', username: '' })
 const pwdForm = reactive({ newPassword: '' })
 const pwdRules = {
   newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { required: true, message: t('page.user.newPasswordRequired'), trigger: 'blur' },
     // 与新增用户一致：前端按默认策略提示，strong 策略由后端返回具体原因
-    { min: 8, max: 64, message: '密码长度必须在 8~64 之间', trigger: 'blur' }
+    { min: 8, max: 64, message: t('page.user.passwordLength'), trigger: 'blur' }
   ]
 }
 
@@ -622,7 +625,7 @@ async function submitResetPwd() {
     pwdSaving.value = true
     try {
       await resetUserPassword(pwdTarget.userId, pwdForm.newPassword)
-      ElMessage.success('密码已重置')
+      ElMessage.success(t('page.user.pwdReset'))
       pwdVisible.value = false
     } finally {
       pwdSaving.value = false

@@ -22,6 +22,7 @@ import '@wangeditor-next/editor/dist/css/style.css'
 import { Editor, Toolbar } from '@wangeditor-next/editor-for-vue'
 import { onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { uploadFile } from '@/api/file'
 
 /**
@@ -42,6 +43,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue'])
+const { t } = useI18n()
 
 const editorRef = shallowRef(null)
 const valueHtml = ref(props.modelValue || '')
@@ -68,7 +70,7 @@ const editorConfig = {
           const data = await uploadFile(file, { bizType: 'notice', remark: '富文本配图' })
           insertFn(data.url, data.displayName || data.originalName, data.url)
         } catch (e) {
-          ElMessage.error('图片上传失败')
+          ElMessage.error(t('editor.imageUploadFailed'))
         }
       }
     }

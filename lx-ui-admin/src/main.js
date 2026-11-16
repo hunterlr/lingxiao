@@ -1,15 +1,16 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
-import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 
 import App from './App.vue'
 import router from './router'
+import i18n from './i18n'
 import { permission } from './directives/permission'
 import { useAppStore } from './store/app'
+import { useLocaleStore } from './store/locale'
 import './assets/styles/index.css'
 
 /**
@@ -21,6 +22,9 @@ import './assets/styles/index.css'
  *
  * <p>暗色样式表必须显式引入：Element Plus 2.x 的 dark/css-vars.css
  * 只在 html.dark 下生效，不引就会“背景黑了、组件还是白的”。</p>
+ *
+ * <p>Element Plus 的组件语言不在这里写死：App.vue 用 ElConfigProvider
+ * 绑定响应式的 locale，切换语言后分页、日期、空状态会一起变。</p>
  */
 const app = createApp(App)
 const pinia = createPinia()
@@ -32,8 +36,11 @@ for (const [name, component] of Object.entries(ElementPlusIconsVue)) {
 app.use(pinia)
 // 先落主题再挂载，避免刷新时先闪一下亮色
 useAppStore(pinia).initTheme()
+// 语言同理：先把 localStorage / 浏览器语言写回 i18n 与 html.lang
+useLocaleStore(pinia).init()
+app.use(i18n)
 app.use(router)
-app.use(ElementPlus, { locale: zhCn, size: 'default' })
+app.use(ElementPlus, { size: 'default' })
 app.directive('hasPerm', permission)
 
 app.mount('#app')

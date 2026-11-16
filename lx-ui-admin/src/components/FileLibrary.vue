@@ -4,7 +4,7 @@
       <div class="toolbar-left">
         <el-input
           v-model="query.keyword"
-          placeholder="按原名 / 现名 / 备注搜索"
+          :placeholder="t('fileLib.searchPlaceholder')"
           clearable
           style="width: 260px"
           @keyup.enter="handleSearch"
@@ -17,25 +17,25 @@
         <el-input
           v-if="!fixedBizType"
           v-model="query.bizType"
-          placeholder="业务类型（如 notice）"
+          :placeholder="t('fileLib.bizTypePlaceholder')"
           clearable
           style="width: 180px"
           @keyup.enter="handleSearch"
           @clear="handleSearch"
         />
-        <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
-        <el-button :icon="Refresh" @click="handleReset">重置</el-button>
+        <el-button type="primary" :icon="Search" @click="handleSearch">{{ t('common.search') }}</el-button>
+        <el-button :icon="Refresh" @click="handleReset">{{ t('common.reset') }}</el-button>
       </div>
       <div class="toolbar-right">
         <el-button v-if="showUpload" type="primary" :icon="UploadFilled" @click="openUpload">
-          上传文件
+          {{ t('fileLib.upload') }}
         </el-button>
-        <el-button :icon="Refresh" circle title="刷新" @click="loadList" />
+        <el-button :icon="Refresh" circle :title="t('common.refresh')" @click="loadList" />
       </div>
     </div>
 
     <div v-loading="loading" class="file-grid-wrapper">
-      <el-empty v-if="!loading && !files.length" description="还没有文件，先上传一个试试" />
+      <el-empty v-if="!loading && !files.length" :description="t('fileLib.empty')" />
 
       <div v-else class="file-grid">
         <div v-for="file in files" :key="file.fileId" class="file-card">
@@ -58,7 +58,7 @@
               <div class="file-name">{{ file.displayName || file.originalName }}</div>
             </el-tooltip>
             <div v-if="isRenamed(file)" class="file-origin">
-              原名：{{ file.originalName }}
+              {{ t('fileLib.originalName', { name: file.originalName }) }}
             </div>
             <div class="file-sub">
               <span>{{ formatFileSize(file.size) }}</span>
@@ -69,9 +69,9 @@
           </div>
 
           <div class="file-actions">
-            <el-button link type="primary" @click="openDetail(file)">详情</el-button>
-            <el-button link type="primary" @click="openRename(file)">改名</el-button>
-            <el-button link type="primary" @click="copyUrl(file)">复制链接</el-button>
+            <el-button link type="primary" @click="openDetail(file)">{{ t('common.detail') }}</el-button>
+            <el-button link type="primary" @click="openRename(file)">{{ t('fileLib.rename') }}</el-button>
+            <el-button link type="primary" @click="copyUrl(file)">{{ t('fileLib.copyLink') }}</el-button>
           </div>
         </div>
       </div>
@@ -91,22 +91,22 @@
     </div>
 
     <!-- 上传 -->
-    <el-dialog v-model="uploadVisible" title="上传文件" width="520px" append-to-body>
+    <el-dialog v-model="uploadVisible" :title="t('fileLib.uploadTitle')" width="520px" append-to-body>
       <el-form label-width="90px">
-        <el-form-item label="业务类型">
+        <el-form-item :label="t('fileLib.bizType')">
           <el-input v-model="uploadForm.bizType" placeholder="common / notice / cms ..." />
         </el-form-item>
-        <el-form-item label="备注">
+        <el-form-item :label="t('common.remark')">
           <el-input
             v-model="uploadForm.remark"
             type="textarea"
             :rows="2"
             maxlength="200"
             show-word-limit
-            placeholder="例如《系统升级公告》配图，方便以后搜索"
+            :placeholder="t('fileLib.remarkPlaceholder')"
           />
         </el-form-item>
-        <el-form-item label="选择文件">
+        <el-form-item :label="t('fileLib.selectFile')">
           <el-upload
             drag
             :show-file-list="false"
@@ -116,10 +116,10 @@
           >
             <el-icon class="upload-icon"><UploadFilled /></el-icon>
             <div class="el-upload__text">
-              把文件拖到这里，或 <em>点击选择</em>
+              {{ t('fileLib.dropHint') }}<em>{{ t('fileLib.clickSelect') }}</em>
             </div>
             <template #tip>
-              <div class="form-tip">单个文件不超过 10MB；图片会自动生成缩略图。</div>
+              <div class="form-tip">{{ t('fileLib.uploadTip') }}</div>
             </template>
           </el-upload>
           <el-progress
@@ -132,36 +132,36 @@
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="uploadVisible = false">关闭</el-button>
+          <el-button @click="uploadVisible = false">{{ t('common.close') }}</el-button>
         </div>
       </template>
     </el-dialog>
 
     <!-- 改名 -->
-    <el-dialog v-model="renameVisible" title="文件改名" width="480px" append-to-body>
+    <el-dialog v-model="renameVisible" :title="t('fileLib.renameTitle')" width="480px" append-to-body>
       <el-form label-width="90px">
-        <el-form-item label="原文件名">
+        <el-form-item :label="t('fileLib.originalFileName')">
           <span class="text-secondary">{{ renameTarget.originalName }}</span>
         </el-form-item>
-        <el-form-item label="当前名称">
+        <el-form-item :label="t('fileLib.currentName')">
           <el-input v-model="renameTarget.displayName" maxlength="200" show-word-limit />
         </el-form-item>
         <el-form-item>
           <div class="form-tip">
-            改名只影响展示名，原始文件名与存储路径不变；每次改名都会写入改名历史。
+            {{ t('fileLib.renameTip') }}
           </div>
         </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="renameVisible = false">取消</el-button>
-          <el-button type="primary" :loading="renaming" @click="submitRename">保存</el-button>
+          <el-button @click="renameVisible = false">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="renaming" @click="submitRename">{{ t('common.save') }}</el-button>
         </div>
       </template>
     </el-dialog>
 
     <!-- 详情 -->
-    <el-drawer v-model="detailVisible" title="文件详情" size="480px" append-to-body>
+    <el-drawer v-model="detailVisible" :title="t('fileLib.detailTitle')" size="480px" append-to-body>
       <div v-if="detail" class="file-detail">
         <el-image
           v-if="isImage(detail) && detail.url"
@@ -172,39 +172,39 @@
           preview-teleported
         />
         <el-descriptions :column="1" border>
-          <el-descriptions-item label="文件 ID">
+          <el-descriptions-item :label="t('fileLib.fileId')">
             <span class="text-mono">{{ detail.fileId }}</span>
           </el-descriptions-item>
-          <el-descriptions-item label="现用名">{{ detail.displayName || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="原始名">{{ detail.originalName || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="类型">{{ detail.mime || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="大小">{{ formatFileSize(detail.size) }}</el-descriptions-item>
-          <el-descriptions-item label="尺寸">
+          <el-descriptions-item :label="t('fileLib.displayName')">{{ detail.displayName || '-' }}</el-descriptions-item>
+          <el-descriptions-item :label="t('fileLib.originalNameLabel')">{{ detail.originalName || '-' }}</el-descriptions-item>
+          <el-descriptions-item :label="t('fileLib.mimeType')">{{ detail.mime || '-' }}</el-descriptions-item>
+          <el-descriptions-item :label="t('fileLib.size')">{{ formatFileSize(detail.size) }}</el-descriptions-item>
+          <el-descriptions-item :label="t('fileLib.dimension')">
             {{ detail.width && detail.height ? `${detail.width} × ${detail.height}` : '-' }}
           </el-descriptions-item>
-          <el-descriptions-item label="图片变体">
+          <el-descriptions-item :label="t('fileLib.variants')">
             <span v-if="detail.thumbUrl" class="text-mono">
-              缩略图 / 中图已生成
+              {{ t('fileLib.variantsReady') }}
             </span>
-            <span v-else class="text-secondary">未生成（非图片或原图较小）</span>
+            <span v-else class="text-secondary">{{ t('fileLib.variantsMissing') }}</span>
           </el-descriptions-item>
-          <el-descriptions-item label="业务类型">{{ detail.bizType || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="备注">{{ detail.remark || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="上传时间">{{ detail.createTime || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="访问地址">
+          <el-descriptions-item :label="t('fileLib.bizType')">{{ detail.bizType || '-' }}</el-descriptions-item>
+          <el-descriptions-item :label="t('common.remark')">{{ detail.remark || '-' }}</el-descriptions-item>
+          <el-descriptions-item :label="t('fileLib.uploadedAt')">{{ detail.createTime || '-' }}</el-descriptions-item>
+          <el-descriptions-item :label="t('fileLib.url')">
             <span class="text-mono">{{ detail.url }}</span>
           </el-descriptions-item>
         </el-descriptions>
 
-        <h4 class="section-title" style="margin-top: 20px">改名历史</h4>
-        <el-empty v-if="!history.length" description="没有改名记录" :image-size="60" />
+        <h4 class="section-title" style="margin-top: 20px">{{ t('fileLib.renameHistory') }}</h4>
+        <el-empty v-if="!history.length" :description="t('fileLib.noHistory')" :image-size="60" />
         <el-timeline v-else>
           <el-timeline-item
             v-for="item in history"
             :key="item.logId || item.id || item.createTime"
             :timestamp="item.createTime"
           >
-            {{ item.oldName || '原始名' }} → {{ item.newName || item.displayName }}
+            {{ item.oldName || t('fileLib.originalBadge') }} → {{ item.newName || item.displayName }}
           </el-timeline-item>
         </el-timeline>
       </div>
@@ -215,6 +215,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { Refresh, Search, UploadFilled } from '@element-plus/icons-vue'
 import {
   getFile,
@@ -238,6 +239,7 @@ const props = defineProps({
 })
 
 const loading = ref(false)
+const { t } = useI18n()
 const files = ref([])
 const total = ref(0)
 const query = reactive({
@@ -313,7 +315,7 @@ async function doUpload(options) {
         uploadPercent.value = value
       }
     })
-    ElMessage.success(`上传成功：${data.displayName || data.originalName}`)
+    ElMessage.success(t('fileLib.uploadSuccess', { name: data.displayName || data.originalName }))
     uploadVisible.value = false
     query.pageNum = 1
     await loadList()
@@ -340,13 +342,13 @@ function openRename(file) {
 
 async function submitRename() {
   if (!renameTarget.displayName || !renameTarget.displayName.trim()) {
-    ElMessage.warning('新名称不能为空')
+    ElMessage.warning(t('fileLib.nameRequired'))
     return
   }
   renaming.value = true
   try {
     await renameFile(renameTarget.fileId, renameTarget.displayName.trim())
-    ElMessage.success('改名成功')
+    ElMessage.success(t('fileLib.renamed'))
     renameVisible.value = false
     await loadList()
     if (detailVisible.value && detail.value && String(detail.value.fileId) === String(renameTarget.fileId)) {
@@ -379,9 +381,9 @@ async function copyUrl(file) {
   const url = `${window.location.origin}${file.url || ''}`
   try {
     await navigator.clipboard.writeText(url)
-    ElMessage.success('链接已复制')
+    ElMessage.success(t('fileLib.linkCopied'))
   } catch (e) {
-    ElMessage.warning(`复制失败，请手动复制：${url}`)
+    ElMessage.warning(t('fileLib.copyFailedManual', { url }))
   }
 }
 </script>

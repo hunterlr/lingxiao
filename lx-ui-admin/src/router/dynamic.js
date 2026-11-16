@@ -51,6 +51,7 @@ export function installDynamicRoutes(menus) {
       component: resolveComponent(menu.component),
       meta: {
         title: menu.name,
+        titleKey: menu.menuKey ? `menu.${menu.menuKey}` : '',
         icon: menu.icon,
         perms: menu.perms,
         menuId: menu.id,

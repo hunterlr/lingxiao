@@ -3,11 +3,11 @@
     <div class="editor-bar">
       <div class="editor-bar-left">
         <el-tag size="small" effect="plain" type="info">{{ currentLabel }}</el-tag>
-        <span class="editor-hint">图片自动上传到文件中心，不存 base64</span>
+        <span class="editor-hint">{{ t('editor.hint') }}</span>
       </div>
       <el-dropdown trigger="click" placement="bottom-end" @command="handleSwitch">
         <el-button link type="primary" size="small">
-          切换编辑器
+          {{ t('editor.switch') }}
           <el-icon class="el-icon--right"><ArrowDown /></el-icon>
         </el-button>
         <template #dropdown>
@@ -20,11 +20,11 @@
             >
               <div class="engine-option">
                 <span class="engine-option-label">{{ item.label }}</span>
-                <span class="engine-option-hint">{{ item.hint }}</span>
+                <span class="engine-option-hint">{{ t('editor.' + item.hintKey) }}</span>
               </div>
             </el-dropdown-item>
             <el-dropdown-item divided command="__default__" :disabled="!overrideActive">
-              跟随平台默认
+              {{ t('editor.followDefault') }}
             </el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -35,15 +35,16 @@
       v-if="engine === 'wangeditor-next'"
       v-model="inner"
       :height="height"
-      :placeholder="placeholder"
+      :placeholder="resolvedPlaceholder"
     />
-    <UEditorPlus v-else v-model="inner" :height="height" :placeholder="placeholder" />
+    <UEditorPlus v-else v-model="inner" :height="height" :placeholder="resolvedPlaceholder" />
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { ArrowDown } from '@element-plus/icons-vue'
 import WangEditorNext from '@/components/editor/WangEditorNext.vue'
 import UEditorPlus from '@/components/editor/UEditorPlus.vue'
@@ -72,14 +73,16 @@ import {
 const props = defineProps({
   modelValue: { type: String, default: '' },
   height: { type: String, default: '360px' },
-  placeholder: { type: String, default: '请输入内容…' }
+  placeholder: { type: String, default: '' }
 })
 
 const emit = defineEmits(['update:modelValue'])
+const { t } = useI18n()
 
 const engine = editorEngine
 const currentLabel = computed(() => engineLabel(engine.value))
 const overrideActive = computed(() => hasEditorOverride())
+const resolvedPlaceholder = computed(() => props.placeholder || t('editor.placeholder'))
 
 const inner = computed({
   get: () => props.modelValue || '',
@@ -97,8 +100,8 @@ function handleSwitch(command) {
   if (next === before) return
   ElMessage.success(
     command === '__default__'
-      ? `已恢复平台默认：${engineLabel(next)}`
-      : `已切换到 ${engineLabel(next)}`
+      ? t('editor.restoredDefault', { engine: engineLabel(next) })
+      : t('editor.switchedTo', { engine: engineLabel(next) })
   )
 }
 </script>

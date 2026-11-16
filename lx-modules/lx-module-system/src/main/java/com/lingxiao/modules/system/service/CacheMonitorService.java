@@ -1,5 +1,6 @@
 package com.lingxiao.modules.system.service;
 
+import com.lingxiao.common.core.i18n.MessageUtils;
 import com.lingxiao.modules.system.dto.CacheInfoVO;
 import com.lingxiao.modules.system.service.captcha.CaptchaStore;
 import lombok.RequiredArgsConstructor;
@@ -49,26 +50,32 @@ public class CacheMonitorService {
         vo.setCaptcha(safeCaptchaStats());
 
         if (!redisEnabled) {
-            vo.setNote("当前未启用 Redis：验证码与会话保存在本机内存，以下为 Caffeine 统计。"
-                    + "多实例部署请把 lx.redis.enabled 改为 true。");
+            vo.setNote(MessageUtils.message("monitor.cache.note.local",
+                    "当前未启用 Redis：验证码与会话保存在本机内存，以下为 Caffeine 统计。"
+                            + "多实例部署请把 lx.redis.enabled 改为 true。"));
             return vo;
         }
 
         StringRedisTemplate template = redisTemplateProvider.getIfAvailable();
         if (template == null) {
-            vo.setNote("已启用 Redis，但容器里没有 StringRedisTemplate，已降级展示验证码存储统计。");
-            vo.getWarnings().add("未找到 StringRedisTemplate，请检查 spring-boot-starter-data-redis 依赖");
+            vo.setNote(MessageUtils.message("monitor.cache.note.redisNoTemplate",
+                    "已启用 Redis，但容器里没有 StringRedisTemplate，已降级展示验证码存储统计。"));
+            vo.getWarnings().add(MessageUtils.message("monitor.cache.warning.noTemplate",
+                    "未找到 StringRedisTemplate，请检查 spring-boot-starter-data-redis 依赖"));
             return vo;
         }
 
         try {
             vo.setRedis(readRedis(template));
-            vo.setNote("已启用 Redis：以下为 INFO 摘要与验证码 Key 统计。");
+            vo.setNote(MessageUtils.message("monitor.cache.note.redis",
+                    "已启用 Redis：以下为 INFO 摘要与验证码 Key 统计。"));
         } catch (Exception e) {
             // 连接超时 / 权限不足 / 代理异常：只降级，不 500
             log.warn("读取 Redis INFO 失败: {}", e.getMessage());
-            vo.setNote("已启用 Redis，但本次读取失败，已降级展示验证码存储统计。");
-            vo.getWarnings().add("Redis 读取失败: " + e.getMessage());
+            vo.setNote(MessageUtils.message("monitor.cache.note.redisFailed",
+                    "已启用 Redis，但本次读取失败，已降级展示验证码存储统计。"));
+            vo.getWarnings().add(MessageUtils.message("monitor.cache.warning.redisError",
+                    new Object[]{e.getMessage()}, "Redis 读取失败: " + e.getMessage()));
         }
         return vo;
     }
@@ -193,19 +200,19 @@ public class CacheMonitorService {
 
     private String humanDuration(long seconds) {
         if (seconds <= 0) {
-            return "0 秒";
+            return MessageUtils.message("monitor.cache.duration.zero", "0 秒");
         }
         long days = seconds / 86400;
         long hours = (seconds % 86400) / 3600;
         long minutes = (seconds % 3600) / 60;
         StringBuilder sb = new StringBuilder();
         if (days > 0) {
-            sb.append(days).append(" 天 ");
+            sb.append(MessageUtils.message("monitor.cache.duration.days", new Object[]{days}, days + " 天")).append(' ');
         }
         if (hours > 0 || days > 0) {
-            sb.append(hours).append(" 小时 ");
+            sb.append(MessageUtils.message("monitor.cache.duration.hours", new Object[]{hours}, hours + " 小时")).append(' ');
         }
-        sb.append(minutes).append(" 分");
+        sb.append(MessageUtils.message("monitor.cache.duration.minutes", new Object[]{minutes}, minutes + " 分"));
         return sb.toString().trim();
     }
 

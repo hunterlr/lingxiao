@@ -318,6 +318,7 @@ public class AuthService {
         MenuVO vo = new MenuVO();
         vo.setId(menu.getMenuId());
         vo.setParentId(menu.getParentId());
+        vo.setMenuKey(menu.getMenuKey());
         vo.setName(menu.getMenuName());
         vo.setType(menu.getMenuType());
         vo.setPath(menu.getPath());

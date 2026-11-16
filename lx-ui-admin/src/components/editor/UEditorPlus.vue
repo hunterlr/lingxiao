@@ -19,6 +19,7 @@
 import { VueUeditorWrap } from 'vue-ueditor-wrap'
 import { computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { uploadFile } from '@/api/file'
 
 /**
@@ -44,6 +45,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue'])
+const { t } = useI18n()
 
 const editorId = `lx-uep-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 
@@ -63,10 +65,16 @@ const frameHeight = Math.max(Number.parseInt(props.height, 10) - 70 || 290, 220)
 
 /** 自定义上传：type 是 UEditor 传的 image / video / audio / attachment。 */
 function uploadServiceUpload(type, file, callbacks) {
-  const labels = { image: '图片', video: '视频', audio: '音频', attachment: '附件' }
+  // 备注是写进文件中心的数据，跟随当前语言存，方便同一语言下搜索
+  const labels = {
+    image: t('editor.materialImage'),
+    video: t('editor.materialVideo'),
+    audio: t('editor.materialAudio'),
+    attachment: t('editor.materialAttachment')
+  }
   uploadFile(file, {
     bizType: 'notice',
-    remark: `富文本${labels[type] || '素材'}（UEditor Plus）`,
+    remark: t('editor.materialRemark', { label: labels[type] || t('editor.materialOther') }),
     onProgress: (percent) => callbacks.progress && callbacks.progress(percent)
   })
     .then((data) => {
@@ -81,8 +89,8 @@ function uploadServiceUpload(type, file, callbacks) {
       })
     })
     .catch((error) => {
-      ElMessage.error(error.message || '素材上传失败')
-      callbacks.error(error.message || '上传失败')
+      ElMessage.error(error.message || t('editor.materialUploadFailed'))
+      callbacks.error(error.message || t('editor.uploadFailed'))
     })
 }
 

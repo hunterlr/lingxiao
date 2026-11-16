@@ -1,4 +1,5 @@
 import { useAuthStore } from '@/store/auth'
+import i18n from '@/i18n'
 import { installDynamicRoutes, resetDynamicRoutes } from './dynamic'
 
 /**
@@ -49,6 +50,9 @@ export function setupGuard(router) {
   })
 
   router.afterEach((to) => {
-    document.title = to.meta && to.meta.title ? `${to.meta.title} · 凌霄后台` : '凌霄后台'
+    const { t, te } = i18n.global
+    const meta = to.meta || {}
+    const pageTitle = meta.titleKey && te(meta.titleKey) ? t(meta.titleKey) : meta.title
+    document.title = pageTitle ? `${pageTitle} · ${t('layout.brand')}` : t('layout.brand')
   })
 }

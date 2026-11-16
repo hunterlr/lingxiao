@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import i18n from '@/i18n'
 import * as authApi from '@/api/auth'
 import { clearToken, getToken, getTokenName, setToken } from '@/utils/auth'
 
@@ -29,9 +30,16 @@ export const useAuthStore = defineStore('auth', {
 
   getters: {
     isLogin: (state) => Boolean(state.token),
-    displayName: (state) => state.nickname || state.username || '未登录',
+    // 读一下 locale.value，切语言时 getter 才会重新求值（否则一直用首次渲染的文案）
+    displayName(state) {
+      void i18n.global.locale.value
+      return state.nickname || state.username || i18n.global.t('layout.notLoggedIn')
+    },
     isSuperAdmin: (state) => state.permissions.includes('*:*:*'),
-    roleLabel: (state) => (state.roles.length ? state.roles.join(' / ') : '普通用户')
+    roleLabel(state) {
+      void i18n.global.locale.value
+      return state.roles.length ? state.roles.join(' / ') : i18n.global.t('layout.normalUser')
+    }
   },
 
   actions: {

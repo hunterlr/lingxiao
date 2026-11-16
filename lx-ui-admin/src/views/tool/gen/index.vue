@@ -2,20 +2,20 @@
   <div class="page-container">
     <div class="page-card">
       <el-form :inline="true" :model="query" class="search-form" @submit.prevent>
-        <el-form-item label="表名称">
+        <el-form-item :label="t('page.gen.tableName')">
           <el-input
             v-model="query.tableName"
-            placeholder="输入表名"
+            :placeholder="t('page.gen.namePlaceholder')"
             clearable
             style="width: 180px"
             @keyup.enter="handleSearch"
             @clear="handleSearch"
           />
         </el-form-item>
-        <el-form-item label="表描述">
+        <el-form-item :label="t('page.gen.tableComment')">
           <el-input
             v-model="query.tableComment"
-            placeholder="输入表注释"
+            :placeholder="t('page.gen.commentPlaceholder')"
             clearable
             style="width: 180px"
             @keyup.enter="handleSearch"
@@ -23,16 +23,15 @@
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
-          <el-button :icon="Refresh" @click="handleReset">重置</el-button>
+          <el-button type="primary" :icon="Search" @click="handleSearch">{{ t('common.search') }}</el-button>
+          <el-button :icon="Refresh" @click="handleReset">{{ t('common.reset') }}</el-button>
         </el-form-item>
       </el-form>
 
       <div class="table-toolbar">
         <div class="toolbar-left">
           <span class="text-secondary">
-            导入表 → 配置字段 → 预览 → 下载 ZIP；生成物需要放进目标模块后编译。
-            生成器只读表结构，不会修改数据库。
+            {{ t('page.gen.hint') }}
           </span>
         </div>
         <div class="toolbar-right">
@@ -42,26 +41,26 @@
             :icon="Upload"
             @click="openImport"
           >
-            导入表
+            {{ t('page.gen.import') }}
           </el-button>
-          <el-button :icon="Refresh" @click="loadList">刷新</el-button>
+          <el-button :icon="Refresh" @click="loadList">{{ t('common.refresh') }}</el-button>
         </div>
       </div>
 
       <el-table v-loading="loading" :data="rows" border stripe row-key="tableId">
-        <el-table-column prop="tableName" label="表名称" min-width="170" show-overflow-tooltip>
+        <el-table-column prop="tableName" :label="t('page.gen.tableName')" min-width="170" show-overflow-tooltip>
           <template #default="{ row }">
             <span class="text-mono">{{ row.tableName }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="tableComment" label="表描述" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="className" label="实体类" min-width="140" show-overflow-tooltip />
-        <el-table-column prop="moduleName" label="模块" width="100" />
-        <el-table-column prop="businessName" label="业务名" min-width="140" show-overflow-tooltip />
-        <el-table-column prop="functionName" label="功能名" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="functionAuthor" label="作者" width="110" show-overflow-tooltip />
-        <el-table-column prop="createTime" label="导入时间" width="165" />
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column prop="tableComment" :label="t('page.gen.tableComment')" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="className" :label="t('page.gen.entity')" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="moduleName" :label="t('page.gen.module')" width="100" />
+        <el-table-column prop="businessName" :label="t('page.gen.businessName')" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="functionName" :label="t('page.gen.functionName')" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="functionAuthor" :label="t('page.gen.author')" width="110" show-overflow-tooltip />
+        <el-table-column prop="createTime" :label="t('page.gen.importTime')" width="165" />
+        <el-table-column :label="t('common.operation')" width="250" fixed="right">
           <template #default="{ row }">
             <div class="table-actions">
               <el-button
@@ -70,7 +69,7 @@
                 type="primary"
                 @click="openPreview(row)"
               >
-                预览
+                {{ t('page.gen.preview') }}
               </el-button>
               <el-button
                 v-hasPerm="'platform:tool:gen:edit'"
@@ -78,7 +77,7 @@
                 type="primary"
                 @click="openConfig(row)"
               >
-                配置
+                {{ t('page.gen.config') }}
               </el-button>
               <el-button
                 v-hasPerm="'platform:tool:gen:download'"
@@ -86,7 +85,7 @@
                 type="primary"
                 @click="handleDownload(row)"
               >
-                下载
+                {{ t('page.gen.download') }}
               </el-button>
               <el-button
                 v-hasPerm="'platform:tool:gen:remove'"
@@ -94,7 +93,7 @@
                 type="danger"
                 @click="handleDelete(row)"
               >
-                删除
+                {{ t('common.delete') }}
               </el-button>
             </div>
           </template>
@@ -118,7 +117,7 @@
     <!-- 导入表 -->
     <el-dialog
       v-model="importVisible"
-      title="导入数据库表"
+      :title="t('page.gen.importTitle')"
       width="780px"
       append-to-body
       destroy-on-close
@@ -127,15 +126,15 @@
       <div class="import-toolbar">
         <el-input
           v-model="dbKeyword"
-          placeholder="搜索表名 / 表注释"
+          :placeholder="t('page.gen.searchTable')"
           clearable
           style="width: 240px"
           @keyup.enter="loadDbTables"
           @clear="loadDbTables"
         />
-        <el-button :icon="Search" @click="loadDbTables">搜索</el-button>
+        <el-button :icon="Search" @click="loadDbTables">{{ t('common.search') }}</el-button>
         <span class="text-secondary">
-          已导入的表会置灰；一次最多导入 50 张，无主键 / 复合主键会被跳过。
+          {{ t('page.gen.importHint') }}
         </span>
       </div>
 
@@ -147,9 +146,9 @@
         class="import-result"
       >
         <template #title>
-          成功导入 {{ importResult.imported }} 张表
+          {{ t('page.gen.importedCount', { count: importResult.imported }) }}
           <span v-if="importResult.skipped.length">
-            ，{{ importResult.skipped.length }} 张被跳过
+            {{ t('page.gen.skippedCount', { count: importResult.skipped.length }) }}
           </span>
         </template>
         <ul v-if="importResult.skipped.length" class="skip-list">
@@ -167,31 +166,31 @@
         @selection-change="handleDbSelectionChange"
       >
         <el-table-column type="selection" width="50" :selectable="(row) => !row.imported" />
-        <el-table-column prop="tableName" label="表名称" min-width="220">
+        <el-table-column prop="tableName" :label="t('page.gen.tableName')" min-width="220">
           <template #default="{ row }">
             <span class="text-mono">{{ row.tableName }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="tableComment" label="表注释" min-width="220" show-overflow-tooltip />
-        <el-table-column label="状态" width="100" align="center">
+        <el-table-column prop="tableComment" :label="t('page.gen.tableCommentCol')" min-width="220" show-overflow-tooltip />
+        <el-table-column :label="t('common.status')" width="100" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.imported" size="small" effect="plain" type="info">已导入</el-tag>
-            <el-tag v-else size="small" effect="plain" type="success">可导入</el-tag>
+            <el-tag v-if="row.imported" size="small" effect="plain" type="info">{{ t('page.gen.imported') }}</el-tag>
+            <el-tag v-else size="small" effect="plain" type="success">{{ t('page.gen.importable') }}</el-tag>
           </template>
         </el-table-column>
       </el-table>
 
       <template #footer>
         <div class="dialog-footer">
-          <span class="text-secondary selected-tip">已选 {{ selectedTables.length }} 张</span>
-          <el-button @click="importVisible = false">关闭</el-button>
+          <span class="text-secondary selected-tip">{{ t('page.gen.selectedCount', { count: selectedTables.length }) }}</span>
+          <el-button @click="importVisible = false">{{ t('common.close') }}</el-button>
           <el-button
             type="primary"
             :loading="importing"
             :disabled="!selectedTables.length"
             @click="submitImport"
           >
-            导入
+            {{ t('page.gen.importBtn') }}
           </el-button>
         </div>
       </template>
@@ -207,13 +206,13 @@
     >
       <template #header>
         <div class="config-header">
-          <span>生成配置</span>
+          <span>{{ t('page.gen.configTitle') }}</span>
           <span class="text-secondary text-mono">{{ current.tableName }}</span>
         </div>
       </template>
 
       <el-tabs v-model="configTab">
-        <el-tab-pane label="基本信息" name="base">
+        <el-tab-pane :label="t('page.gen.tabBase')" name="base">
           <el-form
             ref="configFormRef"
             v-loading="configLoading"
@@ -222,43 +221,43 @@
             label-width="120px"
             class="config-form"
           >
-            <el-form-item label="表名称">
+            <el-form-item :label="t('page.gen.tableName')">
               <el-input :model-value="current.tableName" disabled />
             </el-form-item>
-            <el-form-item label="表描述" prop="tableComment">
+            <el-form-item :label="t('page.gen.tableComment')" prop="tableComment">
               <el-input v-model="current.tableComment" maxlength="500" show-word-limit />
             </el-form-item>
-            <el-form-item label="实体类名" prop="className">
-              <el-input v-model="current.className" placeholder="PascalCase，例如 BizOrder" />
+            <el-form-item :label="t('page.gen.className')" prop="className">
+              <el-input v-model="current.className" :placeholder="t('page.gen.classNamePlaceholder')" />
             </el-form-item>
-            <el-form-item label="模块名" prop="moduleName">
-              <el-input v-model="current.moduleName" placeholder="小写，例如 biz；决定包名与接口前缀" />
+            <el-form-item :label="t('page.gen.moduleName')" prop="moduleName">
+              <el-input v-model="current.moduleName" :placeholder="t('page.gen.modulePlaceholder')" />
             </el-form-item>
-            <el-form-item label="业务名" prop="businessName">
-              <el-input v-model="current.businessName" placeholder="camelCase，例如 bizOrder" />
+            <el-form-item :label="t('page.gen.businessName')" prop="businessName">
+              <el-input v-model="current.businessName" :placeholder="t('page.gen.businessPlaceholder')" />
             </el-form-item>
-            <el-form-item label="功能名" prop="functionName">
-              <el-input v-model="current.functionName" maxlength="64" placeholder="菜单标题，例如 订单管理" />
+            <el-form-item :label="t('page.gen.functionName')" prop="functionName">
+              <el-input v-model="current.functionName" maxlength="64" :placeholder="t('page.gen.functionPlaceholder')" />
             </el-form-item>
-            <el-form-item label="作者" prop="functionAuthor">
+            <el-form-item :label="t('page.gen.author')" prop="functionAuthor">
               <el-input v-model="current.functionAuthor" maxlength="64" />
             </el-form-item>
-            <el-form-item label="前端路由" prop="genPath">
-              <el-input v-model="current.genPath" placeholder="例如 /biz/order" />
+            <el-form-item :label="t('page.gen.genPath')" prop="genPath">
+              <el-input v-model="current.genPath" :placeholder="t('page.gen.genPathPlaceholder')" />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" :loading="configSaving" @click="saveBase">保存基本信息</el-button>
-              <el-button @click="configVisible = false">关闭</el-button>
+              <el-button type="primary" :loading="configSaving" @click="saveBase">{{ t('page.gen.saveBase') }}</el-button>
+              <el-button @click="configVisible = false">{{ t('common.close') }}</el-button>
             </el-form-item>
           </el-form>
         </el-tab-pane>
 
-        <el-tab-pane label="字段配置" name="columns">
+        <el-tab-pane :label="t('page.gen.tabColumns')" name="columns">
           <div class="column-toolbar">
             <span class="text-secondary">
-              列名 / 主键 / 自增来自数据库，不可修改；其余字段决定生成代码里的字段、表单控件和查询条件。
+              {{ t('page.gen.columnHint') }}
             </span>
-            <el-button type="primary" :loading="configSaving" @click="saveColumns">保存字段配置</el-button>
+            <el-button type="primary" :loading="configSaving" @click="saveColumns">{{ t('page.gen.saveColumns') }}</el-button>
           </div>
 
           <el-table
@@ -269,54 +268,54 @@
             row-key="columnId"
             max-height="560"
           >
-            <el-table-column prop="columnName" label="列名" width="160" fixed>
+            <el-table-column prop="columnName" :label="t('page.gen.columnName')" width="160" fixed>
               <template #default="{ row }">
                 <span class="text-mono">{{ row.columnName }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="注释" width="170">
+            <el-table-column :label="t('page.gen.columnComment')" width="170">
               <template #default="{ row }">
                 <el-input v-model="row.columnComment" size="small" maxlength="500" />
               </template>
             </el-table-column>
-            <el-table-column label="Java 字段" width="150">
+            <el-table-column :label="t('page.gen.javaField')" width="150">
               <template #default="{ row }">
                 <el-input v-model="row.javaField" size="small" />
               </template>
             </el-table-column>
-            <el-table-column label="Java 类型" width="140">
+            <el-table-column :label="t('page.gen.javaType')" width="140">
               <template #default="{ row }">
                 <el-select v-model="row.javaType" size="small" style="width: 100%">
                   <el-option v-for="type in javaTypes" :key="type" :label="type" :value="type" />
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="必填" width="70" align="center">
+            <el-table-column :label="t('page.gen.required')" width="70" align="center">
               <template #default="{ row }">
                 <el-switch v-model="row.isRequired" active-value="1" inactive-value="0" size="small" />
               </template>
             </el-table-column>
-            <el-table-column label="新增" width="70" align="center">
+            <el-table-column :label="t('page.gen.insert')" width="70" align="center">
               <template #default="{ row }">
                 <el-switch v-model="row.isInsert" active-value="1" inactive-value="0" size="small" />
               </template>
             </el-table-column>
-            <el-table-column label="编辑" width="70" align="center">
+            <el-table-column :label="t('page.gen.edit')" width="70" align="center">
               <template #default="{ row }">
                 <el-switch v-model="row.isEdit" active-value="1" inactive-value="0" size="small" />
               </template>
             </el-table-column>
-            <el-table-column label="列表" width="70" align="center">
+            <el-table-column :label="t('page.gen.list')" width="70" align="center">
               <template #default="{ row }">
                 <el-switch v-model="row.isList" active-value="1" inactive-value="0" size="small" />
               </template>
             </el-table-column>
-            <el-table-column label="查询" width="70" align="center">
+            <el-table-column :label="t('page.gen.query')" width="70" align="center">
               <template #default="{ row }">
                 <el-switch v-model="row.isQuery" active-value="1" inactive-value="0" size="small" />
               </template>
             </el-table-column>
-            <el-table-column label="查询方式" width="120">
+            <el-table-column :label="t('page.gen.queryType')" width="120">
               <template #default="{ row }">
                 <el-select
                   v-model="row.queryType"
@@ -324,23 +323,23 @@
                   :disabled="row.isQuery !== '1'"
                   style="width: 100%"
                 >
-                  <el-option v-for="item in queryTypes" :key="item.value" :label="item.label" :value="item.value" />
+                  <el-option v-for="item in queryTypes" :key="item.value" :label="t('page.gen.q_' + item.key)" :value="item.value" />
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="表单控件" width="140">
+            <el-table-column :label="t('page.gen.htmlType')" width="140">
               <template #default="{ row }">
                 <el-select v-model="row.htmlType" size="small" style="width: 100%">
-                  <el-option v-for="item in htmlTypes" :key="item.value" :label="item.label" :value="item.value" />
+                  <el-option v-for="item in htmlTypes" :key="item.value" :label="t('page.gen.h_' + item.key)" :value="item.value" />
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="字典类型" width="150">
+            <el-table-column :label="t('page.gen.dictType')" width="150">
               <template #default="{ row }">
-                <el-input v-model="row.dictType" size="small" placeholder="可空" />
+                <el-input v-model="row.dictType" size="small" :placeholder="t('page.gen.dictPlaceholder')" />
               </template>
             </el-table-column>
-            <el-table-column label="排序" width="100">
+            <el-table-column :label="t('common.sort')" width="100">
               <template #default="{ row }">
                 <el-input-number
                   v-model="row.sort"
@@ -352,10 +351,10 @@
                 />
               </template>
             </el-table-column>
-            <el-table-column label="标记" width="110" align="center">
+            <el-table-column :label="t('page.gen.marks')" width="110" align="center">
               <template #default="{ row }">
-                <el-tag v-if="row.isPk === '1'" size="small" effect="plain" type="warning">主键</el-tag>
-                <el-tag v-if="row.isIncrement === '1'" size="small" effect="plain" type="info">自增</el-tag>
+                <el-tag v-if="row.isPk === '1'" size="small" effect="plain" type="warning">{{ t('page.gen.pk') }}</el-tag>
+                <el-tag v-if="row.isIncrement === '1'" size="small" effect="plain" type="info">{{ t('page.gen.increment') }}</el-tag>
               </template>
             </el-table-column>
           </el-table>
@@ -366,7 +365,7 @@
     <!-- 预览代码 -->
     <el-dialog
       v-model="previewVisible"
-      title="代码预览"
+      :title="t('page.gen.previewTitle')"
       width="86%"
       append-to-body
       destroy-on-close
@@ -387,12 +386,12 @@
           </el-tab-pane>
         </el-tabs>
         <pre v-if="activePreview" class="code-preview">{{ activePreview.content }}</pre>
-        <el-empty v-else-if="!previewLoading" description="没有可预览的文件" />
+        <el-empty v-else-if="!previewLoading" :description="t('page.gen.emptyPreview')" />
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button :icon="CopyDocument" @click="copyPreview">复制当前文件</el-button>
-          <el-button @click="previewVisible = false">关闭</el-button>
+          <el-button :icon="CopyDocument" @click="copyPreview">{{ t('page.gen.copyCurrent') }}</el-button>
+          <el-button @click="previewVisible = false">{{ t('common.close') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -414,6 +413,7 @@ import {
   updateGenColumns,
   updateGenTable
 } from '@/api/gen'
+import { useI18n } from 'vue-i18n'
 
 /**
  * 代码生成器。
@@ -422,6 +422,8 @@ import {
  * 预览内容全部来自后端 Velocity 渲染，下载的 ZIP 与预览使用同一份变量，
  * 避免“预览对了、下载错了”的双份实现。</p>
  */
+
+const { t } = useI18n()
 
 const loading = ref(false)
 const rows = ref([])
@@ -494,7 +496,7 @@ function handleImportClosed() {
 
 async function submitImport() {
   if (!selectedTables.value.length) {
-    ElMessage.warning('请先选择要导入的表')
+    ElMessage.warning(t('page.gen.selectFirst'))
     return
   }
   importing.value = true
@@ -502,10 +504,10 @@ async function submitImport() {
     const result = await importGenTables(selectedTables.value.map((row) => row.tableName))
     importResult.value = result
     if (result.imported > 0) {
-      ElMessage.success(`成功导入 ${result.imported} 张表`)
+      ElMessage.success(t('page.gen.importSuccess', { count: result.imported }))
       await loadList()
     } else {
-      ElMessage.warning('没有表被导入，请查看跳过原因')
+      ElMessage.warning(t('page.gen.importNone'))
     }
     await loadDbTables()
     selectedTables.value = []
@@ -537,11 +539,11 @@ const emptyCurrent = () => ({
 const current = reactive(emptyCurrent())
 
 const configRules = {
-  className: [{ required: true, message: '请输入实体类名', trigger: 'blur' }],
-  moduleName: [{ required: true, message: '请输入模块名', trigger: 'blur' }],
-  businessName: [{ required: true, message: '请输入业务名', trigger: 'blur' }],
-  functionName: [{ required: true, message: '请输入功能名', trigger: 'blur' }],
-  genPath: [{ required: true, message: '请输入前端路由', trigger: 'blur' }]
+  className: [{ required: true, message: t('page.gen.classNameRequired'), trigger: 'blur' }],
+  moduleName: [{ required: true, message: t('page.gen.moduleRequired'), trigger: 'blur' }],
+  businessName: [{ required: true, message: t('page.gen.businessRequired'), trigger: 'blur' }],
+  functionName: [{ required: true, message: t('page.gen.functionRequired'), trigger: 'blur' }],
+  genPath: [{ required: true, message: t('page.gen.genPathRequired'), trigger: 'blur' }]
 }
 
 const javaTypes = [
@@ -550,23 +552,23 @@ const javaTypes = [
 ]
 
 const queryTypes = [
-  { value: 'EQ', label: '等于 EQ' },
-  { value: 'LIKE', label: '模糊 LIKE' },
-  { value: 'GT', label: '大于 GT' },
-  { value: 'GE', label: '大于等于 GE' },
-  { value: 'LT', label: '小于 LT' },
-  { value: 'LE', label: '小于等于 LE' }
+  { value: 'EQ', key: 'eq' },
+  { value: 'LIKE', key: 'like' },
+  { value: 'GT', key: 'gt' },
+  { value: 'GE', key: 'ge' },
+  { value: 'LT', key: 'lt' },
+  { value: 'LE', key: 'le' }
 ]
 
 const htmlTypes = [
-  { value: 'input', label: '输入框' },
-  { value: 'textarea', label: '多行文本' },
-  { value: 'select', label: '下拉框' },
-  { value: 'radio', label: '单选框' },
-  { value: 'checkbox', label: '复选框' },
-  { value: 'datetime', label: '日期时间' },
-  { value: 'upload', label: '上传' },
-  { value: 'editor', label: '富文本' }
+  { value: 'input', key: 'input' },
+  { value: 'textarea', key: 'textarea' },
+  { value: 'select', key: 'select' },
+  { value: 'radio', key: 'radio' },
+  { value: 'checkbox', key: 'checkbox' },
+  { value: 'datetime', key: 'datetime' },
+  { value: 'upload', key: 'upload' },
+  { value: 'editor', key: 'editor' }
 ]
 
 async function openConfig(row) {
@@ -612,7 +614,7 @@ async function saveBase() {
         functionAuthor: current.functionAuthor,
         genPath: current.genPath
       })
-      ElMessage.success('基本信息已保存')
+      ElMessage.success(t('page.gen.baseSaved'))
       await loadList()
     } finally {
       configSaving.value = false
@@ -622,7 +624,7 @@ async function saveBase() {
 
 async function saveColumns() {
   if (!columns.value.length) {
-    ElMessage.warning('没有字段配置可保存，请重新导入')
+    ElMessage.warning(t('page.gen.noColumns'))
     return
   }
   configSaving.value = true
@@ -643,7 +645,7 @@ async function saveColumns() {
       sort: column.sort
     }))
     await updateGenColumns(current.tableId, payload)
-    ElMessage.success('字段配置已保存')
+    ElMessage.success(t('page.gen.columnsSaved'))
     const detail = await getGenTable(current.tableId)
     columns.value = detail.columns || []
   } finally {
@@ -676,14 +678,14 @@ async function openPreview(row) {
 
 async function copyPreview() {
   if (!activePreview.value) {
-    ElMessage.warning('没有可复制的内容')
+    ElMessage.warning(t('page.gen.noCopy'))
     return
   }
   try {
     await navigator.clipboard.writeText(activePreview.value.content)
-    ElMessage.success('已复制当前文件内容')
+    ElMessage.success(t('page.gen.copied'))
   } catch (e) {
-    ElMessage.error('复制失败，请检查浏览器剪贴板权限')
+    ElMessage.error(t('page.gen.copyFailed'))
   }
 }
 
@@ -697,21 +699,21 @@ async function handleDownload(row) {
   link.click()
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
-  ElMessage.success('ZIP 已开始下载')
+  ElMessage.success(t('page.gen.zipStarted'))
 }
 
 async function handleDelete(row) {
   try {
     await ElMessageBox.confirm(
-      `确认删除表「${row.tableName}」的生成配置吗？只会删除 gen_table / gen_table_column 记录，不会动数据库原表。`,
-      '删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+      t('page.gen.deleteConfirm', { name: row.tableName }),
+      t('common.deleteTitle'),
+      { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel') }
     )
   } catch (e) {
     return
   }
   await deleteGenTable(row.tableId)
-  ElMessage.success('已删除生成配置')
+  ElMessage.success(t('page.gen.deleted'))
   await loadList()
 }
 </script>

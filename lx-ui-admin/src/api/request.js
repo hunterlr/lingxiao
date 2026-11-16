@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import i18n from '@/i18n'
 import { clearToken, getToken, getTokenName } from '@/utils/auth'
 
 /**
@@ -10,7 +11,8 @@ import { clearToken, getToken, getTokenName } from '@/utils/auth'
  *   <li>成功时直接返回后端 {@code R.data}，业务代码不用每次 {@code res.data.data}；</li>
  *   <li>失败时抛出带 {@code code} 的 Error，页面可按错误码分支；</li>
  *   <li>HTTP 401 / 业务码 1002：清 Token 并跳登录页，只提示一次；</li>
- *   <li>请求配置可带 {@code silent: true}，用于“失败不弹提示”的探测型请求。</li>
+ *   <li>请求配置可带 {@code silent: true}，用于“失败不弹提示”的探测型请求；</li>
+ *   <li>每个请求自动带 {@code X-Lang}，后端据此返回对应语言的 msg。</li>
  * </ul>
  *
  * <p>注意：后端把 Long 序列化成字符串，前端拿到的 ID 全是字符串，
@@ -39,6 +41,17 @@ export class BizError extends Error {
   }
 }
 
+/** 当前语言；i18n 未初始化时也保证返回一个合法标签。 */
+function currentLang() {
+  return i18n.global.locale.value || 'zh-CN'
+}
+
+/** 取当前语言的文案，key 缺失时用 fallback。 */
+function t(key, fallback) {
+  const { t: translate, te } = i18n.global
+  return te(key) ? translate(key) : fallback
+}
+
 let redirecting = false
 
 function redirectToLogin() {
@@ -64,6 +77,7 @@ http.interceptors.request.use((config) => {
   if (token) {
     config.headers[getTokenName()] = token
   }
+  config.headers['X-Lang'] = currentLang()
   return config
 })
 
@@ -79,27 +93,28 @@ http.interceptors.response.use(
     }
     if (body.code === 1002) {
       redirectToLogin()
-      return Promise.reject(new BizError(body.code, body.msg || '登录已过期'))
+      return Promise.reject(new BizError(body.code, body.msg || t('common.sessionExpired', '登录已过期')))
     }
     if (!response.config.silent) {
-      notify(body.msg || '请求失败')
+      notify(body.msg || t('common.requestFailed', '请求失败'))
     }
-    return Promise.reject(new BizError(body.code, body.msg || '请求失败'))
+    return Promise.reject(new BizError(body.code, body.msg || t('common.requestFailed', '请求失败')))
   },
   (error) => {
     const status = error.response && error.response.status
     const body = error.response && error.response.data
-    const message = (body && body.msg) || error.message || '网络异常'
+    const message = (body && body.msg) || error.message || t('common.networkError', '网络异常')
 
     if (status === 401) {
       redirectToLogin()
       return Promise.reject(new BizError(1002, message))
     }
     if (status === 403) {
+      const forbidden = t('common.noPermission', '没有权限执行该操作')
       if (!error.config || !error.config.silent) {
-        notify('没有权限执行该操作')
+        notify(forbidden)
       }
-      return Promise.reject(new BizError(1003, '没有权限执行该操作'))
+      return Promise.reject(new BizError(1003, forbidden))
     }
     if (!error.config || !error.config.silent) {
       notify(message)

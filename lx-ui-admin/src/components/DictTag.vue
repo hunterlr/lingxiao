@@ -1,12 +1,13 @@
 <template>
   <el-tag v-if="current" :type="tagType" :effect="effect" size="small" disable-transitions>
-    {{ current.dictLabel }}
+    {{ label }}
   </el-tag>
   <span v-else class="text-secondary">-</span>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { listDictDataOptions } from '@/api/dict'
 
 /**
@@ -25,12 +26,25 @@ const props = defineProps({
 })
 
 const list = ref(props.options || [])
+const { t, te } = useI18n()
 
 const current = computed(() => {
   if (props.value === null || props.value === undefined || props.value === '') return null
   const hit = list.value.find((item) => String(item.dictValue) === String(props.value))
   if (hit) return hit
   return { dictLabel: String(props.value), listClass: '' }
+})
+
+/**
+ * 字典文案优先取语言包 dict.<dict_type>.<value>，缺项回退后端 dictLabel。
+ *
+ * <p>语言包只覆盖内置字典；业务自定义字典仍然显示数据库里的标签，
+ * 这样新增字典类型不需要改前端。</p>
+ */
+const label = computed(() => {
+  if (!current.value) return ''
+  const key = `dict.${props.dictType}.${props.value}`
+  return props.dictType && te(key) ? t(key) : current.value.dictLabel
 })
 
 const tagType = computed(() => {

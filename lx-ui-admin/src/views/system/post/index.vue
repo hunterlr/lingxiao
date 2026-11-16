@@ -1,39 +1,39 @@
-<template>
+﻿<template>
   <div class="page-container">
     <div class="page-card">
       <el-form :inline="true" :model="query" class="search-form" @submit.prevent>
-        <el-form-item label="岗位编码">
+        <el-form-item :label="t('page.post.postCode')">
           <el-input
             v-model="query.postCode"
-            placeholder="如 ceo"
+            :placeholder="t('page.post.codePlaceholder')"
             clearable
             style="width: 150px"
             @keyup.enter="handleSearch"
             @clear="handleSearch"
           />
         </el-form-item>
-        <el-form-item label="岗位名称">
+        <el-form-item :label="t('page.post.postName')">
           <el-input
             v-model="query.postName"
-            placeholder="岗位名称"
+            :placeholder="t('page.post.postName')"
             clearable
             style="width: 160px"
             @keyup.enter="handleSearch"
             @clear="handleSearch"
           />
         </el-form-item>
-        <el-form-item label="状态">
-          <DictSelect v-model="query.status" dict-type="sys_common_status" width="130px" placeholder="全部状态" />
+        <el-form-item :label="t('common.status')">
+          <DictSelect v-model="query.status" dict-type="sys_common_status" width="130px" :placeholder="t('common.allStatus')" />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
-          <el-button :icon="Refresh" @click="handleReset">重置</el-button>
+          <el-button type="primary" :icon="Search" @click="handleSearch">{{ t('common.search') }}</el-button>
+          <el-button :icon="Refresh" @click="handleReset">{{ t('common.reset') }}</el-button>
         </el-form-item>
       </el-form>
 
       <div class="table-toolbar">
         <div class="toolbar-left">
-          <span class="text-secondary">岗位是职务标签，与部门正交，权限仍由角色决定</span>
+          <span class="text-secondary">{{ t('page.post.hint') }}</span>
         </div>
         <div class="toolbar-right">
           <el-button
@@ -42,30 +42,30 @@
             :icon="Plus"
             @click="openAdd"
           >
-            新增岗位
+            {{ t('page.post.add') }}
           </el-button>
-          <el-button :icon="Refresh" @click="loadList">刷新</el-button>
+          <el-button :icon="Refresh" @click="loadList">{{ t('common.refresh') }}</el-button>
         </div>
       </div>
 
       <el-table v-loading="loading" :data="rows" border stripe row-key="postId">
-        <el-table-column prop="postCode" label="岗位编码" min-width="140">
+        <el-table-column prop="postCode" :label="t('page.post.postCode')" min-width="140">
           <template #default="{ row }">
             <span class="text-mono">{{ row.postCode }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="postName" label="岗位名称" min-width="150" />
-        <el-table-column prop="sort" label="排序" width="80" align="center" />
-        <el-table-column prop="status" label="状态" width="90" align="center">
+        <el-table-column prop="postName" :label="t('page.post.postName')" min-width="150" />
+        <el-table-column prop="sort" :label="t('common.sort')" width="80" align="center" />
+        <el-table-column prop="status" :label="t('common.status')" width="90" align="center">
           <template #default="{ row }">
             <DictTag :value="row.status" dict-type="sys_common_status" />
           </template>
         </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="180" show-overflow-tooltip>
+        <el-table-column prop="remark" :label="t('common.remark')" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">{{ row.remark || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="160" />
-        <el-table-column label="操作" width="140" fixed="right">
+        <el-table-column prop="createTime" :label="t('common.createTime')" width="160" />
+        <el-table-column :label="t('common.operation')" width="140" fixed="right">
           <template #default="{ row }">
             <div class="table-actions">
               <el-button
@@ -74,7 +74,7 @@
                 type="primary"
                 @click="openEdit(row)"
               >
-                编辑
+                {{ t('common.edit') }}
               </el-button>
               <el-button
                 v-hasPerm="'platform:system:post:remove'"
@@ -82,7 +82,7 @@
                 type="danger"
                 @click="handleDelete(row)"
               >
-                删除
+                {{ t('common.delete') }}
               </el-button>
             </div>
           </template>
@@ -105,7 +105,7 @@
 
     <el-dialog
       v-model="dialogVisible"
-      :title="isEdit ? '编辑岗位' : '新增岗位'"
+      :title="isEdit ? t('page.post.edit') : t('page.post.add')"
       width="520px"
       append-to-body
       destroy-on-close
@@ -118,26 +118,26 @@
         :rules="rules"
         label-width="90px"
       >
-        <el-form-item label="岗位编码" prop="postCode">
-          <el-input v-model="form.postCode" maxlength="64" placeholder="如 operator" />
+        <el-form-item :label="t('page.post.postCode')" prop="postCode">
+          <el-input v-model="form.postCode" maxlength="64" :placeholder="t('page.post.codePlaceholderEdit')" />
         </el-form-item>
-        <el-form-item label="岗位名称" prop="postName">
+        <el-form-item :label="t('page.post.postName')" prop="postName">
           <el-input v-model="form.postName" maxlength="64" />
         </el-form-item>
-        <el-form-item label="排序" prop="sort">
+        <el-form-item :label="t('common.sort')" prop="sort">
           <el-input-number v-model="form.sort" :min="0" :max="9999" style="width: 100%" />
         </el-form-item>
-        <el-form-item label="状态">
+        <el-form-item :label="t('common.status')">
           <DictSelect v-model="form.status" dict-type="sys_common_status" />
         </el-form-item>
-        <el-form-item label="备注">
+        <el-form-item :label="t('common.remark')">
           <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" show-word-limit />
         </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="saving" @click="submitForm">保存</el-button>
+          <el-button @click="dialogVisible = false">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="saving" @click="submitForm">{{ t('common.save') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -147,6 +147,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import DictSelect from '@/components/DictSelect.vue'
 import DictTag from '@/components/DictTag.vue'
@@ -155,6 +156,8 @@ import { addPost, deletePost, getPost, listPosts, updatePost } from '@/api/post'
 /**
  * 岗位管理。字段少，单列表 + 弹窗即可，不套树。
  */
+const { t } = useI18n()
+
 const loading = ref(false)
 const rows = ref([])
 const total = ref(0)
@@ -210,8 +213,8 @@ const emptyForm = () => ({
 const form = reactive(emptyForm())
 
 const rules = {
-  postCode: [{ required: true, message: '请输入岗位编码', trigger: 'blur' }],
-  postName: [{ required: true, message: '请输入岗位名称', trigger: 'blur' }]
+  postCode: [{ required: true, message: t('page.post.codeRequired'), trigger: 'blur' }],
+  postName: [{ required: true, message: t('page.post.nameRequired'), trigger: 'blur' }]
 }
 
 function resetForm() {
@@ -270,10 +273,10 @@ async function submitForm() {
       }
       if (!isEdit.value) {
         await addPost(payload)
-        ElMessage.success('新增成功')
+        ElMessage.success(t('common.addSuccess'))
       } else {
         await updatePost(editingId.value, payload)
-        ElMessage.success('保存成功')
+        ElMessage.success(t('common.saveSuccess'))
       }
       dialogVisible.value = false
       await loadList()
@@ -286,15 +289,15 @@ async function submitForm() {
 async function handleDelete(row) {
   try {
     await ElMessageBox.confirm(
-      `确认删除岗位「${row.postName}」吗？仍有用户关联该岗位时，服务端会拒绝删除。`,
-      '删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+      t('page.post.deleteConfirm', { name: row.postName }),
+      t('common.deleteTitle'),
+      { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel') }
     )
   } catch (e) {
     return
   }
   await deletePost(row.postId)
-  ElMessage.success('删除成功')
+  ElMessage.success(t('common.deleteSuccess'))
   await loadList()
 }
 </script>

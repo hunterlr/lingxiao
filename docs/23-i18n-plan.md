@@ -291,14 +291,20 @@ const label = menu.menu_key ? t(`menu.${menu.menu_key}`, menu.menu_name) : menu.
 
 ### 3.4 验收清单（L1）
 
-- [ ] 默认 `zh-CN`，与 v1.0 视觉/文案完全一致；
-- [ ] 切到 `en-US`：登录页、侧边栏、面包屑、8 个系统页、日志页、监控页、任务页、生成器页无中文残留（允许日志内容中文）；
-- [ ] 刷新后语言保持；
-- [ ] Element Plus 分页、日期、空状态、确认框变英文；
-- [ ] 后端错误：密码错误、账号锁定、无权限、参数校验，四种提示都跟着语言变；
-- [ ] 未知语言 / 缺翻译 key：回退中文，不白屏、不显示 `menu.xxx`；
-- [ ] 浏览器控制台无 i18n missing key 警告；
-- [ ] 定时任务日志、操作日志仍为中文（明确不翻译）。
+> 2026-11-17 全部实测通过，证据见 §10.4。
+
+- [x] 默认 `zh-CN`，与 v1.0 视觉/文案完全一致；
+- [x] 切到 `en-US`：登录页、侧边栏、面包屑、8 个系统页、日志页、监控页、任务页、生成器页无中文残留（允许日志内容中文）；
+- [x] 刷新后语言保持；
+- [x] Element Plus 分页、日期、空状态、确认框变英文；
+- [x] 后端错误：密码错误、账号锁定、无权限、参数校验，四种提示都跟着语言变；
+- [x] 未知语言 / 缺翻译 key：回退中文，不白屏、不显示 `menu.xxx`；
+- [x] 浏览器控制台无 i18n missing key 警告；
+- [x] 定时任务日志、操作日志仍为中文（明确不翻译）。
+
+> 说明：菜单名、字典 `label`、参数名 / 说明、部门 / 岗位 / 公告 / 任务名、文件备注
+> 属于**业务数据**，L1 不翻译，英文界面下允许中文残留；字典与参数只有“标签”在
+> 前端有译文（`dict.<type>.<value>`、`config.<config_key>`），缺项回退数据库文本。
 
 ---
 
@@ -416,7 +422,9 @@ v1.0 先把中文写死没关系；要做的时候按本文 L1 走，4~5 天能�
 
 ---
 
-## 10. 施工状态（第一轮：后端链路，2026-11-16）
+## 10. 施工状态（2026-11-16 后端链路 / 2026-11-17 前端界面）
+
+> 两轮均已完成，L1 收口。下面 §10.1~10.3 是第一轮记录，§10.4 是第二轮记录。
 
 ### 10.1 已完成
 
@@ -458,19 +466,40 @@ v1.0 先把中文写死没关系；要做的时候按本文 L1 走，4~5 天能�
 
 合计 **84 项**（原 66 + 新增 18），`mvn test` 不依赖 MySQL / Redis。
 
-### 10.4 待做（第二轮：前端）
+### 10.4 第二轮（前端）：已完成（2026-11-17）
 
-| 任务 | 说明 |
+| 任务 | 落地 |
 |---|---|
-| 安装 `vue-i18n@9` | 前端目前还没有这个依赖 |
-| `src/i18n/{index,zh-CN,en-US}.js` | 语言包骨架，键名与后端 `error.*` 对齐 |
-| `src/store/locale.js` | `localStorage['lx-admin-locale']` → 浏览器语言 → `zh-CN` |
-| `App.vue` + `main.js` | 静态 `ElementPlus({locale})` 改 `ElConfigProvider` |
-| `Navbar.vue` | 顶栏语言下拉（中文 / English） |
-| `api/request.js` | 请求头加 `X-Lang` |
-| 菜单 / 字典 / 参数 | `MenuVO` 补 `menuKey` 下发，`t('menu.'+key, name)` 兜底 |
-| 18 个业务页文案 | 机械替换，按页面验收 |
+| 安装 `vue-i18n@9` | `^9.14.4`（锁定 9.14.4），未引 `@intlify/unplugin-vue-i18n` |
+| `src/i18n/{index,zh-CN,en-US}.js` | 各 **897 键**，`fallbackLocale = zh-CN`，`missingWarn/fallbackWarn = false` |
+| `src/store/locale.js` | `localStorage['lx-admin-locale']` → 浏览器语言 → `zh-CN`；切语言同步 `html.lang` |
+| `App.vue` + `main.js` | 静态 `ElementPlus({locale})` 改 `ElConfigProvider`，分页 / 日期 / 确认框跟随 |
+| `Navbar.vue` | 顶栏语言胶囊（`中` / `EN`），原生 `title` 提示（避开 tooltip + dropdown 的 `role` 校验） |
+| `api/request.js` | 请求头加 `X-Lang`，拦截器兜底文案走语言包 |
+| 菜单 / 字典 / 参数 | `MenuVO` 补 `menuKey` 下发；`t('menu.'+key, name)`、`dict.*`、`config.*` 缺项回退数据库文本 |
+| 18 个业务页 + 登录 / 403 / 404 / 占位 / 个人中心 | 全量替换；`FileLibrary`、`ThemeDrawer`、`RichEditor`、UEditor / wangEditor 一并接上 |
+
+实测（2026-11-17）：
+
+```text
+node scripts/check-i18n-keys.mjs   zh=897 en=897，键集合一致，missing=none
+npx vite build                     built in 5.61s
+mvn -B -ntp test                   84 项全通过（16 个测试类）
+.local/uitest/smoke.mjs            pass=22 fail=0，控制台 0 error
+.local/uitest/theme.mjs            12 项全 PASS
+```
+
+- 默认 `zh-CN` 与 v1.0 一致；切 `en-US` 后刷新保持；
+- 18 个页面静态文案全英文，剩余中文仅为业务数据（菜单名、字典 label、参数说明、
+  部门 / 岗位 / 公告 / 任务名、文件备注、日志内容）；
+- 后端四类错误双语实测通过：`error.2001` 密码错误、空参数校验、`error.1002` 未登录、
+  `error.2004.locked` 账号锁定；
+- Element Plus：`Total 1 | 10/page | 1 | Go to`、`Start time / End time / to`、
+  `Notice / Sign out now? / Cancel / Sign out` 均英文；
+- 控制台无 `[intlify]` missing key 警告、无 Vue prop 警告。
 
 > 第一轮刻意只做后端：接口契约先稳定，前端才有稳定的 `messageKey` 可用；
 > 也避免“前端切了英文、后端还弹中文”这种半成品状态。
+>
+> 下一步是 L2（v1.2）：`i18n_*` 表翻译业务数据；L1 不新增数据库列。
 

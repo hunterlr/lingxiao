@@ -2,29 +2,29 @@
   <div class="page-container">
     <div class="page-card">
       <el-form :inline="true" :model="query" class="search-form" @submit.prevent>
-        <el-form-item label="部门名称">
+        <el-form-item :label="t('page.dept.deptName')">
           <el-input
             v-model="query.deptName"
-            placeholder="按名称搜索"
+            :placeholder="t('page.dept.namePlaceholder')"
             clearable
             style="width: 180px"
             @keyup.enter="handleSearch"
             @clear="handleSearch"
           />
         </el-form-item>
-        <el-form-item label="状态">
-          <DictSelect v-model="query.status" dict-type="sys_common_status" width="130px" placeholder="全部状态" />
+        <el-form-item :label="t('common.status')">
+          <DictSelect v-model="query.status" dict-type="sys_common_status" width="130px" :placeholder="t('common.allStatus')" />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
-          <el-button :icon="Refresh" @click="handleReset">重置</el-button>
+          <el-button type="primary" :icon="Search" @click="handleSearch">{{ t('common.search') }}</el-button>
+          <el-button :icon="Refresh" @click="handleReset">{{ t('common.reset') }}</el-button>
         </el-form-item>
       </el-form>
 
       <div class="table-toolbar">
         <div class="toolbar-left">
           <span class="text-secondary">
-            部门层级由闭包表维护：移动部门时后端会重建整棵子树，前端只传新的 parentId
+            {{ t('page.dept.hint') }}
           </span>
         </div>
         <div class="toolbar-right">
@@ -34,9 +34,9 @@
             :icon="Plus"
             @click="openAdd(null)"
           >
-            新增部门
+            {{ t('page.dept.add') }}
           </el-button>
-          <el-button :icon="Refresh" @click="loadData">刷新</el-button>
+          <el-button :icon="Refresh" @click="loadData">{{ t('common.refresh') }}</el-button>
         </div>
       </div>
 
@@ -48,24 +48,24 @@
         default-expand-all
         :tree-props="{ children: 'children' }"
       >
-        <el-table-column prop="deptName" label="部门名称" min-width="200" />
-        <el-table-column prop="orderNum" label="排序" width="80" align="center" />
-        <el-table-column prop="leader" label="负责人" min-width="110">
+        <el-table-column prop="deptName" :label="t('page.dept.deptName')" min-width="200" />
+        <el-table-column prop="orderNum" :label="t('common.sort')" width="80" align="center" />
+        <el-table-column prop="leader" :label="t('page.dept.leader')" min-width="110">
           <template #default="{ row }">{{ row.leader || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="phone" label="联系电话" min-width="130">
+        <el-table-column prop="phone" :label="t('page.dept.phone')" min-width="130">
           <template #default="{ row }">{{ row.phone || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="email" label="邮箱" min-width="160" show-overflow-tooltip>
+        <el-table-column prop="email" :label="t('page.dept.email')" min-width="160" show-overflow-tooltip>
           <template #default="{ row }">{{ row.email || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="90" align="center">
+        <el-table-column prop="status" :label="t('common.status')" width="90" align="center">
           <template #default="{ row }">
             <DictTag :value="row.status" dict-type="sys_common_status" />
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="160" />
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column prop="createTime" :label="t('common.createTime')" width="160" />
+        <el-table-column :label="t('common.operation')" width="220" fixed="right">
           <template #default="{ row }">
             <div class="table-actions">
               <el-button
@@ -74,7 +74,7 @@
                 type="primary"
                 @click="openAdd(row)"
               >
-                新增下级
+                {{ t('page.dept.addChild') }}
               </el-button>
               <el-button
                 v-hasPerm="'platform:system:dept:edit'"
@@ -82,7 +82,7 @@
                 type="primary"
                 @click="openEdit(row)"
               >
-                编辑
+                {{ t('common.edit') }}
               </el-button>
               <el-button
                 v-hasPerm="'platform:system:dept:remove'"
@@ -90,7 +90,7 @@
                 type="danger"
                 @click="handleDelete(row)"
               >
-                删除
+                {{ t('common.delete') }}
               </el-button>
             </div>
           </template>
@@ -100,7 +100,7 @@
 
     <el-dialog
       v-model="dialogVisible"
-      :title="isEdit ? '编辑部门' : '新增部门'"
+      :title="isEdit ? t('page.dept.edit') : t('page.dept.add')"
       width="640px"
       append-to-body
       destroy-on-close
@@ -113,50 +113,50 @@
         :rules="rules"
         label-width="90px"
       >
-        <el-form-item label="上级部门" prop="parentId">
+        <el-form-item :label="t('page.dept.parent')" prop="parentId">
           <el-tree-select
             v-model="form.parentId"
             :data="parentOptions"
             node-key="id"
             :props="{ label: 'label', children: 'children' }"
             check-strictly
-            placeholder="请选择上级部门"
+            :placeholder="t('page.dept.parentPlaceholder')"
             style="width: 100%"
           />
         </el-form-item>
         <el-row :gutter="16">
           <el-col :span="12">
-            <el-form-item label="部门名称" prop="deptName">
+            <el-form-item :label="t('page.dept.deptName')" prop="deptName">
               <el-input v-model="form.deptName" maxlength="64" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="排序" prop="orderNum">
+            <el-form-item :label="t('common.sort')" prop="orderNum">
               <el-input-number v-model="form.orderNum" :min="0" :max="9999" style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="负责人">
+            <el-form-item :label="t('page.dept.leader')">
               <el-input v-model="form.leader" maxlength="64" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="联系电话">
+            <el-form-item :label="t('page.dept.phone')">
               <el-input v-model="form.phone" maxlength="32" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="邮箱" prop="email">
+            <el-form-item :label="t('page.dept.email')" prop="email">
               <el-input v-model="form.email" maxlength="128" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="状态">
+            <el-form-item :label="t('common.status')">
               <DictSelect v-model="form.status" dict-type="sys_common_status" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
-            <el-form-item label="备注">
+            <el-form-item :label="t('common.remark')">
               <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" show-word-limit />
             </el-form-item>
           </el-col>
@@ -164,8 +164,8 @@
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="saving" @click="submitForm">保存</el-button>
+          <el-button @click="dialogVisible = false">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="saving" @click="submitForm">{{ t('common.save') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -175,6 +175,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import DictSelect from '@/components/DictSelect.vue'
 import DictTag from '@/components/DictTag.vue'
@@ -188,6 +189,8 @@ import { listToTree, collectIds } from '@/utils/tree'
  * 删除受后端约束：有子部门或仍有用户挂在该部门下会拒绝，
  * 前端不提前猜，把服务端提示原样展示。</p>
  */
+const { t } = useI18n()
+
 const loading = ref(false)
 const rows = ref([])
 const query = reactive({ deptName: '', status: '' })
@@ -246,9 +249,9 @@ const emptyForm = () => ({
 const form = reactive(emptyForm())
 
 const rules = {
-  parentId: [{ required: true, message: '请选择上级部门', trigger: 'change' }],
-  deptName: [{ required: true, message: '请输入部门名称', trigger: 'blur' }],
-  email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }]
+  parentId: [{ required: true, message: t('page.dept.parentRequired'), trigger: 'change' }],
+  deptName: [{ required: true, message: t('page.dept.nameRequired'), trigger: 'blur' }],
+  email: [{ type: 'email', message: t('page.dept.emailInvalid'), trigger: 'blur' }]
 }
 
 /** 编辑时不允许把部门挂到自己或自己的后代下（会成环）。 */
@@ -273,7 +276,7 @@ const parentOptions = computed(() => {
       .filter((node) => !excluded.has(String(node.id)))
       .map((node) => ({ ...node, children: prune(node.children) }))
 
-  return [{ id: '0', label: '顶级部门', children: prune(deptTree.value) }]
+  return [{ id: '0', label: t('page.dept.topLevel'), children: prune(deptTree.value) }]
 })
 
 function resetForm() {
@@ -344,10 +347,10 @@ async function submitForm() {
       }
       if (!isEdit.value) {
         await addDept(payload)
-        ElMessage.success('新增成功')
+        ElMessage.success(t('common.addSuccess'))
       } else {
         await updateDept(editingId.value, payload)
-        ElMessage.success('保存成功（如调整了上级，子树层级已同步重建）')
+        ElMessage.success(t('page.dept.saveSuccessTree'))
       }
       dialogVisible.value = false
       await loadData()
@@ -360,15 +363,15 @@ async function submitForm() {
 async function handleDelete(row) {
   try {
     await ElMessageBox.confirm(
-      `确认删除部门「${row.deptName}」吗？存在子部门或部门下仍有用户时，服务端会拒绝删除。`,
-      '删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+      t('page.dept.deleteConfirm', { name: row.deptName }),
+      t('common.deleteTitle'),
+      { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel') }
     )
   } catch (e) {
     return
   }
   await deleteDept(row.deptId)
-  ElMessage.success('删除成功')
+  ElMessage.success(t('common.deleteSuccess'))
   await loadData()
 }
 </script>

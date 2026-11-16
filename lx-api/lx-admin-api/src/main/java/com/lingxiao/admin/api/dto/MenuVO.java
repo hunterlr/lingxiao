@@ -15,6 +15,14 @@ public class MenuVO {
 
     private Long id;
     private Long parentId;
+
+    /**
+     * 菜单标识（sys_menu.menu_key），前端用它取语言包 {@code menu.<menuKey>}。
+     *
+     * <p>这是稳定键，改名不影响；为空时前端退回 {@code name}。</p>
+     */
+    private String menuKey;
+
     private String name;
 
     /** M 目录 / C 菜单 / F 按钮 */

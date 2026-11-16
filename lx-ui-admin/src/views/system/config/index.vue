@@ -2,53 +2,52 @@
   <div class="page-container">
     <div class="page-card">
       <el-form :inline="true" :model="query" class="search-form" @submit.prevent>
-        <el-form-item label="参数名称">
+        <el-form-item :label="t('page.config.configName')">
           <el-input
             v-model="query.configName"
-            placeholder="参数名称"
+            :placeholder="t('page.config.namePlaceholder')"
             clearable
             style="width: 160px"
             @keyup.enter="handleSearch"
             @clear="handleSearch"
           />
         </el-form-item>
-        <el-form-item label="参数键名">
+        <el-form-item :label="t('page.config.configKey')">
           <el-input
             v-model="query.configKey"
-            placeholder="如 sys.account.captchaEnabled"
+            :placeholder="t('page.config.keyPlaceholder')"
             clearable
             style="width: 230px"
             @keyup.enter="handleSearch"
             @clear="handleSearch"
           />
         </el-form-item>
-        <el-form-item label="控件">
-          <el-select v-model="query.controlType" clearable placeholder="全部" style="width: 110px">
+        <el-form-item :label="t('page.config.control')">
+          <el-select v-model="query.controlType" clearable :placeholder="t('common.all')" style="width: 110px">
             <el-option
               v-for="item in CONTROL_TYPES"
               :key="item.value"
-              :label="item.label"
+              :label="controlTypeLabel(item.value)"
               :value="item.value"
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="类型">
-          <el-select v-model="query.configType" clearable placeholder="全部" style="width: 110px">
-            <el-option label="内置" value="Y" />
-            <el-option label="普通" value="N" />
+        <el-form-item :label="t('page.config.configType')">
+          <el-select v-model="query.configType" clearable :placeholder="t('common.all')" style="width: 110px">
+            <el-option :label="t('page.config.builtin')" value="Y" />
+            <el-option :label="t('page.config.normal')" value="N" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
-          <el-button :icon="Refresh" @click="handleReset">重置</el-button>
+          <el-button type="primary" :icon="Search" @click="handleSearch">{{ t('common.search') }}</el-button>
+          <el-button :icon="Refresh" @click="handleReset">{{ t('common.reset') }}</el-button>
         </el-form-item>
       </el-form>
 
       <div class="table-toolbar">
         <div class="toolbar-left">
           <span class="text-secondary">
-            参数按“控件”渲染：文本 / 数字 / 开关 / 下拉。内置参数只允许改值，
-            键名、控件类型、选项与删除入口都会被禁用。
+            {{ t('page.config.hint') }}
           </span>
         </div>
         <div class="toolbar-right">
@@ -58,20 +57,22 @@
             :icon="Plus"
             @click="openAdd"
           >
-            新增参数
+            {{ t('page.config.add') }}
           </el-button>
-          <el-button :icon="Refresh" @click="loadList">刷新</el-button>
+          <el-button :icon="Refresh" @click="loadList">{{ t('common.refresh') }}</el-button>
         </div>
       </div>
 
       <el-table v-loading="loading" :data="rows" border stripe row-key="configId">
-        <el-table-column prop="configName" label="参数名称" min-width="160" />
-        <el-table-column prop="configKey" label="参数键名" min-width="220">
+        <el-table-column prop="configName" :label="t('page.config.configName')" min-width="160">
+          <template #default="{ row }">{{ configLabel(row) }}</template>
+        </el-table-column>
+        <el-table-column prop="configKey" :label="t('page.config.configKey')" min-width="220">
           <template #default="{ row }">
             <span class="text-mono">{{ row.configKey }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="configValue" label="参数键值" min-width="170">
+        <el-table-column prop="configValue" :label="t('page.config.configValue')" min-width="170">
           <template #default="{ row }">
             <el-tag
               v-if="row.controlType === 'switch'"
@@ -84,25 +85,25 @@
             <span v-else class="config-value">{{ displayConfigValue(row) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="controlType" label="控件" width="100" align="center">
+        <el-table-column prop="controlType" :label="t('page.config.control')" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="controlTagType(row.controlType)" size="small" effect="plain">
               {{ controlTypeLabel(row.controlType) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="configType" label="类型" width="90" align="center">
+        <el-table-column prop="configType" :label="t('page.config.configType')" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="row.configType === 'Y' ? 'warning' : 'info'" size="small" effect="plain">
-              {{ row.configType === 'Y' ? '内置' : '普通' }}
+              {{ row.configType === 'Y' ? t('page.config.builtin') : t('page.config.normal') }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="200" show-overflow-tooltip>
+        <el-table-column prop="remark" :label="t('common.remark')" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">{{ row.remark || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="160" />
-        <el-table-column label="操作" width="140" fixed="right">
+        <el-table-column prop="createTime" :label="t('common.createTime')" width="160" />
+        <el-table-column :label="t('common.operation')" width="140" fixed="right">
           <template #default="{ row }">
             <div class="table-actions">
               <el-button
@@ -111,7 +112,7 @@
                 type="primary"
                 @click="openEdit(row)"
               >
-                编辑
+                {{ t('common.edit') }}
               </el-button>
               <el-button
                 v-hasPerm="'platform:system:config:remove'"
@@ -120,7 +121,7 @@
                 :disabled="row.configType === 'Y'"
                 @click="handleDelete(row)"
               >
-                删除
+                {{ t('common.delete') }}
               </el-button>
             </div>
           </template>
@@ -143,7 +144,7 @@
 
     <el-dialog
       v-model="dialogVisible"
-      :title="isEdit ? '编辑参数' : '新增参数'"
+      :title="isEdit ? t('page.config.edit') : t('page.config.add')"
       width="600px"
       append-to-body
       destroy-on-close
@@ -156,19 +157,19 @@
         :rules="rules"
         label-width="90px"
       >
-        <el-form-item label="参数名称" prop="configName">
+        <el-form-item :label="t('page.config.configName')" prop="configName">
           <el-input v-model="form.configName" maxlength="100" />
         </el-form-item>
-        <el-form-item label="参数键名" prop="configKey">
+        <el-form-item :label="t('page.config.configKey')" prop="configKey">
           <el-input
             v-model="form.configKey"
             maxlength="100"
             :disabled="isBuiltinConfig"
-            placeholder="如 sys.account.captchaEnabled"
+            :placeholder="t('page.config.keyPlaceholder')"
           />
-          <div v-if="isBuiltinConfig" class="form-tip">内置参数的键名被代码引用，不允许修改。</div>
+          <div v-if="isBuiltinConfig" class="form-tip">{{ t('page.config.builtinKeyTip') }}</div>
         </el-form-item>
-        <el-form-item label="控件类型">
+        <el-form-item :label="t('page.config.controlType')">
           <el-select
             v-model="form.controlType"
             :disabled="isBuiltinConfig"
@@ -178,53 +179,53 @@
             <el-option
               v-for="item in CONTROL_TYPES"
               :key="item.value"
-              :label="item.label"
+              :label="controlTypeLabel(item.value)"
               :value="item.value"
             />
           </el-select>
           <div v-if="isBuiltinConfig" class="form-tip">
-            内置参数的控件类型与选项被代码依赖，不允许修改。
+            {{ t('page.config.builtinControlTip') }}
           </div>
         </el-form-item>
-        <el-form-item v-if="form.controlType !== 'text'" label="控件选项" prop="configOptions">
+        <el-form-item v-if="form.controlType !== 'text'" :label="t('page.config.controlOptions')" prop="configOptions">
           <el-input
             v-if="form.controlType === 'select'"
             v-model="form.configOptions"
             type="textarea"
             :rows="3"
             maxlength="1000"
-            placeholder="每行一个，格式 值:显示名&#10;wangeditor-next:wangEditor Next&#10;ueditor-plus:UEditor Plus"
+            :placeholder="t('page.config.optionsPlaceholder')"
           />
           <el-input
             v-else-if="form.controlType === 'number'"
             v-model="form.configOptions"
             maxlength="1000"
-            placeholder="最小值:最大值，例如 1:3650；留空表示不限制"
+            :placeholder="t('page.config.numberPlaceholder')"
           />
           <el-input
             v-else
             v-model="form.configOptions"
             maxlength="1000"
-            placeholder="开值:关值，例如 true:false；留空默认 true:false"
+            :placeholder="t('page.config.switchPlaceholder')"
           />
           <div class="form-tip">
             <template v-if="form.controlType === 'select'">
-              下拉显示“显示名”，入库保存“值”。选项值不能为空、不能重复。
+              {{ t('page.config.selectOptionTip') }}
             </template>
             <template v-else-if="form.controlType === 'number'">
-              只接受整数；可只写一侧，例如 1: 或 :100。
+              {{ t('page.config.numberOptionTip') }}
             </template>
             <template v-else>
-              开关保存的是原始值（true/false 或 1/0），显示为“开启 / 关闭”。
+              {{ t('page.config.switchOptionTip') }}
             </template>
           </div>
         </el-form-item>
-        <el-form-item label="参数键值" prop="configValue">
+        <el-form-item :label="t('page.config.configValue')" prop="configValue">
           <el-input
             v-if="form.controlType === 'text'"
             v-model="form.configValue"
             maxlength="500"
-            placeholder="请输入参数值"
+            :placeholder="t('page.config.valuePlaceholder')"
           />
           <el-input-number
             v-else-if="form.controlType === 'number'"
@@ -240,13 +241,13 @@
             v-model="switchValue"
             :active-value="switchValues.on"
             :inactive-value="switchValues.off"
-            active-text="开启"
-            inactive-text="关闭"
+            :active-text="t('page.config.switchOn')"
+            :inactive-text="t('page.config.switchOff')"
           />
           <el-select
             v-else
             v-model="form.configValue"
-            placeholder="请选择参数值"
+            :placeholder="t('page.config.selectValuePlaceholder')"
             style="width: 100%"
           >
             <el-option
@@ -257,20 +258,20 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="参数类型">
+        <el-form-item :label="t('page.config.configTypeLabel')">
           <el-radio-group v-model="form.configType" :disabled="isBuiltinConfig">
-            <el-radio value="Y">内置</el-radio>
-            <el-radio value="N">普通</el-radio>
+            <el-radio value="Y">{{ t('page.config.builtin') }}</el-radio>
+            <el-radio value="N">{{ t('page.config.normal') }}</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="备注">
+        <el-form-item :label="t('common.remark')">
           <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" show-word-limit />
         </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="saving" @click="submitForm">保存</el-button>
+          <el-button @click="dialogVisible = false">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="saving" @click="submitForm">{{ t('common.save') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -281,6 +282,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 import { addConfig, deleteConfig, getConfig, listConfigs, updateConfig } from '@/api/config'
 import {
   CONTROL_TYPES,
@@ -301,6 +303,14 @@ import {
  * <p>前端校验只是为了少一次往返，最终约束在 `SysConfigService`：
  * 下拉值必须在选项内、数字必须是合法整数、开关值必须匹配开/关值。</p>
  */
+const { t, te } = useI18n()
+
+/** 参数名走语言包 config.<config_key>；没有译文时退回数据库里的 config_name。 */
+function configLabel(row) {
+  const key = row.configKey ? `config.${row.configKey}` : ''
+  return key && te(key) ? t(key) : row.configName
+}
+
 const loading = ref(false)
 const rows = ref([])
 const total = ref(0)
@@ -412,17 +422,17 @@ const switchValue = computed({
 function validateConfigOptions(rule, value, callback) {
   const raw = String(value || '').trim()
   if (form.controlType === 'select' && parseSelectOptions(raw).length === 0) {
-    callback(new Error('下拉控件至少配置一个选项'))
+    callback(new Error(t('page.config.optionsRequired')))
     return
   }
   if (form.controlType === 'number' && raw && !/^(-?\d+)?:(-?\d+)?$/.test(raw)) {
-    callback(new Error('数字范围格式应为 最小值:最大值，例如 1:3650'))
+    callback(new Error(t('page.config.rangeFormat')))
     return
   }
   if (form.controlType === 'switch' && raw) {
     const parts = raw.split(':')
     if (parts.length !== 2 || !parts[0].trim() || !parts[1].trim() || parts[0].trim() === parts[1].trim()) {
-      callback(new Error('开关选项格式应为 开值:关值，且两值不同'))
+      callback(new Error(t('page.config.switchFormat')))
       return
     }
   }
@@ -432,33 +442,33 @@ function validateConfigOptions(rule, value, callback) {
 function validateConfigValue(rule, value, callback) {
   const raw = value === null || value === undefined ? '' : String(value).trim()
   if (!raw) {
-    callback(new Error('请输入参数键值'))
+    callback(new Error(t('page.config.valueRequired')))
     return
   }
   if (form.controlType === 'number') {
     if (!/^-?\d+$/.test(raw)) {
-      callback(new Error('数字参数必须是整数'))
+      callback(new Error(t('page.config.integer')))
       return
     }
     const number = Number(raw)
     const { min, max } = numberRange.value
     if (min !== undefined && number < min) {
-      callback(new Error(`不能小于 ${min}`))
+      callback(new Error(t('page.config.minOnly', { min })))
       return
     }
     if (max !== undefined && number > max) {
-      callback(new Error(`不能大于 ${max}`))
+      callback(new Error(t('page.config.maxOnly', { max })))
       return
     }
   } else if (form.controlType === 'switch') {
     const { on, off } = switchValues.value
     if (raw !== on && raw !== off) {
-      callback(new Error(`只能是 ${on} 或 ${off}`))
+      callback(new Error(t('page.config.switchValue', { on, off })))
       return
     }
   } else if (form.controlType === 'select') {
     if (!selectOptions.value.some((option) => option.value === raw)) {
-      callback(new Error('参数值不在可选项内'))
+      callback(new Error(t('page.config.notInOptions')))
       return
     }
   }
@@ -466,12 +476,12 @@ function validateConfigValue(rule, value, callback) {
 }
 
 const rules = {
-  configName: [{ required: true, message: '请输入参数名称', trigger: 'blur' }],
+  configName: [{ required: true, message: t('page.config.nameRequired'), trigger: 'blur' }],
   configKey: [
-    { required: true, message: '请输入参数键名', trigger: 'blur' },
+    { required: true, message: t('page.config.keyRequired'), trigger: 'blur' },
     {
       pattern: /^[a-zA-Z][a-zA-Z0-9_.-]*$/,
-      message: '以字母开头，只能包含字母、数字、点、下划线、短横线',
+      message: t('page.config.keyPattern'),
       trigger: 'blur'
     }
   ],
@@ -566,10 +576,10 @@ async function submitForm() {
       }
       if (!isEdit.value) {
         await addConfig(payload)
-        ElMessage.success('新增成功')
+        ElMessage.success(t('common.addSuccess'))
       } else {
         await updateConfig(editingId.value, payload)
-        ElMessage.success('保存成功')
+        ElMessage.success(t('common.saveSuccess'))
       }
       dialogVisible.value = false
       await loadList()
@@ -581,16 +591,16 @@ async function submitForm() {
 
 async function handleDelete(row) {
   try {
-    await ElMessageBox.confirm(`确认删除参数「${row.configName}」吗？`, '删除确认', {
+    await ElMessageBox.confirm(t('page.config.deleteConfirm', { name: configLabel(row) }), t('common.deleteTitle'), {
       type: 'warning',
-      confirmButtonText: '删除',
-      cancelButtonText: '取消'
+      confirmButtonText: t('common.delete'),
+      cancelButtonText: t('common.cancel')
     })
   } catch (e) {
     return
   }
   await deleteConfig(row.configId)
-  ElMessage.success('删除成功')
+  ElMessage.success(t('common.deleteSuccess'))
   await loadList()
 }
 </script>

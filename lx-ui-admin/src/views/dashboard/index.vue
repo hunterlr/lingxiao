@@ -2,16 +2,16 @@
   <div class="page-container">
     <div class="welcome-card">
       <div class="welcome-text">
-        <h2>{{ greeting }}，{{ auth.displayName }}</h2>
+        <h2>{{ t('dashboard.hello', { greeting, name: auth.displayName }) }}</h2>
         <p class="welcome-sub">
-          欢迎使用凌霄后台基座。当前登录账号 <b>{{ auth.username }}</b>
-          <span v-if="auth.isSuperAdmin">（超级管理员，拥有全部权限）</span>
+          {{ t('dashboard.welcomePrefix') }} <b>{{ auth.username }}</b>
+          <span v-if="auth.isSuperAdmin">{{ t('dashboard.superAdmin') }}</span>
         </p>
         <div class="welcome-tags">
           <el-tag v-for="role in auth.roles" :key="role" effect="dark" type="primary" size="small">
             {{ role }}
           </el-tag>
-          <el-tag v-if="!auth.roles.length" type="info" size="small">未分配角色</el-tag>
+          <el-tag v-if="!auth.roles.length" type="info" size="small">{{ t('dashboard.noRole') }}</el-tag>
         </div>
       </div>
       <div class="welcome-illustration">
@@ -38,7 +38,7 @@
     <el-row :gutter="16">
       <el-col :xs="24" :lg="14">
         <div class="page-card">
-          <h3 class="section-title">快捷入口</h3>
+          <h3 class="section-title">{{ t('dashboard.quickEntry') }}</h3>
           <div class="quick-grid">
             <div
               v-for="entry in quickEntries"
@@ -52,7 +52,7 @@
           </div>
           <el-empty
             v-if="!quickEntries.length"
-            description="当前账号没有可见的业务菜单"
+            :description="t('dashboard.noMenu')"
             :image-size="80"
           />
         </div>
@@ -60,31 +60,31 @@
 
       <el-col :xs="24" :lg="10">
         <div class="page-card">
-          <h3 class="section-title">基座能力</h3>
+          <h3 class="section-title">{{ t('dashboard.capability') }}</h3>
           <ul class="capability-list">
             <li>
               <el-icon color="#3fae6a"><CircleCheckFilled /></el-icon>
-              登录 / 验证码 / 平台域 Token
+              {{ t('dashboard.cap1') }}
             </li>
             <li>
               <el-icon color="#3fae6a"><CircleCheckFilled /></el-icon>
-              RBAC 权限到按钮，超管拥有全部权限
+              {{ t('dashboard.cap2') }}
             </li>
             <li>
               <el-icon color="#3fae6a"><CircleCheckFilled /></el-icon>
-              部门闭包表，支持移动子树
+              {{ t('dashboard.cap3') }}
             </li>
             <li>
               <el-icon color="#3fae6a"><CircleCheckFilled /></el-icon>
-              文件上传、秒传、改名留痕
+              {{ t('dashboard.cap4') }}
             </li>
             <li>
               <el-icon color="#3fae6a"><CircleCheckFilled /></el-icon>
-              模块开关：关闭后 Bean 不加载、接口 404
+              {{ t('dashboard.cap5') }}
             </li>
             <li class="pending">
               <el-icon color="#d9a13b"><Clock /></el-icon>
-              缩略图 / EXIF / 裁剪（W3 待补）
+              {{ t('dashboard.cap6') }}
             </li>
           </ul>
         </div>
@@ -96,6 +96,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   CircleCheckFilled,
   Clock,
@@ -114,15 +115,16 @@ import { useAuthStore } from '@/store/auth'
  * 这里展示的是真实登录信息、菜单数量与可点进去的菜单入口。</p>
  */
 const router = useRouter()
+const { t, te } = useI18n()
 const auth = useAuthStore()
 
 const greeting = computed(() => {
   const hour = new Date().getHours()
-  if (hour < 6) return '夜深了'
-  if (hour < 12) return '早上好'
-  if (hour < 14) return '中午好'
-  if (hour < 18) return '下午好'
-  return '晚上好'
+  if (hour < 6) return t('dashboard.greetingNight')
+  if (hour < 12) return t('dashboard.greetingMorning')
+  if (hour < 14) return t('dashboard.greetingNoon')
+  if (hour < 18) return t('dashboard.greetingAfternoon')
+  return t('dashboard.greetingEvening')
 })
 
 const pageMenus = computed(() => {
@@ -139,29 +141,29 @@ const pageMenus = computed(() => {
 
 const stats = computed(() => [
   {
-    label: '可见菜单',
+    label: t('dashboard.visibleMenus'),
     value: pageMenus.value.length,
     icon: MenuIcon,
     color: '#2f6fed',
     bg: 'rgba(47, 111, 237, 0.1)'
   },
   {
-    label: '权限码',
-    value: auth.isSuperAdmin ? '全部' : auth.permissions.length,
+    label: t('dashboard.permissions'),
+    value: auth.isSuperAdmin ? t('dashboard.allPermissions') : auth.permissions.length,
     icon: Document,
     color: '#7a5af8',
     bg: 'rgba(122, 90, 248, 0.1)'
   },
   {
-    label: '角色数',
+    label: t('dashboard.roles'),
     value: auth.roles.length,
     icon: UserFilled,
     color: '#3fae6a',
     bg: 'rgba(63, 174, 106, 0.1)'
   },
   {
-    label: '文件模块',
-    value: '已启用',
+    label: t('dashboard.fileModule'),
+    value: t('dashboard.fileEnabled'),
     icon: Files,
     color: '#e08a3c',
     bg: 'rgba(224, 138, 60, 0.12)'
@@ -174,10 +176,15 @@ const stats = computed(() => [
  * <p>后端菜单节点的字段是 {@code name}（不是 title），这里显式映射成
  * {@code title}，避免模板里出现“只有图标、没有文字”的空壳入口。</p>
  */
+function menuLabel(menu) {
+  const key = menu.menuKey ? `menu.${menu.menuKey}` : ''
+  return key && te(key) ? t(key) : menu.name
+}
+
 const quickEntries = computed(() =>
   pageMenus.value.slice(0, 8).map((menu) => ({
     path: menu.path,
-    title: menu.name,
+    title: menuLabel(menu),
     icon: menu.icon
   }))
 )

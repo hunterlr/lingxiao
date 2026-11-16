@@ -3,15 +3,15 @@
     <div class="page-card">
       <div class="table-toolbar">
         <div class="toolbar-left">
-          <h3 class="section-title" style="margin: 0">缓存状态</h3>
+          <h3 class="section-title" style="margin: 0">{{ t('page.cache.title') }}</h3>
           <el-tag :type="data?.redisEnabled ? 'success' : 'info'" effect="plain">
-            {{ data?.redisEnabled ? 'Redis 已启用' : '本机缓存' }}
+            {{ data?.redisEnabled ? t('page.cache.redisEnabled') : t('page.cache.localCache') }}
           </el-tag>
-          <span v-if="data" class="text-secondary">验证码存储：{{ data.storeMode }}</span>
+          <span v-if="data" class="text-secondary">{{ t('page.cache.captchaStore', { mode: data.storeMode }) }}</span>
         </div>
         <div class="toolbar-right">
-          <span v-if="data" class="text-secondary">数据截至 {{ data.sampleTime }}</span>
-          <el-button :icon="Refresh" @click="load">刷新</el-button>
+          <span v-if="data" class="text-secondary">{{ t('page.server.dataAsOf', { time: data.sampleTime }) }}</span>
+          <el-button :icon="Refresh" @click="load">{{ t('common.refresh') }}</el-button>
         </div>
       </div>
 
@@ -40,7 +40,7 @@
             <el-col :xs="24" :sm="6">
               <div class="metric-card">
                 <div class="metric-head">
-                  <span>内存使用</span>
+                  <span>{{ t('page.cache.memoryUsage') }}</span>
                   <span class="text-secondary">
                     {{ data.redis.usedMemoryHuman || bytes(data.redis.usedMemory) }}
                   </span>
@@ -52,14 +52,14 @@
                   :format="(p) => `${p}%`"
                 />
                 <div class="metric-foot text-secondary">
-                  上限 {{ data.redis.maxMemoryHuman || '未设置' }}
+                  {{ t('page.cache.maxMemory', { value: data.redis.maxMemoryHuman || t('page.cache.notSet') }) }}
                 </div>
               </div>
             </el-col>
             <el-col :xs="24" :sm="6">
               <div class="metric-card">
                 <div class="metric-head">
-                  <span>命中率</span>
+                  <span>{{ t('page.cache.hitRate') }}</span>
                   <span class="text-secondary">{{ clampPercent(data.redis.hitRate) }}%</span>
                 </div>
                 <el-progress
@@ -69,65 +69,65 @@
                   :format="(p) => `${p}%`"
                 />
                 <div class="metric-foot text-secondary">
-                  hit {{ data.redis.keyspaceHits }} / miss {{ data.redis.keyspaceMisses }}
+                  {{ t('page.cache.hitMiss', { hit: data.redis.keyspaceHits, miss: data.redis.keyspaceMisses }) }}
                 </div>
               </div>
             </el-col>
             <el-col :xs="24" :sm="6">
               <div class="metric-card">
                 <div class="metric-head">
-                  <span>客户端连接</span>
+                  <span>{{ t('page.cache.clients') }}</span>
                   <span class="text-secondary">{{ data.redis.connectedClients }}</span>
                 </div>
                 <div class="metric-big">{{ data.redis.connectedClients }}</div>
                 <div class="metric-foot text-secondary">
-                  累计连接 {{ data.redis.totalConnectionsReceived }} · 拒绝 {{ data.redis.rejectedConnections }}
+                  {{ t('page.cache.totalConnections', { total: data.redis.totalConnectionsReceived, rejected: data.redis.rejectedConnections }) }}
                 </div>
               </div>
             </el-col>
             <el-col :xs="24" :sm="6">
               <div class="metric-card">
                 <div class="metric-head">
-                  <span>运行时长</span>
+                  <span>{{ t('page.cache.uptime') }}</span>
                   <span class="text-secondary">{{ data.redis.uptimeHuman }}</span>
                 </div>
                 <div class="metric-big">{{ data.redis.uptimeHuman }}</div>
                 <div class="metric-foot text-secondary">
-                  累计命令 {{ data.redis.totalCommandsProcessed }}
+                  {{ t('page.cache.totalCommands', { total: data.redis.totalCommandsProcessed }) }}
                 </div>
               </div>
             </el-col>
           </el-row>
 
           <el-descriptions :column="3" border style="margin-top: 16px">
-            <el-descriptions-item label="Redis 版本">{{ data.redis.version || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="运行模式">{{ data.redis.mode || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="端口">{{ data.redis.port || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="操作系统" :span="2">{{ data.redis.os || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="过期 / 淘汰">
+            <el-descriptions-item :label="t('page.cache.redisVersion')">{{ data.redis.version || '-' }}</el-descriptions-item>
+            <el-descriptions-item :label="t('page.cache.mode')">{{ data.redis.mode || '-' }}</el-descriptions-item>
+            <el-descriptions-item :label="t('page.cache.port')">{{ data.redis.port || '-' }}</el-descriptions-item>
+            <el-descriptions-item :label="t('page.server.os')" :span="2">{{ data.redis.os || '-' }}</el-descriptions-item>
+            <el-descriptions-item :label="t('page.cache.expiringEvicted')">
               {{ data.redis.expiredKeys }} / {{ data.redis.evictedKeys }}
             </el-descriptions-item>
           </el-descriptions>
 
-          <h3 class="section-title" style="margin-top: 20px">逻辑库</h3>
+          <h3 class="section-title" style="margin-top: 20px">{{ t('page.cache.keyspaces') }}</h3>
           <el-table :data="data.redis.keyspaces" border stripe>
-            <el-table-column prop="db" label="库" width="100" />
-            <el-table-column prop="keys" label="键数量" width="140" align="right" />
-            <el-table-column prop="expires" label="带过期时间" width="160" align="right" />
-            <el-table-column prop="avgTtl" label="平均 TTL（毫秒）" align="right" />
+            <el-table-column prop="db" :label="t('page.cache.db')" width="100" />
+            <el-table-column prop="keys" :label="t('page.cache.keyCount')" width="140" align="right" />
+            <el-table-column prop="expires" :label="t('page.cache.withExpiry')" width="160" align="right" />
+            <el-table-column prop="avgTtl" :label="t('page.cache.avgTtl')" align="right" />
           </el-table>
 
           <h3 class="section-title" style="margin-top: 20px">
-            命令统计
+            {{ t('page.cache.commandStats') }}
             <span class="text-secondary" style="font-size: 12px; font-weight: 400">
-              按调用次数取前 20
+              {{ t('page.cache.top20') }}
             </span>
           </h3>
           <el-table :data="(data.redis.commandStats || []).slice(0, 20)" border stripe>
-            <el-table-column prop="command" label="命令" width="140" />
-            <el-table-column prop="calls" label="调用次数" width="160" align="right" />
-            <el-table-column prop="usec" label="总耗时（微秒）" width="180" align="right" />
-            <el-table-column label="平均耗时（微秒）" align="right">
+            <el-table-column prop="command" :label="t('page.cache.command')" width="140" />
+            <el-table-column prop="calls" :label="t('page.cache.calls')" width="160" align="right" />
+            <el-table-column prop="usec" :label="t('page.cache.totalUsec')" width="180" align="right" />
+            <el-table-column :label="t('page.cache.avgUsec')" align="right">
               <template #default="{ row }">{{ Number(row.usecPerCall || 0).toFixed(2) }}</template>
             </el-table-column>
           </el-table>
@@ -136,19 +136,19 @@
         <!-- 未启用 Redis：展示本地 Caffeine 统计 -->
         <template v-else>
           <el-descriptions :column="3" border>
-            <el-descriptions-item label="缓存实现">{{ local.mode || data?.storeMode || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="当前条目">{{ local.size ?? 0 }}</el-descriptions-item>
-            <el-descriptions-item label="容量上限">{{ local.maxSize ?? '-' }}</el-descriptions-item>
-            <el-descriptions-item label="命中次数">{{ local.hitCount ?? 0 }}</el-descriptions-item>
-            <el-descriptions-item label="未命中次数">{{ local.missCount ?? 0 }}</el-descriptions-item>
-            <el-descriptions-item label="命中率">{{ ratioPercent(local.hitRate) }}%</el-descriptions-item>
-            <el-descriptions-item label="淘汰条目">{{ local.evictionCount ?? 0 }}</el-descriptions-item>
-            <el-descriptions-item label="条目过期（秒）">{{ local.expireSeconds ?? '-' }}</el-descriptions-item>
-            <el-descriptions-item label="加载次数">{{ local.loadCount ?? 0 }}</el-descriptions-item>
+            <el-descriptions-item :label="t('page.cache.localImpl')">{{ local.mode || data?.storeMode || '-' }}</el-descriptions-item>
+            <el-descriptions-item :label="t('page.cache.currentEntries')">{{ local.size ?? 0 }}</el-descriptions-item>
+            <el-descriptions-item :label="t('page.cache.maxSize')">{{ local.maxSize ?? '-' }}</el-descriptions-item>
+            <el-descriptions-item :label="t('page.cache.hits')">{{ local.hitCount ?? 0 }}</el-descriptions-item>
+            <el-descriptions-item :label="t('page.cache.misses')">{{ local.missCount ?? 0 }}</el-descriptions-item>
+            <el-descriptions-item :label="t('page.cache.hitRate')">{{ ratioPercent(local.hitRate) }}%</el-descriptions-item>
+            <el-descriptions-item :label="t('page.cache.evictions')">{{ local.evictionCount ?? 0 }}</el-descriptions-item>
+            <el-descriptions-item :label="t('page.cache.expireSeconds')">{{ local.expireSeconds ?? '-' }}</el-descriptions-item>
+            <el-descriptions-item :label="t('page.cache.loadCount')">{{ local.loadCount ?? 0 }}</el-descriptions-item>
           </el-descriptions>
 
           <el-alert
-            title="这是单机缓存：多实例部署时各节点各存各的验证码，用户在 A 节点取码、请求落到 B 节点会校验失败。"
+            :title="t('page.cache.singleNodeWarning')"
             type="info"
             :closable="false"
             show-icon
@@ -164,6 +164,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
 import { getCacheInfo } from '@/api/monitor'
+import { useI18n } from 'vue-i18n'
 
 /**
  * 缓存监控（/monitor/cache）。
@@ -177,6 +178,8 @@ import { getCacheInfo } from '@/api/monitor'
  * <p>后端读取 Redis 失败时会把原因放进 {@code warnings} 并降级返回，
  * 页面照常渲染，不会出现整页错误。</p>
  */
+const { t } = useI18n()
+
 const loading = ref(false)
 const data = ref(null)
 

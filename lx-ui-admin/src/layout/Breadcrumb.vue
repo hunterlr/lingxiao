@@ -1,6 +1,6 @@
 <template>
   <el-breadcrumb separator="/" class="breadcrumb">
-    <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
+    <el-breadcrumb-item :to="{ path: '/dashboard' }">{{ t('layout.home') }}</el-breadcrumb-item>
     <el-breadcrumb-item v-for="(item, index) in trail" :key="index">
       <span v-if="index === trail.length - 1" class="current">{{ item.title }}</span>
       <router-link v-else-if="item.path" :to="item.path">{{ item.title }}</router-link>
@@ -12,6 +12,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/store/auth'
 import { findTrail } from '@/utils/tree'
 
@@ -22,7 +23,13 @@ import { findTrail } from '@/utils/tree'
  * 路由层级表达不了“系统管理 / 用户管理”，菜单树才是唯一事实源。</p>
  */
 const route = useRoute()
+const { t, te } = useI18n()
 const auth = useAuthStore()
+
+function menuTitle(node) {
+  const key = node.menuKey ? `menu.${node.menuKey}` : ''
+  return key && te(key) ? t(key) : node.name
+}
 
 const trail = computed(() => {
   if (route.path === '/dashboard') {
@@ -31,9 +38,12 @@ const trail = computed(() => {
   const found = findTrail(auth.menus, (node) => node.type === 'C' && node.path === route.path)
   if (found && found.length) {
     return found.map((node) => ({
-      title: node.name,
+      title: menuTitle(node),
       path: node.type === 'C' ? node.path : ''
     }))
+  }
+  if (route.meta && route.meta.titleKey) {
+    return [{ title: t(route.meta.titleKey), path: '' }]
   }
   return route.meta && route.meta.title ? [{ title: route.meta.title, path: '' }] : []
 })

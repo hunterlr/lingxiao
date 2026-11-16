@@ -6,18 +6,18 @@
       </div>
       <h2>{{ title }}</h2>
       <p class="placeholder-desc">
-        菜单已经接进来了，但这个页面还没有实现。前端不需要改路由：
-        在 <code>src/views/{{ componentPath }}.vue</code> 创建文件后，刷新即可生效。
+        {{ t('placeholder.descPrefix') }} <code>src/views/{{ componentPath }}.vue</code>
+        {{ t('placeholder.descSuffix') }}
       </p>
       <el-descriptions :column="1" border class="placeholder-meta">
-        <el-descriptions-item label="当前路径">{{ route.path }}</el-descriptions-item>
-        <el-descriptions-item label="组件路径">
-          <span class="text-mono">{{ componentPath || '未配置' }}</span>
+        <el-descriptions-item :label="t('placeholder.currentPath')">{{ route.path }}</el-descriptions-item>
+        <el-descriptions-item :label="t('placeholder.componentPath')">
+          <span class="text-mono">{{ componentPath || t('placeholder.notConfigured') }}</span>
         </el-descriptions-item>
-        <el-descriptions-item label="权限码">{{ perms || '未配置' }}</el-descriptions-item>
-        <el-descriptions-item label="计划版本">{{ milestone }}</el-descriptions-item>
+        <el-descriptions-item :label="t('placeholder.perms')">{{ perms || t('placeholder.notConfigured') }}</el-descriptions-item>
+        <el-descriptions-item :label="t('placeholder.milestone')">{{ milestone }}</el-descriptions-item>
       </el-descriptions>
-      <el-button style="margin-top: 20px" @click="router.push('/')">返回首页</el-button>
+      <el-button style="margin-top: 20px" @click="router.push('/')">{{ t('errorPage.backHome') }}</el-button>
     </div>
   </div>
 </template>
@@ -25,6 +25,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 /**
  * 占位页。
@@ -35,17 +36,22 @@ import { useRoute, useRouter } from 'vue-router'
  */
 const route = useRoute()
 const router = useRouter()
+const { t, te } = useI18n()
 
-const title = computed(() => (route.meta && route.meta.title) || '功能建设中')
+const title = computed(() => {
+  const meta = route.meta || {}
+  if (meta.titleKey && te(meta.titleKey)) return t(meta.titleKey)
+  return meta.title || t('placeholder.underConstruction')
+})
 const componentPath = computed(() => (route.meta && route.meta.component) || '')
 const perms = computed(() => (route.meta && route.meta.perms) || '')
 const milestone = computed(() => {
   const path = route.path
-  if (path.startsWith('/monitor')) return 'W4 在线用户 / 服务器 / 缓存监控'
-  if (path.startsWith('/tool/job')) return 'W4 定时任务'
-  if (path.startsWith('/tool/gen')) return 'W5 代码生成'
-  if (path.startsWith('/tool/api-doc')) return 'W5 接口文档'
-  return '后续版本'
+  if (path.startsWith('/monitor')) return t('placeholder.milestoneMonitor')
+  if (path.startsWith('/tool/job')) return t('placeholder.milestoneJob')
+  if (path.startsWith('/tool/gen')) return t('placeholder.milestoneGen')
+  if (path.startsWith('/tool/api-doc')) return t('placeholder.milestoneApiDoc')
+  return t('placeholder.milestoneLater')
 })
 </script>
 

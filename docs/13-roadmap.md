@@ -355,3 +355,78 @@ gantt
 - 不要在没有多库 CI 的情况下承诺“兼容国产数据库”。
 - 不要在 P1 就把 CMS / 会员 / 工作流全部打开。
 - 不要让代码生成器生成“不能编译”的代码。
+
+---
+
+## 12. 待办清单（2026-11-17 记录，尚未开工）
+
+> 背景：v1.0 基座 + README 双语 + 多语言 L1 已收口（`1a3333b`）。
+> 下面两项是**已声明能力与实现之间的缺口**，优先于新版本功能。
+> 每项都写了验收标准，开工时按此逐条勾。
+
+### 12.1 P0：权限到按钮（前端指令已写好，但没有页面在用）
+
+**现状**：`src/directives/permission.js` 实现 `v-hasPerm`，`main.js` 已注册，
+但 18 个业务页里使用次数为 **0** —— 所有角色都能看到新增 / 修改 / 删除按钮，
+点下去才被后端 403。首页却写着“RBAC 权限到按钮”。
+
+| 步骤 | 内容 |
+|---|---|
+| 1 | 按 40 个按钮权限码铺到 18 个页面：`user / role / menu / dept / post / dict / config / notice / job / gen / file / online / operlog / loginlog` |
+| 2 | 新建只读角色 + 测试账号（本地验证用，不入库、不提交），逐页确认写按钮不可见 |
+| 3 | 只读账号直接调接口仍返回 403 / 1003（前端隐藏不是安全边界） |
+| 4 | 修 `lx-modules/lx-module-system/README.md` 第 241 行“前端指令待做”的过期描述 |
+| 5 | `smoke.mjs` 超管回归保持 22/22，另加一条“只读账号按钮隐藏”断言 |
+
+**验收**：只读账号 14 个页面看不到写按钮；超管全功能不回归；README 与实际一致。
+
+**参考权限码**（Flyway V4 / V8 / V10 / V11 + 文件、生成器，共 64 个，
+按钮级约 40 个，前缀 `platform:`）：
+
+```text
+system:user:add|edit|remove|resetPwd|unlock
+system:role|menu|dept|post|dict|config|notice:add|edit|remove
+monitor:job:add|edit|remove|run|changeStatus|log|log:clean
+monitor:operlog:clean  monitor:loginlog:clean  monitor:online:kickout
+file:upload  file:rename
+tool:gen:import|edit|preview|remove|download
+```
+
+### 12.2 P0：数据范围「2 自定义」
+
+**现状**：`sys_role_dept` 表不存在，保存 `data_scope=2` 直接拒绝，降级为仅本人；
+部门 / 角色列表也未按数据范围过滤。`lx-modules/lx-module-system/README.md`
+第 8、226、235 行都标着“待补”。
+
+| 步骤 | 内容 |
+|---|---|
+| 1 | Flyway 新增 `sys_role_dept(role_id, dept_id)` + 唯一索引 + 必要外键 / 注释 |
+| 2 | `SysRoleService` 保存 / 详情带 `deptIds`（先清后插，`null` = 不修改） |
+| 3 | `DataScopeService` 对 `2` 返回自定义部门集合；多角色仍取最大范围 |
+| 4 | 用户列表 `applyUserScope` 支持多部门 `IN`；部门列表、角色列表补同口径过滤 |
+| 5 | 前端角色页加部门树多选（仅 `data_scope=2` 显示），详情回显 |
+| 6 | 单测：自定义范围命中 / 空集合收紧为仅本人 / 超管放行 / 多角色取最大 |
+
+**验收**：选「自定义」并勾 2 个部门后，该角色用户只看到这两个部门及其用户；
+清空部门保存被拒绝；单测覆盖上述四种边界。
+
+### 12.3 P1：L2 多语言设计（只写方案，v1.2 再实现）
+
+- `docs/15-i18n.md` 定稿：`i18n_language` / `i18n_key` / `i18n_text` 三张表；
+- 明确哪些翻译：字典 `label`、参数名 / 说明、菜单名、公告标题 / 正文、CMS 内容；
+- 说明 L1 的 `menu_key` / `dict.<type>.<value>` / `config.<config_key>` 如何平滑迁到 L2；
+- 给出回退链：`请求语言 → 默认语言 → 数据库原文`，以及缓存策略（Caffeine / Redis）；
+- 产出评审结论后再排期，避免先写代码后改表。
+
+### 12.4 P1：发布包演练
+
+- `deploy/package.ps1` / `.sh` 打包（jar + 前端 dist + SQL + 脚本）；
+- 解压到干净目录，用 `application-prod.yml` + Nginx 跑通登录 / 上传 / 生成器关闭；
+- 写部署核对清单（JDK、时区、上传目录权限、Flyway、健康检查、回滚）。
+
+### 12.5 P2：零散小活（各 30 分钟内）
+
+- README / README.en 补 3 张英文界面截图（登录、列表、监控），双语现在只有中文图；
+- `docs/21-build-log.md` 目录 / 索引补 §41；
+- 清理 `docs/23` §7 中已被本轮实现覆盖的“暂缓”条目；
+- 核对 `docs/22` 前端依赖表与 `package-lock.json` 是否仍有偏差。

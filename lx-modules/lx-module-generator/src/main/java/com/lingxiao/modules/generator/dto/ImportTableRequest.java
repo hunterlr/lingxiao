@@ -18,7 +18,7 @@ public class ImportTableRequest implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @NotEmpty(message = "请至少选择一张表")
-    @Size(max = 50, message = "一次最多导入 50 张表")
+    @NotEmpty(message = "{valid.gen.tables.required}")
+    @Size(max = 50, message = "{valid.gen.tables.max}")
     private List<String> tables;
 }

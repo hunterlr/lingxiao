@@ -78,8 +78,8 @@ public class AuthService {
             long remaining = Math.max(1, Duration.between(now, user.getLockTime()).toMinutes() + 1);
             recordLoginLog(request.getUsername(), CommonConstants.STATUS_DISABLED,
                     "账号锁定中，剩余 " + remaining + " 分钟");
-            throw new ServiceException(ErrorCode.ACCOUNT_LOCKED,
-                    "账号已锁定，请 " + remaining + " 分钟后再试");
+            // 登录日志是给运维看的中文，不翻译；返回给用户的提示走语言包
+            throw new ServiceException(ErrorCode.ACCOUNT_LOCKED, "error.2004.locked", remaining);
         }
 
         // 3. 密码错误：累计失败次数，达到阈值则锁定
@@ -88,8 +88,7 @@ public class AuthService {
                 int lockMinutes = lockMinutes();
                 recordLoginLog(request.getUsername(), CommonConstants.STATUS_DISABLED,
                         "密码错误次数过多，账号锁定 " + lockMinutes + " 分钟");
-                throw new ServiceException(ErrorCode.ACCOUNT_LOCKED,
-                        "密码错误次数过多，账号已锁定 " + lockMinutes + " 分钟");
+                throw new ServiceException(ErrorCode.ACCOUNT_LOCKED, "error.2004.failures", lockMinutes);
             }
             recordLoginLog(request.getUsername(), CommonConstants.STATUS_DISABLED, "用户名或密码错误");
             throw new ServiceException(ErrorCode.LOGIN_FAILED);
@@ -207,7 +206,7 @@ public class AuthService {
 
         String nickname = request.getNickname() == null ? "" : request.getNickname().trim();
         if (nickname.isEmpty()) {
-            throw new ServiceException(ErrorCode.BAD_REQUEST, "昵称不能为空");
+            throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.nickname");
         }
 
         userMapper.update(null, new LambdaUpdateWrapper<SysUser>()
@@ -244,7 +243,7 @@ public class AuthService {
             throw new ServiceException(ErrorCode.OLD_PASSWORD_ERROR);
         }
         if (request.getOldPassword().equals(request.getNewPassword())) {
-            throw new ServiceException(ErrorCode.BAD_REQUEST, "新密码不能与原密码相同");
+            throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.samePassword");
         }
         passwordPolicy.validate(request.getNewPassword());
 

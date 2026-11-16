@@ -13,7 +13,7 @@ import javax.validation.constraints.Size;
 @Data
 public class RenameRequest {
 
-    @NotBlank(message = "新名称不能为空")
-    @Size(max = 255, message = "名称长度不能超过 255")
+    @NotBlank(message = "{valid.file.name.required}")
+    @Size(max = 255, message = "{valid.file.name.max}")
     private String displayName;
 }

@@ -26,8 +26,8 @@ public class SysNotice extends BaseEntity {
     @TableId(value = "notice_id", type = IdType.ASSIGN_ID)
     private Long noticeId;
 
-    @NotBlank(message = "公告标题不能为空")
-    @Size(max = 200, message = "公告标题不能超过 200 个字符")
+    @NotBlank(message = "{valid.notice.title.required}")
+    @Size(max = 200, message = "{valid.notice.title.max}")
     private String noticeTitle;
 
     /** 1 通知 / 2 公告 */
@@ -39,6 +39,6 @@ public class SysNotice extends BaseEntity {
     /** 0 正常 / 1 关闭 */
     private String status;
 
-    @Size(max = 500, message = "备注不能超过 500 个字符")
+    @Size(max = 500, message = "{valid.remark.max}")
     private String remark;
 }

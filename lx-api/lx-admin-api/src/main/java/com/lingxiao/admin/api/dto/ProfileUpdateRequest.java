@@ -15,14 +15,14 @@ import javax.validation.constraints.Size;
 @Data
 public class ProfileUpdateRequest {
 
-    @NotBlank(message = "昵称不能为空")
-    @Size(max = 64, message = "昵称不能超过 64 个字符")
+    @NotBlank(message = "{valid.nickname.required}")
+    @Size(max = 64, message = "{valid.nickname.max}")
     private String nickname;
 
-    @Email(message = "邮箱格式不正确")
-    @Size(max = 128, message = "邮箱不能超过 128 个字符")
+    @Email(message = "{valid.email.format}")
+    @Size(max = 128, message = "{valid.email.max}")
     private String email;
 
-    @Size(max = 32, message = "手机号不能超过 32 个字符")
+    @Size(max = 32, message = "{valid.phone.max}")
     private String phone;
 }

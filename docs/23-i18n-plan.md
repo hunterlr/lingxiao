@@ -413,3 +413,64 @@ CREATE TABLE i18n_value (
 **多语言不是“装个 vue-i18n”，而是“先定错误码契约，再收口文案，最后才是翻译文件”。**
 v1.0 先把中文写死没关系；要做的时候按本文 L1 走，4~5 天能出双语后台，
 数据库一行不用改；等 CMS 真要多语言内容，再启用 docs/15 的完整表设计。
+
+---
+
+## 10. 施工状态（第一轮：后端链路，2026-11-16）
+
+### 10.1 已完成
+
+| 内容 | 落点 | 说明 |
+|---|---|---|
+| 文案解析接口 | `lx-common-core/.../i18n/MessageResolver` | core 不依赖 Spring，只定义 `resolve(key, args)` |
+| 静态入口 | `lx-common-core/.../i18n/MessageUtils` | 永不抛异常；未初始化 / 缺 key / 解析器异常都退回默认文案 |
+| 语言包装配 | `lx-common-web/.../i18n/I18nConfig` | `ResourceBundleMessageSource`，basename `i18n/messages`，UTF-8，`fallbackToSystemLocale=false` |
+| 语言解析 | `lx-common-web/.../i18n/LingxiaoLocaleResolver` | `X-Lang > ?lang= > Accept-Language > zh-CN`；`zh/en/zh_CN/EN-us` 归一化 |
+| 静态入口初始化 | `lx-common-web/.../i18n/I18nMessageInitializer` | 单独组件，避免配置类与 MessageSource 循环依赖 |
+| 语言包 | `lx-common-web/src/main/resources/i18n/messages*.properties` | 默认中文 + `_en_US`；**94 个键**，中英键集合完全一致 |
+| 统一响应 | `R.java` | 新增 `messageKey`（`@JsonInclude(NON_NULL)`）；`ok/fail(ErrorCode)` 自动本地化 |
+| 业务异常 | `ServiceException.java` | 新增 `messageKey` / `args`、三参构造、`keyed(...)` 工厂；`getMessage()` 保留中文兜底 |
+| 全局异常 | `GlobalExceptionHandler.java` | 带 key 的走 MessageSource 翻译；校验消息由 Validator 直接解析 |
+| 鉴权异常 | `SaTokenExceptionHandler`（未改动） | 走 `R.fail(ErrorCode)`，自动跟着语言变 |
+| 错误码文案 | `messages*.properties` | `error.<code>` 覆盖 `ErrorCode` 全部 18 个枚举 |
+| 参数校验 | 17 个 DTO / 实体、87 处注解 | 中文 `message` 全部换成 `{valid.*}`，**70 个键** |
+| 登录锁定 | `AuthService` | `error.2004.locked` / `error.2004.failures` 带分钟参数；登录日志仍写中文 |
+| 密码策略 | `PasswordPolicy` | `valid.password.policy.basic/strong` |
+
+### 10.2 实测（8080，`--lx.captcha.enabled=false`）
+
+| 场景 | `X-Lang` | 返回 |
+|---|---|---|
+| 密码错误 | `zh-CN` | `{"code":2001,"msg":"用户名或密码错误","messageKey":"error.2001"}` |
+| 密码错误 | `en-US` | `{"code":2001,"msg":"Incorrect username or password","messageKey":"error.2001"}` |
+| 空用户名密码 | `zh-CN` | `password: 密码不能为空；username: 用户名不能为空` |
+| 空用户名密码 | `en-US` | `password: Password must not be empty; username: Username must not be empty` |
+| 未登录 | `en-US` | `{"code":1002,"msg":"Not signed in or session expired","messageKey":"error.1002"}` |
+| 登录成功 | `en-US` | `{"code":0,"msg":"Success",...}`（`messageKey` 为 null 时不输出） |
+
+### 10.3 单测
+
+| 新增测试类 | 数量 | 锁什么 |
+|---|---|---|
+| `MessageUtilsTest` | 6 | 未初始化 / 缺 key / 解析器抛异常都退回默认文案 |
+| `LingxiaoLocaleResolverTest` | 7 | 四级优先级、标签归一化、`setLocale` 不落 Cookie |
+| `I18nMessageSourceTest` | 5 | 中英键集合一致、每个 `ErrorCode` 都有文案、占位符替换、缺 key 返回 null |
+
+合计 **84 项**（原 66 + 新增 18），`mvn test` 不依赖 MySQL / Redis。
+
+### 10.4 待做（第二轮：前端）
+
+| 任务 | 说明 |
+|---|---|
+| 安装 `vue-i18n@9` | 前端目前还没有这个依赖 |
+| `src/i18n/{index,zh-CN,en-US}.js` | 语言包骨架，键名与后端 `error.*` 对齐 |
+| `src/store/locale.js` | `localStorage['lx-admin-locale']` → 浏览器语言 → `zh-CN` |
+| `App.vue` + `main.js` | 静态 `ElementPlus({locale})` 改 `ElConfigProvider` |
+| `Navbar.vue` | 顶栏语言下拉（中文 / English） |
+| `api/request.js` | 请求头加 `X-Lang` |
+| 菜单 / 字典 / 参数 | `MenuVO` 补 `menuKey` 下发，`t('menu.'+key, name)` 兜底 |
+| 18 个业务页文案 | 机械替换，按页面验收 |
+
+> 第一轮刻意只做后端：接口契约先稳定，前端才有稳定的 `messageKey` 可用；
+> 也避免“前端切了英文、后端还弹中文”这种半成品状态。
+

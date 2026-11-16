@@ -15,6 +15,6 @@ import java.util.List;
 @Data
 public class KickoutRequest {
 
-    @NotEmpty(message = "请选择要强退的会话")
+    @NotEmpty(message = "{valid.online.sessions.required}")
     private List<String> tokenIds;
 }

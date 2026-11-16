@@ -34,20 +34,20 @@ public class SysJob extends BaseEntity {
     @TableId(value = "job_id", type = IdType.ASSIGN_ID)
     private Long jobId;
 
-    @NotBlank(message = "任务名称不能为空")
-    @Size(max = 64, message = "任务名称不能超过 64 个字符")
+    @NotBlank(message = "{valid.job.name.required}")
+    @Size(max = 64, message = "{valid.job.name.max}")
     private String jobName;
 
     /** 任务分组，v1.0 固定 DEFAULT，保留字段便于后续按业务线分组 */
-    @Size(max = 64, message = "任务分组不能超过 64 个字符")
+    @Size(max = 64, message = "{valid.job.group.max}")
     private String jobGroup;
 
-    @NotBlank(message = "执行器不能为空")
-    @Size(max = 500, message = "执行器不能超过 500 个字符")
+    @NotBlank(message = "{valid.job.invokeTarget.required}")
+    @Size(max = 500, message = "{valid.job.invokeTarget.max}")
     private String invokeTarget;
 
-    @NotBlank(message = "Cron 表达式不能为空")
-    @Size(max = 255, message = "Cron 表达式不能超过 255 个字符")
+    @NotBlank(message = "{valid.job.cron.required}")
+    @Size(max = 255, message = "{valid.job.cron.max}")
     private String cronExpression;
 
     /** 1 立即 / 2 执行一次 / 3 放弃 */
@@ -59,7 +59,7 @@ public class SysJob extends BaseEntity {
     /** 0 正常 / 1 暂停 */
     private String status;
 
-    @Size(max = 500, message = "备注不能超过 500 个字符")
+    @Size(max = 500, message = "{valid.remark.max}")
     private String remark;
 
     /**

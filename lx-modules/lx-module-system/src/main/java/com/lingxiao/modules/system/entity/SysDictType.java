@@ -24,17 +24,17 @@ public class SysDictType extends BaseEntity {
     @TableId(value = "dict_id", type = IdType.ASSIGN_ID)
     private Long dictId;
 
-    @NotBlank(message = "字典名称不能为空")
-    @Size(max = 100, message = "字典名称不能超过 100 个字符")
+    @NotBlank(message = "{valid.dictType.name.required}")
+    @Size(max = 100, message = "{valid.dictType.name.max}")
     private String dictName;
 
-    @NotBlank(message = "字典类型编码不能为空")
-    @Size(max = 100, message = "字典类型编码不能超过 100 个字符")
+    @NotBlank(message = "{valid.dictType.type.required}")
+    @Size(max = 100, message = "{valid.dictType.type.max}")
     private String dictType;
 
     /** 0 正常 / 1 停用 */
     private String status;
 
-    @Size(max = 500, message = "备注不能超过 500 个字符")
+    @Size(max = 500, message = "{valid.remark.max}")
     private String remark;
 }

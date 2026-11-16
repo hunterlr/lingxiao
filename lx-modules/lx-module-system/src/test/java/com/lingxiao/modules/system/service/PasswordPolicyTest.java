@@ -45,14 +45,15 @@ class PasswordPolicyTest {
         ServiceException tooShort = catchThrowableOfType(
                 () -> policy.validate("abc1234"), ServiceException.class);
         assertThat(tooShort.getCode()).isEqualTo(1001);
-        assertThat(tooShort.getMessage()).contains("至少 8 位");
+        // 文案在多语言改造后由语言包提供，这里只锁“命中了哪个键”
+        assertThat(tooShort.getMessageKey()).isEqualTo("valid.password.policy.basic");
 
         assertThatThrownBy(() -> policy.validate("abcdefgh"))
                 .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("英文字母和数字");
+                .hasFieldOrPropertyWithValue("messageKey", "valid.password.policy.basic");
         assertThatThrownBy(() -> policy.validate("12345678"))
                 .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("英文字母和数字");
+                .hasFieldOrPropertyWithValue("messageKey", "valid.password.policy.basic");
         assertThatThrownBy(() -> policy.validate(null))
                 .isInstanceOf(ServiceException.class);
     }
@@ -76,16 +77,16 @@ class PasswordPolicyTest {
         assertThatCode(() -> policy.validate("Abcdef123!")).doesNotThrowAnyException();
         assertThatThrownBy(() -> policy.validate("abcdef123!"))
                 .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("大写字母");
+                .hasFieldOrPropertyWithValue("messageKey", "valid.password.policy.strong");
         assertThatThrownBy(() -> policy.validate("ABCDEF123!"))
                 .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("小写字母");
+                .hasFieldOrPropertyWithValue("messageKey", "valid.password.policy.strong");
         assertThatThrownBy(() -> policy.validate("Abcdefghij"))
                 .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("数字");
+                .hasFieldOrPropertyWithValue("messageKey", "valid.password.policy.strong");
         assertThatThrownBy(() -> policy.validate("Abcdef1234"))
                 .isInstanceOf(ServiceException.class)
-                .hasMessageContaining("符号");
+                .hasFieldOrPropertyWithValue("messageKey", "valid.password.policy.strong");
     }
 
     @Test

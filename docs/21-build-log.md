@@ -3835,3 +3835,79 @@ status      : ## main...origin/main（工作区干净）
 - 决定仓库是否要转私有；公开的话建议补 `LICENSE`；
 - `~/.gitconfig` 里那段死代理建议删掉，否则以后 `git clone` 还会踩；
 - 下一轮按 `docs/27` 4.3 的候选继续（多语言 L1 / 中文接口名 / Excel）。
+
+---
+
+## 40. 第二十三轮：README 双语化 + 多语言 L1（后端）
+
+### 40.1 README 重写
+
+原来的 `README.md` 是施工式文档（“第 N 轮做了什么、验证了多少项”），不适合给外部看。这一轮改成公开项目介绍：
+
+| 动作 | 结果 |
+|---|---|
+| 中文 `README.md` 重写 | 徽章 → 一句话定位 → 功能特性 → 截图 → 技术栈 → 快速开始 → 目录 → 接口 → 文档 → 路线图 → 贡献 / 致谢 |
+| 新增 `README.en.md` | 与中文同结构，顶部互相加语言切换链接 |
+| 截图 | 12 张 PNG 放到 `docs/images/`（登录、首页、用户、角色、参数、字典、生成器、监控、任务、文件、暗色、主题抽屉），表格里用 `<img width="430">` 控制宽度 |
+| 删掉的内容 | 施工记录、验证项计数、“本轮做了什么”全部移出 README，只留在 `docs/21` |
+
+截图由 `.local/uitest/shots-readme.mjs` 用 Puppeteer 生成（1440×900，控制台 0 error），脚本不入库。
+提交 `a4b6d4e`，只带 `README.md` / `README.en.md` / `docs/images/`，不夹带 i18n 改动。
+
+### 40.2 多语言 L1：只做后端
+
+按 `docs/23` 的分轮建议，第一轮先把**接口契约**稳定下来，前端第二轮再切 UI。
+
+新增文件：
+
+| 文件 | 作用 |
+|---|---|
+| `lx-common-core/.../i18n/MessageResolver.java` | 最小解析接口，core 不依赖 Spring |
+| `lx-common-core/.../i18n/MessageUtils.java` | 静态入口；永不抛异常，失败退回默认文案 |
+| `lx-common-web/.../i18n/I18nConfig.java` | MessageSource + LocaleResolver 装配 |
+| `lx-common-web/.../i18n/LingxiaoLocaleResolver.java` | `X-Lang > ?lang= > Accept-Language > zh-CN` |
+| `lx-common-web/.../i18n/I18nMessageInitializer.java` | 启动时把 MessageSource 插到静态入口上 |
+| `i18n/messages.properties` / `messages_en_US.properties` | 94 个键（18 个错误码 + 5 个带参错误 + 70 个校验 + 1 个分隔符） |
+
+改动文件：
+
+- `R.java`：`messageKey` 字段（`NON_NULL` 不输出）+ `ok/fail(ErrorCode)` 本地化；
+- `ServiceException.java`：`messageKey` / `args` / 三参构造 / `keyed(...)` 工厂，`getMessage()` 保留中文兜底；
+- `GlobalExceptionHandler.java`：构造注入 MessageSource，带 key 的异常翻译后再返回；
+- `AuthService.java`：锁定文案换成 `error.2004.locked` / `error.2004.failures`（登录日志仍写中文）；
+- `PasswordPolicy.java`：密码策略文案 key 化；
+- 17 个 DTO / 实体、87 处 `@NotBlank/@Size/...`：中文 message 换成 `{valid.*}`。
+
+### 40.3 踩坑
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| 想给配置类构造注入 MessageSource 报循环依赖 | 配置类 → Bean → 配置类 | 拆出 `I18nMessageInitializer` 单独组件 |
+| `ServiceException(ErrorCode, "key")` 走不到带参构造 | 两参构造是“字面量”语义，重载更具体 | 无参 key 用 `ServiceException.keyed(...)` 工厂 |
+| 三参构造 `super(key)` 导致翻译失败时把 key 弹给用户 | 缺省消息用了 key | 改成 `super(errorCode.getMsg())`，兜底是中文枚举 |
+| 校验消息不跟语言走 | Validator 需要容器里的 MessageSource | 不自己定义 Validator，让 Boot 自动装配接上（配合 `LocaleContextHolder`） |
+| `MockHttpServletRequest` 默认 Accept-Language 是 en | Spring 测试桩的默认值 | 测试里显式给 `fr-FR` 验证“不支持 → 回退中文” |
+| 中英 properties 容易只改一边 | 两份文件手工维护 | 新增 `I18nMessageSourceTest` 断言键集合完全一致 |
+
+### 40.4 验证
+
+```text
+mvn -B -ntp test            BUILD SUCCESS，84 项（原 66 + 新增 18）
+mvn -B -ntp -DskipTests package   BUILD SUCCESS
+```
+
+接口实测（8080，关闭验证码）：
+
+```text
+X-Lang: zh-CN  {"code":2001,"msg":"用户名或密码错误","messageKey":"error.2001"}
+X-Lang: en-US  {"code":2001,"msg":"Incorrect username or password","messageKey":"error.2001"}
+X-Lang: en-US  {"code":1001,"msg":"password: Password must not be empty; username: Username must not be empty"}
+X-Lang: en-US  {"code":1002,"msg":"Not signed in or session expired","messageKey":"error.1002"}
+X-Lang: en-US  {"code":0,"msg":"Success","data":{"tokenName":"lx-platform-token",...}}
+```
+
+### 40.5 下一轮
+
+- 前端：`vue-i18n@9`、`store/locale.js`、`ElConfigProvider`、顶栏语言切换、`X-Lang` 请求头；
+- `MenuVO` 补 `menuKey`，侧边栏 `t('menu.'+key, name)`；
+- 18 个业务页文案替换，按 `docs/23` 3.4 清单验收。

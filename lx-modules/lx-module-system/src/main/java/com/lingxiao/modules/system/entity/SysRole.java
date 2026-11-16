@@ -30,12 +30,12 @@ public class SysRole extends BaseEntity {
     private Long roleId;
 
     /** 角色标识，例如 admin / operator；权限判断用它 */
-    @NotBlank(message = "角色标识不能为空")
-    @Size(max = 64, message = "角色标识不能超过 64 个字符")
+    @NotBlank(message = "{valid.role.key.required}")
+    @Size(max = 64, message = "{valid.role.key.max}")
     private String roleKey;
 
-    @NotBlank(message = "角色名称不能为空")
-    @Size(max = 64, message = "角色名称不能超过 64 个字符")
+    @NotBlank(message = "{valid.role.name.required}")
+    @Size(max = 64, message = "{valid.role.name.max}")
     private String roleName;
 
     /** 排序，越小越靠前 */
@@ -50,7 +50,7 @@ public class SysRole extends BaseEntity {
     /** 0 正常 / 1 停用 */
     private String status;
 
-    @Size(max = 500, message = "备注不能超过 500 个字符")
+    @Size(max = 500, message = "{valid.remark.max}")
     private String remark;
 
     // ==================== 非数据库字段 ====================

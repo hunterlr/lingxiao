@@ -16,19 +16,19 @@ import javax.validation.constraints.Size;
 @Data
 public class LoginRequest {
 
-    @NotBlank(message = "用户名不能为空")
-    @Size(max = 64, message = "用户名长度不能超过 64")
+    @NotBlank(message = "{valid.username.required}")
+    @Size(max = 64, message = "{valid.login.username.max}")
     private String username;
 
-    @NotBlank(message = "密码不能为空")
-    @Size(max = 128, message = "密码长度不能超过 128")
+    @NotBlank(message = "{valid.login.password.required}")
+    @Size(max = 128, message = "{valid.login.password.max}")
     private String password;
 
     /** 验证码标识；关闭验证码时为空 */
-    @Size(max = 64, message = "验证码标识长度不正确")
+    @Size(max = 64, message = "{valid.login.captchaKey.max}")
     private String captchaKey;
 
     /** 验证码；关闭验证码时为空 */
-    @Size(max = 8, message = "验证码长度不正确")
+    @Size(max = 8, message = "{valid.login.captchaCode.max}")
     private String captchaCode;
 }

@@ -14,11 +14,11 @@ import javax.validation.constraints.Size;
 @Data
 public class PasswordChangeRequest {
 
-    @NotBlank(message = "原密码不能为空")
-    @Size(max = 64, message = "原密码不能超过 64 个字符")
+    @NotBlank(message = "{valid.password.old.required}")
+    @Size(max = 64, message = "{valid.password.old.max}")
     private String oldPassword;
 
-    @NotBlank(message = "新密码不能为空")
-    @Size(min = 6, max = 64, message = "新密码长度必须在 6~64 之间")
+    @NotBlank(message = "{valid.password.new.required}")
+    @Size(min = 6, max = 64, message = "{valid.password.new.size}")
     private String newPassword;
 }

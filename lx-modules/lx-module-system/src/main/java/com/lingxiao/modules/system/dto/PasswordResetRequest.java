@@ -13,7 +13,7 @@ import javax.validation.constraints.Size;
 @Data
 public class PasswordResetRequest {
 
-    @NotBlank(message = "新密码不能为空")
-    @Size(min = 6, max = 64, message = "密码长度必须在 6~64 之间")
+    @NotBlank(message = "{valid.password.new.required}")
+    @Size(min = 6, max = 64, message = "{valid.password.size}")
     private String newPassword;
 }

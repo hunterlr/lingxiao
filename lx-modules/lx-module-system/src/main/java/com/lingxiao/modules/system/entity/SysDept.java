@@ -29,8 +29,8 @@ public class SysDept extends BaseEntity {
     /** 上级部门，0 表示根部门 */
     private Long parentId;
 
-    @NotBlank(message = "部门名称不能为空")
-    @Size(max = 64, message = "部门名称不能超过 64 个字符")
+    @NotBlank(message = "{valid.dept.name.required}")
+    @Size(max = 64, message = "{valid.dept.name.max}")
     private String deptName;
 
     private Integer orderNum;
@@ -42,6 +42,6 @@ public class SysDept extends BaseEntity {
     /** 0 正常 / 1 停用 */
     private String status;
 
-    @Size(max = 500, message = "备注不能超过 500 个字符")
+    @Size(max = 500, message = "{valid.remark.max}")
     private String remark;
 }

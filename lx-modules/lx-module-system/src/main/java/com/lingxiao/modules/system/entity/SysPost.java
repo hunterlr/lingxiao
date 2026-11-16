@@ -24,12 +24,12 @@ public class SysPost extends BaseEntity {
     @TableId(value = "post_id", type = IdType.ASSIGN_ID)
     private Long postId;
 
-    @NotBlank(message = "岗位编码不能为空")
-    @Size(max = 64, message = "岗位编码不能超过 64 个字符")
+    @NotBlank(message = "{valid.post.code.required}")
+    @Size(max = 64, message = "{valid.post.code.max}")
     private String postCode;
 
-    @NotBlank(message = "岗位名称不能为空")
-    @Size(max = 64, message = "岗位名称不能超过 64 个字符")
+    @NotBlank(message = "{valid.post.name.required}")
+    @Size(max = 64, message = "{valid.post.name.max}")
     private String postName;
 
     private Integer sort;
@@ -37,6 +37,6 @@ public class SysPost extends BaseEntity {
     /** 0 正常 / 1 停用 */
     private String status;
 
-    @Size(max = 500, message = "备注不能超过 500 个字符")
+    @Size(max = 500, message = "{valid.remark.max}")
     private String remark;
 }

@@ -58,16 +58,14 @@ public class PasswordPolicy {
                     || !UPPER.matcher(password).find()
                     || !DIGIT.matcher(password).find()
                     || !SYMBOL.matcher(password).find()) {
-                throw new ServiceException(ErrorCode.BAD_REQUEST,
-                        "密码至少 10 位，且必须同时包含大写字母、小写字母、数字和符号");
+                throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "valid.password.policy.strong");
             }
             return;
         }
         if (password.length() < 8
                 || !LETTER.matcher(password).find()
                 || !DIGIT.matcher(password).find()) {
-            throw new ServiceException(ErrorCode.BAD_REQUEST,
-                    "密码至少 8 位，且必须同时包含英文字母和数字");
+            throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "valid.password.policy.basic");
         }
     }
 

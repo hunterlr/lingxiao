@@ -27,16 +27,16 @@ public class SysConfig extends BaseEntity {
     @TableId(value = "config_id", type = IdType.ASSIGN_ID)
     private Long configId;
 
-    @NotBlank(message = "参数名称不能为空")
-    @Size(max = 100, message = "参数名称不能超过 100 个字符")
+    @NotBlank(message = "{valid.config.name.required}")
+    @Size(max = 100, message = "{valid.config.name.max}")
     private String configName;
 
-    @NotBlank(message = "参数键名不能为空")
-    @Size(max = 100, message = "参数键名不能超过 100 个字符")
+    @NotBlank(message = "{valid.config.key.required}")
+    @Size(max = 100, message = "{valid.config.key.max}")
     private String configKey;
 
-    @NotBlank(message = "参数键值不能为空")
-    @Size(max = 500, message = "参数键值不能超过 500 个字符")
+    @NotBlank(message = "{valid.config.value.required}")
+    @Size(max = 500, message = "{valid.config.value.max}")
     private String configValue;
 
     /**
@@ -45,7 +45,7 @@ public class SysConfig extends BaseEntity {
      * <p>决定参数设置页用什么控件编辑；空值按 {@code text} 处理，
      * 兼容 V9 之前没有该列的历史数据。</p>
      */
-    @Size(max = 20, message = "控件类型不能超过 20 个字符")
+    @Size(max = 20, message = "{valid.config.type.max}")
     private String controlType;
 
     /**
@@ -59,12 +59,12 @@ public class SysConfig extends BaseEntity {
      *   <li>text：忽略。</li>
      * </ul>
      */
-    @Size(max = 1000, message = "控件选项不能超过 1000 个字符")
+    @Size(max = 1000, message = "{valid.config.options.max}")
     private String configOptions;
 
     /** Y 内置 / N 普通 */
     private String configType;
 
-    @Size(max = 500, message = "备注不能超过 500 个字符")
+    @Size(max = 500, message = "{valid.remark.max}")
     private String remark;
 }

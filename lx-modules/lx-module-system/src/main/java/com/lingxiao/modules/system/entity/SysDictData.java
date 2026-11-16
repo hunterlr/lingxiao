@@ -28,16 +28,16 @@ public class SysDictData extends BaseEntity {
 
     private Integer dictSort;
 
-    @NotBlank(message = "字典标签不能为空")
-    @Size(max = 100, message = "字典标签不能超过 100 个字符")
+    @NotBlank(message = "{valid.dictData.label.required}")
+    @Size(max = 100, message = "{valid.dictData.label.max}")
     private String dictLabel;
 
-    @NotBlank(message = "字典键值不能为空")
-    @Size(max = 100, message = "字典键值不能超过 100 个字符")
+    @NotBlank(message = "{valid.dictData.value.required}")
+    @Size(max = 100, message = "{valid.dictData.value.max}")
     private String dictValue;
 
-    @NotBlank(message = "字典类型不能为空")
-    @Size(max = 100, message = "字典类型不能超过 100 个字符")
+    @NotBlank(message = "{valid.dictData.type.required}")
+    @Size(max = 100, message = "{valid.dictData.type.max}")
     private String dictType;
 
     private String cssClass;
@@ -49,6 +49,6 @@ public class SysDictData extends BaseEntity {
     /** 0 正常 / 1 停用 */
     private String status;
 
-    @Size(max = 500, message = "备注不能超过 500 个字符")
+    @Size(max = 500, message = "{valid.remark.max}")
     private String remark;
 }

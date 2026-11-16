@@ -38,25 +38,25 @@ public class SysUser extends BaseEntity {
     private Long deptId;
 
     /** 登录账号，平台内唯一 */
-    @NotBlank(message = "用户名不能为空")
-    @Size(max = 64, message = "用户名不能超过 64 个字符")
+    @NotBlank(message = "{valid.username.required}")
+    @Size(max = 64, message = "{valid.user.username.max}")
     private String username;
 
     /** 显示名 */
-    @NotBlank(message = "昵称不能为空")
-    @Size(max = 64, message = "昵称不能超过 64 个字符")
+    @NotBlank(message = "{valid.nickname.required}")
+    @Size(max = 64, message = "{valid.nickname.max}")
     private String nickname;
 
     /** BCrypt 哈希，长度固定 60；接口只接收、不返回 */
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
-    @Size(min = 6, max = 64, message = "密码长度必须在 6~64 之间")
+    @Size(min = 6, max = 64, message = "{valid.password.size}")
     private String password;
 
-    @Email(message = "邮箱格式不正确")
-    @Size(max = 128, message = "邮箱不能超过 128 个字符")
+    @Email(message = "{valid.email.format}")
+    @Size(max = 128, message = "{valid.email.max}")
     private String email;
 
-    @Size(max = 32, message = "手机号不能超过 32 个字符")
+    @Size(max = 32, message = "{valid.phone.max}")
     private String phone;
 
     /** 0 男 / 1 女 / 2 未知，字典 sys_user_sex */
@@ -77,7 +77,7 @@ public class SysUser extends BaseEntity {
     /** 锁定截止时间；NULL 表示未锁定。到期后下一次登录从 0 重新计数 */
     private LocalDateTime lockTime;
 
-    @Size(max = 500, message = "备注不能超过 500 个字符")
+    @Size(max = 500, message = "{valid.remark.max}")
     private String remark;
 
     // ==================== 非数据库字段 ====================

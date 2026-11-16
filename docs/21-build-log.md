@@ -3784,3 +3784,54 @@ Testcontainers 都还没进包（源码里 0 引用），原表全标 ✅ 会误
 - 表头加一句「✅ = v1.0 已在用，— = 还没进包」；
 - 未引入的行标 **规划** 或 **不引入**，并写清 v1.0 实际用什么替代（HikariCP / Lettuce / Spring Task）；
 - 补上 v1.0 真正在用的 Jsoup / Velocity / Lombok 三行。
+
+---
+
+## 39. 第二十二轮：上传 GitHub
+
+### 39.1 背景
+
+代码一直只在本机，`docs/27` 写好了流程但没执行。用户要求直接推上去。
+
+### 39.2 做了什么
+
+| 步骤 | 结果 |
+|---|---|
+| `git init -b main` | `E:\java\lingxiao\.git` |
+| `git add .` | 371 个文件（无 `target/` `node_modules/` `dist/` `.local/` `release/`） |
+| 首次提交 | `ee26d5e chore: 凌霄 v1.0 后台基座` |
+| 远端 | `git@github.com:hunterlr/lingxiao.git`（SSH） |
+| 推送 | `main -> main`，`git ls-remote` 与本地 HEAD 完全一致 |
+| 仓库可见性 | public（要改私有：Settings → Danger Zone → Change visibility） |
+
+提交前做了三件事：
+
+1. `git diff --cached --name-only` 按顶层目录统计，确认没有构建产物；
+2. 扫敏感串（`ghp_*` / `sk-*` / `BEGIN * PRIVATE KEY` / `AKIA*`）——0 命中；
+3. 查大文件——无 >5 MB 文件，不会撞 GitHub 的 100 MB 限制。
+
+### 39.3 踩坑
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `git ls-remote` 报 `Failed to connect to 127.0.0.1 port 10808` | `~/.gitconfig` 里 `[http "https://github.com"] proxy = socks5h://127.0.0.1:10808`，代理没开 | 临时用 `-c "http.https://github.com.proxy="` 绕过；`curl --noproxy "*"` 实测直连 200 |
+| `git push` 弹不出认证，直接 `failed to execute prompt script` | `credential.helper=manager` 但 Git Credential Manager 二进制缺失 | 改用 SSH，绕开凭据助手 |
+| `ssh -T git@github.com` 报 `Permission denied (publickey)` | `~/.ssh/id_rsa` 存在但没注册到 GitHub | 用 `https://github.com/<user>.keys` 验证（返回空即未注册），加公钥后重试 |
+| `api.github.com` 任何路径都 301 | 本机网络对 API 域做了重定向 | 不影响 `git push`；只是没法用 API 查 Actions，需要 PAT 或人工看网页 |
+| 剪贴板里的公钥丢了 | 用户侧剪贴板被覆盖 | `Set-Clipboard` 重新写入并用 `Get-Clipboard` 回读校验长度一致 |
+
+### 39.4 验证
+
+```text
+local  HEAD : ee26d5e853af318c7a49fb0ac3b76cd16fac35e3
+remote main : ee26d5e853af318c7a49fb0ac3b76cd16fac35e3
+tracked     : 371
+status      : ## main...origin/main（工作区干净）
+```
+
+### 39.5 后续
+
+- 去 Actions 看 `CI` 首次运行（我这边没有 PAT，查不了 API）；
+- 决定仓库是否要转私有；公开的话建议补 `LICENSE`；
+- `~/.gitconfig` 里那段死代理建议删掉，否则以后 `git clone` 还会踩；
+- 下一轮按 `docs/27` 4.3 的候选继续（多语言 L1 / 中文接口名 / Excel）。

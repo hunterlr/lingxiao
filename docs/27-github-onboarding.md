@@ -43,9 +43,11 @@ $z.Dispose()
 
 ### 2.1 当前状态
 
-- 工程目录**还没有 `git init`**，所有文件都还是“本地文件”。
+- **已上传**：<https://github.com/hunterlr/lingxiao>，分支 `main`，首次提交 `ee26d5e`（2026-11-16，371 个文件）。
 - `.gitignore` 已就绪，`target/`、`node_modules/`、`dist/`、`release/`、`data/`、`.local/`、`*.log` 都不会入库。
 - `.gitattributes` 已就绪：仓库内统一 LF，`.ps1` 保持 CRLF，`.sh` 保持 LF（避免 Linux 上 `bad interpreter`）。
+- 认证方式：**SSH**（`~/.ssh/id_rsa`，指纹 `SHA256:AkJzU7/fpGxdxMepA+hWsrCBHqA5P7pnRQ0x9haQYIA`），无密码短语。
+- 仓库当前是 **public**；要改私有：`Settings → General → Danger Zone → Change visibility`。
 - 没有 `LICENSE`：如果要公开给别人用，建议补一个（MIT / Apache-2.0）；内部仓库可以不加。
 
 ### 2.2 会入库 / 不会入库
@@ -66,7 +68,7 @@ $z.Dispose()
 > **`.local/` 是重点**：里面的 `verify-*.ps1` 与 `uitest/*.mjs` 是每轮发版前的人工回归脚本，
 > 默认不进仓库。换机器后如果要继续跑接口 / 页面回归，见本文 4.4。
 
-### 2.3 首次上传命令
+### 2.3 首次上传命令（已于 2026-11-16 执行完毕，留作参考）
 
 ```powershell
 cd E:\java\lingxiao
@@ -79,9 +81,12 @@ git add .
 git status --short          # 仔细看一眼，不应该出现 target/、node_modules/、.local/、release/
 
 git commit -m "chore: 凌霄 v1.0 后台基座"
-git remote add origin https://github.com/<你的账号>/lingxiao.git
+git remote add origin git@github.com:<你的账号>/lingxiao.git
 git push -u origin main
 ```
+
+> 用 SSH 而不是 HTTPS，是因为这台机器上 `api.github.com` 被重定向劫持、Git Credential Manager
+> 二进制也缺失；SSH 只需要一次性把公钥加到 GitHub，之后不再需要任何交互。
 
 如果误把产物加进了暂存区（还没提交）：
 
@@ -366,6 +371,10 @@ robocopy .local\uitest $dst\uitest *.mjs package.json package-lock.json fixtures
 | `npm ci` 失败 | Node 版本过低（需 18+）；或 `package-lock.json` 与 `package.json` 不同步 |
 | `mvn package` 报 `Unable to rename ... lingxiao.jar` | Windows 下后端正从该 jar 运行；先停服务再打包 |
 | CI 第一次跑失败 | 看 Actions 日志；先在本地跑 `mvn -B -ntp test` 与 `npm run build` 复现 |
+| `git push` 报 `Failed to connect to 127.0.0.1 port 10808` | `~/.gitconfig` 给 `https://github.com` 配了 `socks5h` 代理但代理没开。临时绕过：`git -c "http.https://github.com.proxy=" push`；或删掉 `[http "https://github.com"] proxy` 那段 |
+| `ssh -T git@github.com` 报 `Permission denied (publickey)` | 公钥没加到 GitHub。用 `curl https://github.com/<你的账号>.keys` 核对（返回空就是没加），指纹用 `ssh-keygen -lf ~/.ssh/id_rsa.pub` 对 |
+| 加完公钥立刻 push 仍失败 | 大概率是加到了 `SSH signing keys` 而不是 `SSH keys`；两者不在同一页 |
+| `api.github.com` 请求全是 301 | 本机网络对 API 域做了重定向，`github.com` 正常；不影响 `git push`，只是没法用 API 查 Actions |
 
 ---
 

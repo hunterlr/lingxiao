@@ -1,5 +1,11 @@
 # 凌霄 LingXiao · 一体化内容与业务平台
 
+[![CI](https://github.com/hunterlr/lingxiao/actions/workflows/ci.yml/badge.svg)](https://github.com/hunterlr/lingxiao/actions/workflows/ci.yml)
+[![JDK](https://img.shields.io/badge/JDK-8%20%7C%2011%20%7C%2017-blue)](docs/11-jdk-engineering.md)
+[![License](https://img.shields.io/badge/license-not%20set-lightgrey)](#)
+
+> 仓库：<https://github.com/hunterlr/lingxiao>（`main` 分支）
+>
 > 总体规划稿 v0.1 · 2026-11-10
 >
 > 定位：以 RuoYi 的后台基座为起点，建设一套 **后台管理 + CMS + 会员前台 + 工作流 + SaaS 多租户** 的可插拔一体化平台。后台管系统与内容，前台 PC / H5 / App 消费内容与会员服务，CMS、会员、工作流、SaaS、多语言均可用开关装卸；数据库兼容 MySQL / PostgreSQL / 达梦 / 人大金仓等。

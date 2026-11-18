@@ -364,19 +364,35 @@ gantt
 > 下面两项是**已声明能力与实现之间的缺口**，优先于新版本功能。
 > 每项都写了验收标准，开工时按此逐条勾。
 
-### 12.1 P0：权限到按钮（前端指令已写好，但没有页面在用）
+### 12.1 P0：权限到按钮（已完成，2026-11-18）
 
-**现状**：`src/directives/permission.js` 实现 `v-hasPerm`，`main.js` 已注册，
-但 18 个业务页里使用次数为 **0** —— 所有角色都能看到新增 / 修改 / 删除按钮，
-点下去才被后端 403。首页却写着“RBAC 权限到按钮”。
+**复核结论**：`v-hasPerm` 并不是没做——13 个页面已有 **46 处**使用（第一次核查按
+`v-permission` 搜索所以漏掉了）。2026-11-18 补齐最后 2 个缺口后，覆盖完整。
 
-| 步骤 | 内容 |
+已覆盖：用户 / 角色 / 菜单 / 部门 / 岗位 / 字典 / 参数 / 公告 / 任务 / 生成器 /
+在线用户 / 操作日志 / 登录日志。
+
+| 本次补齐 | 内容 |
 |---|---|
-| 1 | 按 40 个按钮权限码铺到 18 个页面：`user / role / menu / dept / post / dict / config / notice / job / gen / file / online / operlog / loginlog` |
-| 2 | 新建只读角色 + 测试账号（本地验证用，不入库、不提交），逐页确认写按钮不可见 |
-| 3 | 只读账号直接调接口仍返回 403 / 1003（前端隐藏不是安全边界） |
-| 4 | 修 `lx-modules/lx-module-system/README.md` 第 241 行“前端指令待做”的过期描述 |
-| 5 | `smoke.mjs` 超管回归保持 22/22，另加一条“只读账号按钮隐藏”断言 |
+| 文件中心 | `FileLibrary.vue` 上传按钮 `platform:file:upload`、改名按钮 `platform:file:rename` |
+| 用户启停用 | 行内 `el-switch` 增加 `:disabled="!canEditUser"`（`platform:system:user:edit`），与任务页 `canChangeStatus` 口径一致 |
+| 文档 | `lx-modules/lx-module-system/README.md` 删除“前端指令待做”的过期描述 |
+
+**验收结果**（2026-11-18，本地只读角色 `readonly_test`，仅授 M/C 菜单）：
+
+```text
+readonly permissions=18，无任何 add/edit/remove/clean/kickout/upload/rename
+POST /admin/system/user        → 403 {"code":1003,"msg":"没有权限执行该操作"}
+DELETE /admin/system/oper-log/clean → 403 {"code":1003}
+GET  /admin/system/user/list   → 200 code=0，dataScope=5 只返回本人 1 行
+```
+
+浏览器逐页（只读账号）：14 个页面只剩 `搜索 / 重置 / 刷新 / 详情 / 预览 / 复制链接`；
+用户启停用、任务启停用开关均为禁用态。admin 复查：新增 / 编辑 / 删除 / 重置密码 /
+上传 / 改名 / 执行一次 / 日志全部可见。`smoke.mjs` 超管回归 22/22，控制台 0 error。
+
+> 验证脚本 `.local/uitest/perm-check.mjs`（建只读角色 → 建账号 → 验证 → 清理）
+> 只在本地跑，不入库；测试账号与角色验收后已删除。
 
 **验收**：只读账号 14 个页面看不到写按钮；超管全功能不回归；README 与实际一致。
 

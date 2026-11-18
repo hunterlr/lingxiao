@@ -238,7 +238,11 @@ job 模块开启时运维能改 cron、能暂停、能看到每次删除条数�
 
 `V4__system_button_perms.sql` 补 25 条 `menu_type='F'` 记录（`add/edit/remove/resetPwd` 等），ID 按菜单分段（1xx 用户 … 8xx 公告），并授权给 `role_id=1`；`V8__monitor_log_perms.sql` 再补两条日志清空权限（1401 / 1501）；`V10__monitor_online_kickout.sql` 补在线强退权限（1301）；定时任务的 7 个按钮权限（2101~2107）由 `lx-module-job` 的 `V11` 补入。
 
-按钮不进侧边栏，只提供 `perms`；前端应按 `/auth/info` 返回的 `permissions` 控制按钮显隐（前端指令待做）。
+按钮不进侧边栏，只提供 `perms`；前端用全局指令 `v-hasPerm`（`src/directives/permission.js`）
+按 `/auth/info` 返回的 `permissions` 控制按钮显隐，超管 `*:*:*` 直接放行；
+行内 `el-switch`（用户启停用、任务启停）用 `hasPermission(...) + disabled` 做只读态。
+覆盖范围：用户 / 角色 / 菜单 / 部门 / 岗位 / 字典 / 参数 / 公告 / 任务 / 生成器 /
+文件中心 / 在线用户 / 操作日志 / 登录日志。前端隐藏只减少误操作，鉴权仍在后端。
 
 ### 接口一览
 

@@ -96,7 +96,7 @@
               :model-value="row.status"
               active-value="0"
               inactive-value="1"
-              :disabled="isBuiltin(row)"
+              :disabled="isBuiltin(row) || !canEditUser"
               @change="(value) => handleStatusChange(row, value)"
             />
           </template>
@@ -309,12 +309,13 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import DictSelect from '@/components/DictSelect.vue'
 import DictTag from '@/components/DictTag.vue'
+import { useAuthStore } from '@/store/auth'
 import {
   addUser,
   changeUserStatus,
@@ -337,6 +338,10 @@ import { listPostOptions } from '@/api/post'
  * 前端禁用只是让用户少走一步。</p>
  */
 const { t } = useI18n()
+const auth = useAuthStore()
+
+/** 状态开关是“修改用户”，没有该权限时只读（与定时任务页的 canChangeStatus 一致）。 */
+const canEditUser = computed(() => auth.hasPermission('platform:system:user:edit'))
 
 const treeProps = { label: 'label', children: 'children' }
 

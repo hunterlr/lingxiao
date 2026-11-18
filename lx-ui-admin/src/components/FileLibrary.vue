@@ -27,7 +27,7 @@
         <el-button :icon="Refresh" @click="handleReset">{{ t('common.reset') }}</el-button>
       </div>
       <div class="toolbar-right">
-        <el-button v-if="showUpload" type="primary" :icon="UploadFilled" @click="openUpload">
+        <el-button v-if="showUpload" v-hasPerm="'platform:file:upload'" type="primary" :icon="UploadFilled" @click="openUpload">
           {{ t('fileLib.upload') }}
         </el-button>
         <el-button :icon="Refresh" circle :title="t('common.refresh')" @click="loadList" />
@@ -70,7 +70,7 @@
 
           <div class="file-actions">
             <el-button link type="primary" @click="openDetail(file)">{{ t('common.detail') }}</el-button>
-            <el-button link type="primary" @click="openRename(file)">{{ t('fileLib.rename') }}</el-button>
+            <el-button v-hasPerm="'platform:file:rename'" link type="primary" @click="openRename(file)">{{ t('fileLib.rename') }}</el-button>
             <el-button link type="primary" @click="copyUrl(file)">{{ t('fileLib.copyLink') }}</el-button>
           </div>
         </div>

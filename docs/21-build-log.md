@@ -4014,3 +4014,72 @@ mvn -B -ntp test                      BUILD SUCCESS，84 项（16 个测试类�
 - L2（v1.2）才引入 `i18n_*` 表翻译业务数据；L1 不新增数据库列，语言只存浏览器；
 - 若后续要“个人语言偏好跨设备”，在 `sys_user` 加 `language` 列并在登录后回填即可，
   不影响本轮前端结构。
+
+---
+
+## 42. 第二十五轮：按钮权限复核与补齐
+
+### 42.1 起因
+
+记录待办时曾判断“`v-hasPerm` 写了但 0 处使用”，复核发现是**搜索词写错**：
+指令实际叫 `v-hasPerm`（`main.js` 里 `app.directive('hasPerm', permission)`），
+按 `v-permission` 搜索自然是 0。真实情况是 13 个页面已用 46 处。
+
+复核同时发现两个真空档：
+
+| 缺口 | 现状 | 处理 |
+|---|---|---|
+| 文件中心 | 上传 / 改名按钮没有权限控制，只读账号也能上传 | 加 `platform:file:upload` / `platform:file:rename` |
+| 用户启停用 | 行内 `el-switch` 未判断 `user:edit`，只读账号可切换状态（后端会 403） | 加 `canEditUser` 计算属性，无权限时禁用，与任务页 `canChangeStatus` 一致 |
+
+同时修掉 `lx-module-system/README.md` 里“前端指令待做”的过期描述，
+写明覆盖范围与“前端隐藏不是安全边界”。
+
+### 42.2 验证方法
+
+本地脚本 `.local/uitest/perm-check.mjs`（不入库）：
+
+1. admin 登录，取全部 `M` / `C` 菜单（21 个）；
+2. 建只读角色 `readonly_test`：`dataScope=5`（仅本人），只授 M/C，不授任何 F 按钮；
+3. 建同账号名的测试用户并登录，拉 `/auth/info`；
+4. 断言权限集合里没有写权限，直连写接口必须 403；
+5. 用完删除测试用户与角色（幂等，可重复跑）。
+
+### 42.3 实测结果
+
+```text
+M/C menus=21  all menus=64
+readonly permissions=18   has write perm? false
+POST   /admin/system/user          → 403 {"code":1003,"msg":"没有权限执行该操作"}
+DELETE /admin/system/oper-log/clean → 403 {"code":1003}
+GET    /admin/system/user/list      → 200 code=0，dataScope=5 只返回本人 1 行
+```
+
+浏览器逐页核对（只读账号 14 页）：
+
+| 页面 | 剩余按钮 |
+|---|---|
+| 用户 / 角色 / 菜单 / 部门 / 岗位 / 参数 / 在线用户 / 操作日志 / 登录日志 | 搜索、重置、刷新（+ 详情） |
+| 字典 | 搜索 |
+| 公告 | 搜索、重置、刷新、预览 |
+| 文件中心 | 搜索、重置、详情、复制链接（**无** 上传 / 改名） |
+| 定时任务 / 生成器 | 搜索、重置、刷新（**无** 新增 / 执行 / 日志 / 导入 / 配置 / 下载） |
+
+状态开关：用户页 `switchDisabled=1/1`，任务页 `1/1`，均为只读态。
+
+admin 复查：用户页有新增 / 编辑 / 重置密码 / 删除，文件中心有上传 / 改名，
+任务页有新增 / 执行一次 / 日志 / 编辑 / 删除，开关可用。
+
+回归：`smoke.mjs` 22/22，控制台 0 error；`npx vite build` 5.67s 通过。
+
+### 42.4 踩坑
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| 第一次统计 `v-hasPerm` 为 0 | 按 `v-permission` 搜索，大小写与命名都不对 | 以 `app.directive` 注册名为准再搜 |
+| 清理脚本“执行成功”但数据还在 | `PageResult` 字段是 `records`，脚本取了 `list` | 改 `records`；也提醒接口返回不是 MyBatis-Plus `Page` |
+| 本地 MySQL 隔一会儿就消失 | `mysqld` 用 `Start-Process` 从短命令里拉起，会被随命令回收 | 用后台长驻方式启动（或系统服务），跑脚本前先探 3307 |
+
+### 42.5 下一项
+
+`docs/13` §12.2：数据范围「2 自定义」——`sys_role_dept` 表 + 自定义部门树 + 列表过滤。

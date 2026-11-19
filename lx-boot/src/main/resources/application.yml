@@ -104,15 +104,25 @@ knife4j:
     swagger-model-name: 数据模型
     enable-footer: false
     enable-footer-custom: true
-    footer-custom-content: 凌霄 · 后台管理接口
+    footer-custom-content: ${lx.app.name} · 接口文档
 
 lx:
+  # 品牌与版本：全站唯一真源。
+  # 前端启动时读取 /api/admin/app/profile（无需登录），改这里即可改
+  # 侧边栏、登录页、浏览器标题；不需要重新构建前端。
+  # 私有化部署可用环境变量覆盖：LX_APP_NAME / LX_APP_NAME_EN / LX_APP_VERSION。
+  app:
+    name: 凌霄后台
+    name-en: LingXiao Admin
+    # 构建时由 spring-boot-starter-parent 的 @...@ 过滤替换为 pom.xml 的版本；
+    # 发布新版本只改根 pom.xml 的 <version>。
+    version: '@project.version@'
   # 接口文档元信息：只影响 /v3/api-docs 里展示的标题与说明
   api-doc:
     enabled: true
-    title: 凌霄后台管理接口
+    title: ${lx.app.name}管理接口
     description: 平台后台域接口；会员域 /api/app/** 后续单独分组，不混在本分组里。
-    version: 1.0.0
+    version: ${lx.app.version}
     group: 后台管理
   # Redis 开关：基础设施开关，放配置文件而不是参数设置。
   # false = Sa-Token 内存会话 + Caffeine 验证码（单机默认）

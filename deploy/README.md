@@ -134,6 +134,9 @@ mysql -uroot -p < deploy/sql/lingxiao-1.0.0.sql
 | `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` / `REDIS_DB` | 本机 / 6379 / 空 / 0 | Redis 连接 |
 | `LX_FILE_PATH` | `./data/upload` | 上传文件目录（相对应用根目录） |
 | `LX_LOG_FILE` | `./logs/lingxiao.log` | 后端文件日志 |
+| `LX_APP_NAME` | jar 内 `lx.app.name` | 全站中文品牌名（登录页 / 侧边栏 / 浏览器标题） |
+| `LX_APP_NAME_EN` | jar 内 `lx.app.name-en` | 英文品牌名 |
+| `LX_APP_VERSION` | 构建时的 pom 版本 | 展示版本；一般不用设，发版只改根 `pom.xml` |
 | `SPRING_PROFILE` | `prod` | 启动脚本使用的 profile |
 | `JAVA_OPTS` | `-Xms256m -Xmx512m -XX:+UseG1GC` | JVM 参数 |
 
@@ -150,6 +153,10 @@ Windows PowerShell：
 $env:DB_PASSWORD = 'replace-me'
 .\bin\start.ps1
 ```
+
+> 名称与版本的唯一真源是 `config/application-prod.yml` 的 `lx.app.*`
+> （版本默认来自构建时的 pom）。前端启动时读取 `/api/admin/app/profile`，
+> 换品牌不需要重新构建前端；没有前端包的情况下也能用环境变量覆盖。
 
 ### 5.2 生产配置已经关掉了什么
 

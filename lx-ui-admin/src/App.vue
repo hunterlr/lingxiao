@@ -20,26 +20,33 @@ import { useRouter } from 'vue-router'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import en from 'element-plus/es/locale/lang/en'
 import i18n from '@/i18n'
+import { useAppStore } from '@/store/app'
 import { useLocaleStore } from '@/store/locale'
+import { appName } from '@/utils/brand'
 
 const router = useRouter()
 const localeStore = useLocaleStore()
+const appStore = useAppStore()
 
 const elementLocale = computed(() => (localeStore.isEnglish ? en : zhCn))
 
+/** 品牌名优先取后端配置；接口没回来时用语言包兜底。 */
+function brand() {
+  return appName() || i18n.global.t('layout.brand')
+}
+
+function syncTitle() {
+  const { t, te } = i18n.global
+  const meta = router.currentRoute.value.meta || {}
+  const title = meta.titleKey && te(meta.titleKey) ? t(meta.titleKey) : meta.title
+  document.title = title ? `${title} · ${brand()}` : brand()
+}
+
 /**
- * 切换语言时同步浏览器标签页标题。
+ * 切换语言、或品牌配置（异步）到达时同步浏览器标签页标题。
  *
- * <p>路由守卫的 afterEach 只在导航时跑，语言切换不会触发导航；
- * 不补这个 watch，标题会一直停在上一种语言。</p>
+ * <p>路由守卫的 afterEach 只在导航时跑；语言切换、接口返回都不触发导航，
+ * 不补这个 watch，标题会一直停在上一种语言 / 旧名称。</p>
  */
-watch(
-  () => localeStore.locale,
-  () => {
-    const { t, te } = i18n.global
-    const meta = router.currentRoute.value.meta || {}
-    const title = meta.titleKey && te(meta.titleKey) ? t(meta.titleKey) : meta.title
-    document.title = title ? `${title} · ${t('layout.brand')}` : t('layout.brand')
-  }
-)
+watch([() => localeStore.locale, () => appStore.profile], syncTitle, { deep: true })
 </script>

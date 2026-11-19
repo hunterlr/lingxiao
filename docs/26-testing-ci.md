@@ -2,7 +2,7 @@
 
 > 本文回答两个问题：**哪些逻辑必须用单测锁住？没有数据库的机器上怎么自动验证？**
 >
-> 结论：v1.0 先做“纯逻辑 + 安全回归”的 95 个单测（19 个测试类），
+> 结论：v1.0 先做“纯逻辑 + 安全回归”的 99 个单测（20 个测试类），
 > 完全不依赖 MySQL / Redis，`mvn test` 一条命令跑完；
 > 再用 GitHub Actions 覆盖 JDK 8/11/17 与前端构建。
 
@@ -68,7 +68,7 @@ mvn -B -ntp -DskipTests package
 
 ---
 
-## 3. 当前测试清单（95 项 / 19 个类）
+## 3. 当前测试清单（99 项 / 20 个类）
 
 | 模块 | 测试类 | 项数 | 锁住什么 |
 |---|---|---|---|
@@ -91,8 +91,9 @@ mvn -B -ntp -DskipTests package
 | `lx-module-generator` | `NamingUtilsTest` | 5 | 下划线 / 连字符 / 多段命名、Java 关键字避让 |
 | `lx-module-generator` | `JavaTypeResolverTest` | 5 | MySQL / PG / 达梦常见类型映射，未知类型回退 String |
 | `lx-module-generator` | `TextUtilsTest` | 8 | 注释折叠、Javadoc 截断、JS / HTML / Java / SQL 四类转义 |
+| `lx-boot` | `AppProfileTest` | 4 | 品牌名 trim、中英文名互相兜底、版本空值转空串 |
 
-合计：**Tests run: 95, Failures: 0, Errors: 0, Skipped: 0**（2026-11-20，JDK 8 跑通；66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
+合计：**Tests run: 99, Failures: 0, Errors: 0, Skipped: 0**（2026-11-20，JDK 8 跑通；66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
 
 ---
 

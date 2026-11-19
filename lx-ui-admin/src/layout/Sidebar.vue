@@ -3,7 +3,7 @@
     <div class="logo">
       <div class="logo-mark">LX</div>
       <transition name="logo-fade">
-        <span v-show="!appStore.sidebarCollapsed" class="logo-text">{{ t('layout.brand') }}</span>
+        <span v-show="!appStore.sidebarCollapsed" class="logo-text">{{ brandName }}</span>
       </transition>
     </div>
 
@@ -25,7 +25,7 @@
     </el-scrollbar>
 
     <div v-show="!appStore.sidebarCollapsed" class="sidebar-footer">
-      v1.0 · {{ t('layout.brand') }}
+      {{ footerText }}
     </div>
   </aside>
 </template>
@@ -37,6 +37,7 @@ import { useI18n } from 'vue-i18n'
 import { HomeFilled } from '@element-plus/icons-vue'
 import { useAppStore } from '@/store/app'
 import { useAuthStore } from '@/store/auth'
+import { appName, appVersion } from '@/utils/brand'
 import SidebarItem from './SidebarItem.vue'
 
 /**
@@ -51,6 +52,13 @@ const appStore = useAppStore()
 const auth = useAuthStore()
 
 const activeMenu = computed(() => route.path)
+
+// 品牌名 / 版本来自后端配置；接口没返回时用语言包兜底
+const brandName = computed(() => appName() || t('layout.brand'))
+const footerText = computed(() => {
+  const version = appVersion()
+  return version ? `v${version} · ${brandName.value}` : brandName.value
+})
 
 const visibleMenus = computed(() => filterVisible(auth.menus))
 

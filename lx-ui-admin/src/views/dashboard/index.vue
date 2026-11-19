@@ -4,7 +4,7 @@
       <div class="welcome-text">
         <h2>{{ t('dashboard.hello', { greeting, name: auth.displayName }) }}</h2>
         <p class="welcome-sub">
-          {{ t('dashboard.welcomePrefix') }} <b>{{ auth.username }}</b>
+          {{ t('dashboard.welcomePrefix', { app: brandName }) }} <b>{{ auth.username }}</b>
           <span v-if="auth.isSuperAdmin">{{ t('dashboard.superAdmin') }}</span>
         </p>
         <div class="welcome-tags">
@@ -107,6 +107,7 @@ import {
 } from '@element-plus/icons-vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { useAuthStore } from '@/store/auth'
+import { appName } from '@/utils/brand'
 
 /**
  * 首页。
@@ -117,6 +118,9 @@ import { useAuthStore } from '@/store/auth'
 const router = useRouter()
 const { t, te } = useI18n()
 const auth = useAuthStore()
+
+// 品牌名优先取后端配置，接口没回来时用语言包兜底
+const brandName = computed(() => appName() || t('layout.brand'))
 
 const greeting = computed(() => {
   const hour = new Date().getHours()

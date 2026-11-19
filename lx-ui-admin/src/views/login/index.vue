@@ -3,8 +3,8 @@
     <div class="login-brand">
       <div class="brand-inner">
         <div class="brand-logo">LX</div>
-        <h1>{{ t('login.brandTitle') }}</h1>
-        <p class="brand-sub">{{ t('login.brandSub') }}</p>
+        <h1>{{ brandTitle }}</h1>
+        <p class="brand-sub">{{ brandSub }}</p>
         <ul class="brand-points">
           <li>{{ t('login.point1') }}</li>
           <li>{{ t('login.point2') }}</li>
@@ -63,7 +63,7 @@
         </div>
       </div>
 
-      <div class="login-copyright">{{ t('login.copyright') }}</div>
+      <div class="login-copyright">{{ copyright }}</div>
     </div>
   </div>
 </template>
@@ -76,6 +76,7 @@ import { useI18n } from 'vue-i18n'
 import { Key, Lock, User } from '@element-plus/icons-vue'
 import { getCaptcha } from '@/api/auth'
 import { useAuthStore } from '@/store/auth'
+import { appName, appVersion } from '@/utils/brand'
 
 /**
  * 登录页。
@@ -95,6 +96,16 @@ const { t } = useI18n()
 const formRef = ref(null)
 const loading = ref(false)
 const remember = ref(localStorage.getItem('lx-admin-remember') !== '0')
+
+// 品牌名 / 版本来自后端 lx.app.*，这里只做展示；接口没返回时用语言包兜底
+const brandTitle = computed(() => appName() || t('login.brandTitle'))
+const brandSub = computed(() => {
+  const version = appVersion()
+  return version ? t('login.brandSub', { version: `v${version}` }) : t('login.brandSubNoVersion')
+})
+const copyright = computed(() =>
+  t('login.copyright', { year: new Date().getFullYear(), name: brandTitle.value })
+)
 
 const form = reactive({
   username: localStorage.getItem('lx-admin-username') || 'admin',

@@ -4332,3 +4332,63 @@ check-i18n-keys.mjs             zh=902 en=902，missing=none
 | 为什么不给 `createI18n` 加 `flatJson: true` | 一行能修，但会改变全局键解析行为；改成嵌套是 vue-i18n 的标准写法，影响面最小 |
 | 为什么 V17 不改 `update_by` | 迁移只修数据，不伪造操作人；真实改动人已由 `update_by=1` 保留 |
 | 参数名到底以哪边为准 | 页面显示以 i18n 为准，数据库文本仅作缺项回退；L2 再统一迁到 `i18n_*` 表 |
+
+---
+
+## 46. 第二十六轮：品牌名与版本号收口到后端配置
+
+### 46.1 背景
+
+“凌霄后台”“v1.0”“1.0.0”原来散落在侧边栏、登录页、版权、浏览器标题、
+Swagger 元信息里。私有化部署想换个名字，要同时改前端语言包和后端配置，
+前端还得重新 `vite build`，很容易漏改、也容易前后端版本对不上。
+
+### 46.2 为什么选后端配置
+
+| 方案 | 问题 |
+|---|---|
+| 前端 `.env` | 构建期常量，改完必须重新打包；Swagger / 启动日志仍是后端版本，两边会漂移 |
+| `sys_config` 参数表 | 换库 / 清库 / 导快照会丢；登录页未登录就要显示品牌，不适合依赖业务参数 |
+| **后端 `application.yml`** | 版本天然属于制品；Swagger / 接口 / 前端共用一个值；部署时可用环境变量覆盖，换品牌不用重新构建前端 |
+
+### 46.3 落地
+
+| 文件 | 改动 |
+|---|---|
+| `application.yml` | 新增 `lx.app.name` / `lx.app.name-en` / `lx.app.version: '@project.version@'`；Swagger 标题、版本、Knife4j 页脚改为引用同一配置 |
+| `AppProperties` / `AppProfile` | 配置绑定与名片 DTO；中英文名互相兜底，空白值 trim |
+| `AppProfileController` | `GET /api/admin/app/profile`，返回名称 + 版本，不含环境信息 |
+| `SaTokenConfigure` | 放行 `/api/admin/app/profile`，登录页未登录也能读 |
+| `api/app.js` + `store/app.js` | 启动时拉一次名片（`silent`，失败静默）；Pinia 缓存 |
+| `utils/brand.js` | `appName()` 按当前语言取中/英文名，`appVersion()` 取版本；组件不再写死品牌 |
+| `Sidebar.vue` / `login/index.vue` / `App.vue` / `router/guard.js` | 品牌、页脚版本、版权、浏览器标题统一走 `brand.js` |
+| `zh-CN.js` / `en-US.js` | `brandSub` 增加 `{version}` 占位，新增 `brandSubNoVersion`；版权改 `{year}` / `{name}` 占位；首页欢迎语改 `{app}` 占位，登录/公告/任务文案去掉写死的 `v1.0` |
+| `deploy/config/application-prod.yml` | 增加 `lx.app.*` 覆盖示例 |
+
+版本仍只有一个入口：根 `pom.xml` 的 `<version>`。构建时
+`spring-boot-starter-parent` 把 `@project.version@` 替换进打好的 jar；
+发布新版本不需要动前端，也不需要改 `application.yml`。
+
+### 46.4 验证
+
+```text
+GET /api/admin/app/profile（不带 Token）
+  {"name":"凌霄后台","nameEn":"LingXiao Admin","version":"1.0.0-SNAPSHOT"}
+GET /api/admin/system/config/list（不带 Token）  仍为 1002，未放大放行范围
+/v3/api-docs  info.title=凌霄后台管理接口  info.version=1.0.0-SNAPSHOT
+命令行覆盖 --lx.app.name / --lx.app.name-en / --lx.app.version   名片立即变化
+brand-check.mjs   11/11（中英文名称、版本、版权、侧栏、欢迎语、浏览器标题）
+smoke.mjs         22/22      theme.mjs 12/12      config-label-check.mjs 3/3
+mvn test          99 项 / 20 个类（新增 AppProfileTest 4 项）
+check-i18n-keys   zh=903 en=903  dotted-leaf=none
+vite build        通过
+```
+
+### 46.5 取舍
+
+| 问题 | 说明 |
+|---|---|
+| 前端为什么还要读接口 | 不读就只能写死；多一次轻量 GET（每会话一次），失败时静默回退语言包，不阻塞登录 |
+| 为什么开发环境显示 `v1.0.0-SNAPSHOT` | 版本直接来自 pom，不手工截断；正式构建把版本改成 `1.0.0` 即显示 `v1.0.0` |
+| 中英文名算不算两处 | 同一个 `lx.app` 配置块里的两个字段，属于一份配置；英文缺省时自动用中文名兜底 |
+| 为什么不做成参数设置项 | 品牌 / 版本是制品与部署属性，不是运行期业务参数；参数表清空不应影响登录页

@@ -10,10 +10,11 @@ import cn.dev33.satoken.interceptor.SaInterceptor;
 /**
  * 平台后台鉴权入口。
  *
- * <p>只拦 {@code /api/admin/**}，并且放行登录、验证码、demo 三个路径：</p>
+ * <p>只拦 {@code /api/admin/**}，并且放行登录、验证码、应用名片、demo 四个路径：</p>
  * <ul>
  *   <li>{@code /api/admin/auth/**}：登录、登出、当前用户信息；</li>
  *   <li>{@code /api/admin/auth/captcha}：验证码图片；</li>
+ *   <li>{@code /api/admin/app/profile}：品牌名与版本，登录页要用；</li>
  *   <li>{@code /api/admin/demo/**}：仅用于验证“可选模块关闭后接口 404”，生产不打包。</li>
  * </ul>
  *
@@ -45,6 +46,7 @@ public class SaTokenConfigure implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/api/admin/auth/login",
                         "/api/admin/auth/captcha",
+                        "/api/admin/app/profile",
                         "/api/admin/demo/**"
                 );
     }

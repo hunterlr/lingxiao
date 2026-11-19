@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { getAppProfile } from '@/api/app'
 import {
   DEFAULT_THEME,
   applyTheme,
@@ -41,7 +42,9 @@ export const useAppStore = defineStore('app', {
     theme: loadTheme(),
     // 系统明暗单独存，auto 模式下它变化要驱动界面重绘
     systemDark: systemPrefersDark(),
-    themeDrawerVisible: false
+    themeDrawerVisible: false,
+    // 品牌名 / 版本：真源在后端 lx.app.*，这里只是启动时拉到的副本
+    profile: { name: '', nameEn: '', version: '' }
   }),
 
   getters: {
@@ -50,6 +53,26 @@ export const useAppStore = defineStore('app', {
   },
 
   actions: {
+    /**
+     * 启动时拉一次品牌名片（失败静默）。
+     *
+     * <p>不阻塞挂载：正常情况几十毫秒返回，品牌文案与语言包默认值一致，
+     * 界面不会闪；接口挂了也照常登录，只是名称 / 版本用语言包兜底。</p>
+     */
+    async loadProfile() {
+      try {
+        const data = await getAppProfile()
+        if (!data) return
+        this.profile = {
+          name: data.name || '',
+          nameEn: data.nameEn || '',
+          version: data.version || ''
+        }
+      } catch (e) {
+        // 品牌是装饰信息：不提示、不重试，语言包兜底
+      }
+    },
+
     toggleSidebar() {
       this.sidebarCollapsed = !this.sidebarCollapsed
       localStorage.setItem(COLLAPSE_KEY, this.sidebarCollapsed ? '1' : '0')

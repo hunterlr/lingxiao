@@ -99,8 +99,9 @@ export default {
 
   login: {
     brandTitle: 'LingXiao',
-    brandSub: 'Admin foundation · v1.0',
-    point1: 'Platform, tenant and member realms are isolated; v1.0 ships the platform realm',
+    brandSub: 'Admin foundation · {version}',
+    brandSubNoVersion: 'Admin foundation',
+    point1: 'Platform, tenant and member realms are isolated; this release ships the platform realm',
     point2: 'RBAC down to buttons; permission codes come from the backend menu tree',
     point3: 'The file center keeps the original name, current name and rename history',
     point4: 'Pluggable modules: disabled means not loaded and the API returns 404',
@@ -120,7 +121,7 @@ export default {
     usernameRequired: 'Please enter the username',
     passwordRequired: 'Please enter the password',
     captchaRequired: 'Please enter the captcha',
-    copyright: '© 2026 LingXiao · Admin'
+    copyright: '© {year} {name} · Admin'
   },
 
   dashboard: {
@@ -130,8 +131,8 @@ export default {
     greetingAfternoon: 'Good afternoon',
     greetingEvening: 'Good evening',
     hello: '{greeting}, {name}',
-    welcomePrefix: 'Welcome to the LingXiao admin foundation. Signed in as',
-    welcome: 'Welcome to the LingXiao admin foundation. Signed in as {username}',
+    welcomePrefix: 'Welcome to {app}. Signed in as',
+    welcome: 'Welcome to {app}. Signed in as {username}',
     superAdmin: ' (super administrator with all permissions)',
     noRole: 'No role assigned',
     visibleMenus: 'Visible menus',
@@ -325,7 +326,7 @@ export default {
       content: 'Body',
       contentPlaceholder: 'Please enter the notice content…',
       xssTitle: 'Server-side XSS sanitising is not wired up yet (W3)',
-      xssDesc: 'v1.0 only lets admin accounts view the notice body; whitelist sanitising is required before publishing externally.',
+      xssDesc: 'This release only lets admin accounts view the notice body; whitelist sanitising is required before publishing externally.',
       titleRequired: 'Please enter the notice title',
       contentRequired: 'Please enter the notice body',
       deleteConfirm: 'Delete notice "{name}"?',
@@ -687,7 +688,7 @@ export default {
       concurrentForbid: 'Forbid (skip while the previous run is still going)',
       concurrentAllow: 'Allow',
       misfire: 'Misfire policy',
-      misfireGiveUp: 'Give up (actual v1.0 behaviour)',
+      misfireGiveUp: 'Give up (current behaviour)',
       misfireOnce: 'Run once (kept, currently treated as give up)',
       misfireCatch: 'Catch up immediately (kept, currently treated as give up)',
       misfireTip: 'Spring Task does not persist triggers, so runs missed while the service is down are not replayed; the field is kept for compatibility with old data.',

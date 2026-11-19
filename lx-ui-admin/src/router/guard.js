@@ -1,5 +1,6 @@
 import { useAuthStore } from '@/store/auth'
 import i18n from '@/i18n'
+import { appName } from '@/utils/brand'
 import { installDynamicRoutes, resetDynamicRoutes } from './dynamic'
 
 /**
@@ -53,6 +54,7 @@ export function setupGuard(router) {
     const { t, te } = i18n.global
     const meta = to.meta || {}
     const pageTitle = meta.titleKey && te(meta.titleKey) ? t(meta.titleKey) : meta.title
-    document.title = pageTitle ? `${pageTitle} · ${t('layout.brand')}` : t('layout.brand')
+    const brand = appName() || t('layout.brand')
+    document.title = pageTitle ? `${pageTitle} · ${brand}` : brand
   })
 }

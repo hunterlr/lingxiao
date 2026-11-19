@@ -102,8 +102,9 @@ export default {
 
   login: {
     brandTitle: '凌霄 LingXiao',
-    brandSub: '后台管理基座 · v1.0',
-    point1: '平台 / 租户 / 会员三域隔离，v1.0 先实装平台域',
+    brandSub: '后台管理基座 · {version}',
+    brandSubNoVersion: '后台管理基座',
+    point1: '平台 / 租户 / 会员三域隔离，当前版本先实装平台域',
     point2: 'RBAC 权限到按钮，权限码由后端菜单统一下发',
     point3: '文件中心保留原名、现名与改名历史',
     point4: '模块可插拔：关闭即不加载、接口 404',
@@ -123,7 +124,7 @@ export default {
     usernameRequired: '请输入用户名',
     passwordRequired: '请输入密码',
     captchaRequired: '请输入验证码',
-    copyright: '© 2026 凌霄 · 后台管理'
+    copyright: '© {year} {name} · 后台管理'
   },
 
   dashboard: {
@@ -133,8 +134,8 @@ export default {
     greetingAfternoon: '下午好',
     greetingEvening: '晚上好',
     hello: '{greeting}，{name}',
-    welcomePrefix: '欢迎使用凌霄后台基座。当前登录账号',
-    welcome: '欢迎使用凌霄后台基座。当前登录账号 {username}',
+    welcomePrefix: '欢迎使用{app}。当前登录账号',
+    welcome: '欢迎使用{app}。当前登录账号 {username}',
     superAdmin: '（超级管理员，拥有全部权限）',
     noRole: '未分配角色',
     visibleMenus: '可见菜单',
@@ -327,7 +328,7 @@ export default {
       content: '正文',
       contentPlaceholder: '请输入公告内容…',
       xssTitle: '服务端 XSS 清洗尚未接入（W3）',
-      xssDesc: 'v1.0 只允许后台账号查看公告正文；对外发布前必须先做白名单清洗。',
+      xssDesc: '当前版本只允许后台账号查看公告正文；对外发布前必须先做白名单清洗。',
       titleRequired: '请输入公告标题',
       contentRequired: '请输入公告正文',
       deleteConfirm: '确认删除公告「{name}」吗？',
@@ -689,7 +690,7 @@ export default {
       concurrentForbid: '禁止（上次没跑完就跳过）',
       concurrentAllow: '允许',
       misfire: '错失策略',
-      misfireGiveUp: '放弃（v1.0 实际行为）',
+      misfireGiveUp: '放弃（当前版本实际行为）',
       misfireOnce: '执行一次（保留，当前按放弃处理）',
       misfireCatch: '立即补偿（保留，当前按放弃处理）',
       misfireTip: 'Spring Task 不持久化触发器，停机期间错过的执行不会补跑；字段保留用于兼容旧数据。',

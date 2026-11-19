@@ -35,7 +35,10 @@ for (const [name, component] of Object.entries(ElementPlusIconsVue)) {
 
 app.use(pinia)
 // 先落主题再挂载，避免刷新时先闪一下亮色
-useAppStore(pinia).initTheme()
+const appStore = useAppStore(pinia)
+appStore.initTheme()
+// 品牌名 / 版本来自后端 lx.app.*；异步拉取，失败时用语言包兜底
+appStore.loadProfile()
 // 语言同理：先把 localStorage / 浏览器语言写回 i18n 与 html.lang
 useLocaleStore(pinia).init()
 app.use(i18n)

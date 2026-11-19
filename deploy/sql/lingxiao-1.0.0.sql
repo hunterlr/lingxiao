@@ -5,9 +5,9 @@
 --       后台数据时，导入本文件即可。
 --
 -- 内容：
---   23 张表（22 张业务表 + flyway_schema_history）
---   Flyway V1~V14 全部迁移记录（导入后启动不会再建表）
---   admin 账号、64 条菜单、角色 / 字典 / 参数 / 定时任务等初始数据
+--   24 张表（23 张业务表 + flyway_schema_history）
+--   Flyway V1~V17 全部迁移记录（导入后启动只校验，不会再建表）
+--   admin 账号、64 条菜单、角色 / 字典 / 10 项参数 / 定时任务等初始数据
 --
 -- 已清理（相对于开发机的实时库）：
 --   登录日志 / 操作日志 / 任务日志 / 锁记录 / 文件记录 / 代码生成的临时表 / 测试任务 / 测试公告
@@ -24,10 +24,18 @@
 --   4. 上传文件不在本文件里（data/upload 不入库），文件中心会是空列表。
 --
 -- 重新生成（结构或初始数据变化后）：
---   mysqldump --host=127.0.0.1 --port=3307 --user=lingxiao --password=*** \
---     --default-character-set=utf8mb4 --single-transaction --quick \
---     --triggers --no-create-db --databases lingxiao \
---     --result-file=deploy/sql/lingxiao-1.0.0.sql
+--   1) 先迁移到最新：启动一次应用，确认 flyway_schema_history 到 V17；
+--   2) 用临时库导一份干净数据，避免把日志 / 测试数据带进快照：
+--        mysqldump ... --no-create-db lingxiao --result-file=live.sql
+--        CREATE DATABASE lingxiao_snapshot;   -- mysql -uroot -p
+--        mysql lingxiao_snapshot < live.sql
+--      再清空 sys_login_log / sys_oper_log / sys_job_log / sys_job_lock /
+--      sys_file / sys_file_name_log / gen_table / gen_table_column，
+--      并删除测试任务与测试公告；
+--   3) 导出临时库并替换库名：
+--        mysqldump ... --no-create-db --databases lingxiao_snapshot \
+--          --result-file=deploy/sql/lingxiao-1.0.0.sql
+--      把文件里的 lingxiao_snapshot 全部改成 lingxiao，保留本文件头。
 -- =====================================================================
 
 -- MySQL dump 10.13  Distrib 5.7.26, for Win64 (x86_64)
@@ -48,7 +56,7 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
--- Current Database: `lingxiao_snapshot`
+-- Current Database: `lingxiao`
 --
 
 USE `lingxiao`;
@@ -82,7 +90,7 @@ CREATE TABLE `flyway_schema_history` (
 
 LOCK TABLES `flyway_schema_history` WRITE;
 /*!40000 ALTER TABLE `flyway_schema_history` DISABLE KEYS */;
-INSERT INTO `flyway_schema_history` VALUES (1,'1','system schema','SQL','V1__system_schema.sql',-1420895125,'lingxiao','2026-11-15 05:15:08',212,1),(2,'2','system seed','SQL','V2__system_seed.sql',-1808537696,'lingxiao','2026-11-15 05:15:08',37,1),(3,'3','file schema','SQL','V3__file_schema.sql',-1485486679,'lingxiao','2026-11-15 05:15:08',54,1),(4,'4','system button perms','SQL','V4__system_button_perms.sql',-460862906,'lingxiao','2026-11-15 08:11:17',17,1),(5,'5','system editor setting','SQL','V5__system_editor_setting.sql',112983719,'lingxiao','2026-11-15 08:49:14',9,1),(6,'6','file button perms','SQL','V6__file_button_perms.sql',-797253466,'lingxiao','2026-11-15 09:15:40',11,1),(7,'7','remove duplicate file menus','SQL','V7__remove_duplicate_file_menus.sql',1044910462,'lingxiao','2026-11-15 09:32:19',10,1),(8,'8','monitor log perms','SQL','V8__monitor_log_perms.sql',454752005,'lingxiao','2026-11-15 11:08:14',9,1),(9,'9','system config control','SQL','V9__system_config_control.sql',52135458,'lingxiao','2026-11-15 11:40:47',85,1),(10,'10','monitor online kickout','SQL','V10__monitor_online_kickout.sql',-1364584559,'lingxiao','2026-11-15 11:59:47',7,1),(11,'11','job schema','SQL','V11__job_schema.sql',1531858291,'lingxiao','2026-11-15 12:20:12',156,1),(12,'12','generator schema','SQL','V12__generator_schema.sql',-1115767411,'lingxiao','2026-11-15 13:07:08',44,1),(13,'13','file image variants','SQL','V13__file_image_variants.sql',-205937422,'lingxiao','2026-11-15 13:31:17',83,1),(14,'14','login security','SQL','V14__login_security.sql',-765509084,'lingxiao','2026-11-15 13:47:11',84,1);
+INSERT INTO `flyway_schema_history` VALUES (1,'1','system schema','SQL','V1__system_schema.sql',-1420895125,'lingxiao','2026-11-15 05:15:08',212,1),(2,'2','system seed','SQL','V2__system_seed.sql',-1808537696,'lingxiao','2026-11-15 05:15:08',37,1),(3,'3','file schema','SQL','V3__file_schema.sql',-1485486679,'lingxiao','2026-11-15 05:15:08',54,1),(4,'4','system button perms','SQL','V4__system_button_perms.sql',-460862906,'lingxiao','2026-11-15 08:11:17',17,1),(5,'5','system editor setting','SQL','V5__system_editor_setting.sql',112983719,'lingxiao','2026-11-15 08:49:14',9,1),(6,'6','file button perms','SQL','V6__file_button_perms.sql',-797253466,'lingxiao','2026-11-15 09:15:40',11,1),(7,'7','remove duplicate file menus','SQL','V7__remove_duplicate_file_menus.sql',1044910462,'lingxiao','2026-11-15 09:32:19',10,1),(8,'8','monitor log perms','SQL','V8__monitor_log_perms.sql',454752005,'lingxiao','2026-11-15 11:08:14',9,1),(9,'9','system config control','SQL','V9__system_config_control.sql',52135458,'lingxiao','2026-11-15 11:40:47',85,1),(10,'10','monitor online kickout','SQL','V10__monitor_online_kickout.sql',-1364584559,'lingxiao','2026-11-15 11:59:47',7,1),(11,'11','job schema','SQL','V11__job_schema.sql',1531858291,'lingxiao','2026-11-15 12:20:12',156,1),(12,'12','generator schema','SQL','V12__generator_schema.sql',-1115767411,'lingxiao','2026-11-15 13:07:08',44,1),(13,'13','file image variants','SQL','V13__file_image_variants.sql',-205937422,'lingxiao','2026-11-15 13:31:17',83,1),(14,'14','login security','SQL','V14__login_security.sql',-765509084,'lingxiao','2026-11-15 13:47:11',84,1),(15,'15','system role dept','SQL','V15__system_role_dept.sql',-1223705966,'lingxiao','2026-11-19 15:38:52',20,1),(16,'16','system session policy','SQL','V16__system_session_policy.sql',-1596402811,'lingxiao','2026-11-19 16:07:55',14,1),(17,'17','fix config encoding','SQL','V17__fix_config_encoding.sql',1795083158,'lingxiao','2026-11-19 16:14:05',7,1);
 /*!40000 ALTER TABLE `flyway_schema_history` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -197,7 +205,7 @@ CREATE TABLE `sys_config` (
 
 LOCK TABLES `sys_config` WRITE;
 /*!40000 ALTER TABLE `sys_config` DISABLE KEYS */;
-INSERT INTO `sys_config` VALUES (1,'登录验证码开关','sys.account.captchaEnabled','true','switch','true:false','Y',NULL,'2026-11-15 13:15:08.658',1,'2026-11-15 17:45:33.296','0',19,'开关参数：true 开启验证码，false 关闭验证码'),(2,'日志保留天数','sys.log.keepDays','180','number','1:3650','Y',NULL,'2026-11-15 13:15:08.658',NULL,NULL,'0',0,'超过天数的操作日志 / 登录日志由定时任务清理（1~3650 天）'),(3,'单文件上传上限','sys.file.uploadMaxMb','10','number','1:20','Y',NULL,'2026-11-15 13:15:08.658',1,'2026-11-15 19:42:11.804','0',8,'单位 MB；受容器 multipart 上限 20MB 约束，库里只能调小'),(4,'富文本编辑器','sys.editor.type','wangeditor-next','select','wangeditor-next:wangEditor Next,ueditor-plus:UEditor Plus','Y',NULL,'2026-11-15 16:49:14.589',1,'2026-11-15 16:49:57.697','0',6,'平台默认富文本编辑器；用户可在编辑器内临时切换'),(5,'任务日志保留天数','sys.job.logKeepDays','30','number','1:3650','Y',NULL,'2026-11-15 20:20:12.786',NULL,NULL,'0',0,'定时任务日志超过该天数由 jobLogClean 执行器清理（1~3650 天）'),(6,'代码生成作者','sys.gen.author','lingxiao','text',NULL,'Y',NULL,'2026-11-15 21:07:08.810',NULL,NULL,'0',0,'代码生成物头部注释里的作者；导入表时写入 gen_table.function_author'),(7,'登录失败锁定阈值','sys.account.maxRetryCount','5','number','3:10','Y',NULL,'2026-11-15 21:47:11.828',1,'2026-11-15 21:47:39.050','0',9,'连续登录失败达到该次数后锁定账号（3~10 次）'),(8,'账号锁定时长','sys.account.lockMinutes','10','number','1:1440','Y',NULL,'2026-11-15 21:47:11.828',NULL,NULL,'0',0,'账号锁定分钟数，到期自动解锁（1~1440 分钟）'),(9,'密码复杂度策略','sys.account.passwordPolicy','basic','select','off:不校验,basic:至少 8 位且含字母和数字,strong:至少 10 位且含大写/小写/数字/符号','Y',NULL,'2026-11-15 21:47:11.828',1,'2026-11-15 21:51:00.939','0',8,'新增用户、管理员重置密码、个人中心改密时生效');
+INSERT INTO `sys_config` VALUES (1,'登录验证码开关','sys.account.captchaEnabled','true','switch','true:false','Y',NULL,'2026-11-15 13:15:08.658',1,'2026-11-15 17:45:33.296','0',19,'开关参数：true 开启验证码，false 关闭验证码'),(2,'日志保留天数','sys.log.keepDays','180','number','1:3650','Y',NULL,'2026-11-15 13:15:08.658',NULL,NULL,'0',0,'超过天数的操作日志 / 登录日志由定时任务清理（1~3650 天）'),(3,'单文件上传上限','sys.file.uploadMaxMb','10','number','1:20','Y',NULL,'2026-11-15 13:15:08.658',1,'2026-11-15 19:42:11.804','0',8,'单位 MB；受容器 multipart 上限 20MB 约束，库里只能调小'),(4,'富文本编辑器','sys.editor.type','wangeditor-next','select','wangeditor-next:wangEditor Next,ueditor-plus:UEditor Plus','Y',NULL,'2026-11-15 16:49:14.589',1,'2026-11-15 16:49:57.697','0',6,'平台默认富文本编辑器；用户可在编辑器内临时切换'),(5,'任务日志保留天数','sys.job.logKeepDays','30','number','1:3650','Y',NULL,'2026-11-15 20:20:12.786',NULL,NULL,'0',0,'定时任务日志超过该天数由 jobLogClean 执行器清理（1~3650 天）'),(6,'代码生成作者','sys.gen.author','lingxiao','text',NULL,'Y',NULL,'2026-11-15 21:07:08.810',NULL,NULL,'0',0,'代码生成物头部注释里的作者；导入表时写入 gen_table.function_author'),(7,'登录失败锁定阈值','sys.account.maxRetryCount','5','number','3:10','Y',NULL,'2026-11-15 21:47:11.828',1,'2026-11-20 00:14:05.695','0',9,'连续登录失败达到该次数后锁定账号（3~10 次）'),(8,'账号锁定时长','sys.account.lockMinutes','10','number','1:1440','Y',NULL,'2026-11-15 21:47:11.828',NULL,NULL,'0',0,'账号锁定分钟数，到期自动解锁（1~1440 分钟）'),(9,'密码复杂度策略','sys.account.passwordPolicy','basic','select','off:不校验,basic:至少 8 位且含字母和数字,strong:至少 10 位且含大写/小写/数字/符号','Y',NULL,'2026-11-15 21:47:11.828',1,'2026-11-15 21:51:00.939','0',8,'新增用户、管理员重置密码、个人中心改密时生效'),(10,'允许多端登录','sys.account.multiDeviceLogin','false','switch','true:false','Y',NULL,'2026-11-20 00:07:55.825',1,'2026-11-20 00:08:39.594','0',3,'关闭时新登录会踢掉该账号的旧会话（默认关闭）');
 /*!40000 ALTER TABLE `sys_config` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -740,6 +748,30 @@ INSERT INTO `sys_role` VALUES (1,'admin','超级管理员',1,'1','0',NULL,'2026-
 UNLOCK TABLES;
 
 --
+-- Table structure for table `sys_role_dept`
+--
+
+DROP TABLE IF EXISTS `sys_role_dept`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `sys_role_dept` (
+  `role_id` bigint(20) NOT NULL COMMENT '角色ID',
+  `dept_id` bigint(20) NOT NULL COMMENT '部门ID',
+  PRIMARY KEY (`role_id`,`dept_id`),
+  KEY `idx_role_dept_dept` (`dept_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色自定义数据范围：data_scope=2 时生效';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `sys_role_dept`
+--
+
+LOCK TABLES `sys_role_dept` WRITE;
+/*!40000 ALTER TABLE `sys_role_dept` DISABLE KEYS */;
+/*!40000 ALTER TABLE `sys_role_dept` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `sys_role_menu`
 --
 
@@ -805,7 +837,7 @@ CREATE TABLE `sys_user` (
 
 LOCK TABLES `sys_user` WRITE;
 /*!40000 ALTER TABLE `sys_user` DISABLE KEYS */;
-INSERT INTO `sys_user` VALUES (1,1,'admin','超级管理员','$2a$10$MyqaRpRtV3e0F673s3oIzOXta1XWkOknfwll6m/Gqgccrb.D44lUa','admin@lingxiao.local','13800000000','2',NULL,'0','127.0.0.1','2026-11-15 22:38:10.551',0,NULL,NULL,'2026-11-15 13:15:08.636',1,NULL,'0',0,'系统内置超级管理员');
+INSERT INTO `sys_user` VALUES (1,1,'admin','超级管理员','$2a$10$MyqaRpRtV3e0F673s3oIzOXta1XWkOknfwll6m/Gqgccrb.D44lUa','admin@lingxiao.local','13800000000','2',NULL,'0','127.0.0.1','2026-11-20 00:16:01.079',0,NULL,NULL,'2026-11-15 13:15:08.636',1,NULL,'0',0,'系统内置超级管理员');
 /*!40000 ALTER TABLE `sys_user` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -867,4 +899,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-11-15 23:42:35
+-- Dump completed on 2026-11-20  0:19:40

@@ -58,7 +58,7 @@ $z.Dispose()
 | `lx-ui-admin/`（不含 `node_modules/` `dist/`） | ✅ | 前端源码、`package-lock.json`、`.env.development` |
 | `docs/` `deploy/` `README.md` `.github/` | ✅ | 文档、部署脚本、CI |
 | 各模块 `src/test/` | ✅ | 92 项单测 |
-| `deploy/sql/lingxiao-1.0.0.sql` | ✅ | 48 KB 数据库快照，clone 后可直接导入（见 3.3 方式 B） |
+| `deploy/sql/lingxiao-1.0.0.sql` | ✅ | 50 KB 数据库快照，clone 后可直接导入（见 3.3 方式 B） |
 | `lx-ui-admin/public/ueditor-plus/` | ❌ | `prebuild` 从 npm 包生成，不入库 |
 | `target/` `dist/` `release/` | ❌ | 构建产物，重新生成 |
 | `data/upload/` | ❌ | 本地上传文件，不随代码走 |
@@ -147,7 +147,7 @@ cd lingxiao
 | 文件 | 作用 |
 |---|---|
 | `init-db.sql` | 建库、建应用账号、授权（必须执行） |
-| `lingxiao-1.0.0.sql` | v1.0.0 数据库快照：22 张业务表 + `flyway_schema_history` + 初始数据（可选） |
+| `lingxiao-1.0.0.sql` | v1.0.0 数据库快照：23 张业务表 + `flyway_schema_history` + 初始数据（可选） |
 
 第 1 步，建库建号：
 
@@ -161,7 +161,7 @@ mysql -uroot -p < deploy/sql/init-db.sql
 
 **方式 A（推荐给正式环境）：什么都不用导，交给 Flyway。**
 
-> 应用启动时 Flyway 自动执行 V1~V14（system / file / job / generator 四个目录）。
+> 应用启动时 Flyway 自动执行 V1~V17（system / file / job / generator 四个目录）。
 > 全新库第一次启动会看到一串 `Migrating schema ...` 日志，属于正常现象。
 
 **方式 B（想要“开箱即用”的现成数据）：导入快照。**
@@ -176,10 +176,10 @@ mysql -h127.0.0.1 -P3306 -ulingxiao -p lingxiao < deploy/sql/lingxiao-1.0.0.sql
 
 | 内容 | 数量 / 说明 |
 |---|---|
-| 表 | 23 张（22 张业务表 + `flyway_schema_history`） |
-| Flyway 记录 | 14 条（V1~V14，启动时只做校验，不会再建表） |
+| 表 | 24 张（23 张业务表 + `flyway_schema_history`） |
+| Flyway 记录 | 17 条（V1~V17，启动时只做校验，不会再建表） |
 | 菜单 / 角色授权 | 64 条菜单 + 64 条角色菜单 |
-| 参数 / 字典 / 任务 / 公告 | 9 / 3+7 / 1 / 1 |
+| 参数 / 字典 / 任务 / 公告 | 10 / 3+7 / 1 / 1 |
 | 账号 | `admin` / `admin123` |
 
 导入时注意三点：

@@ -23,7 +23,7 @@ lingxiao-1.0.0/
 │  └─ lingxiao.conf             # Nginx 站点示例
 ├─ sql/
 │  ├─ init-db.sql               # 建库 / 建账号 / 授权
-│  └─ lingxiao-1.0.0.sql        # 数据库快照（22 张业务表 + 初始数据，可选导入）
+│  └─ lingxiao-1.0.0.sql        # 数据库快照（23 张业务表 + 初始数据，可选导入）
 ├─ data/upload/                 # 本地文件存储（运行时写入）
 ├─ logs/                        # 日志
 └─ run/                         # pid 文件
@@ -102,7 +102,7 @@ mysql -uroot -p < deploy/sql/init-db.sql
 mysql -uroot -p < deploy/sql/lingxiao-1.0.0.sql
 ```
 
-- 文件 48 KB，包含 23 张表（22 张业务表 + `flyway_schema_history`）和 V1~V14 迁移记录；
+- 文件约 50 KB，包含 24 张表（23 张业务表 + `flyway_schema_history`）和 V1~V17 迁移记录；
 - 因为带了迁移记录，导入后启动只会做校验，**不会重复建表**；
 - 里面有 `DROP TABLE IF EXISTS`，重复导入会把库重置成快照状态；
 - 默认账号 `admin` / `admin123`，导入后请立刻改密码；

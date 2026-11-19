@@ -4316,7 +4316,7 @@ check-i18n-keys.mjs             zh=902 en=902，missing=none
 | `V17__fix_config_encoding.sql` | 按 `config_key` 恢复 `config_name` / `remark`，可重复执行 |
 | `zh-CN.js` / `en-US.js` | `config` 改为嵌套结构，10 个参数名中英都可解析 |
 | `scripts/check-i18n-keys.mjs` | 新增 `dotted-leaf` 检测：叶子键自身带点直接判失败 |
-| `deploy/sql/lingxiao-1.0.0.sql` | 同步修正第 7 行参数名 / 说明 |
+| `deploy/sql/lingxiao-1.0.0.sql` | 按 V17 重新生成：24 张表、V1~V17 迁移记录、参数名已修正 |
 
 浏览器回归 `.local/uitest/config-label-check.mjs` 3/3：
 

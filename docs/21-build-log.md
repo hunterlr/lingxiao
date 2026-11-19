@@ -1735,6 +1735,9 @@ API 手工矩阵（验证码）：
 本轮新增后端断言 **35（数据范围）+ 24（XSS）**，回归 `verify-log 29/29`、`smoke 22/22`、
 `permission 30/30`、`captcha 12/12`，前端构建通过；测试数据全部清理，运行态恢复默认。
 
+> 2026-11-19 更新：`2 自定义数据范围` 已在第 43 节补齐；本节“2 降级 / 保存拒绝”
+> 与 26.5 的“下拉禁用”只代表第九轮当时状态，以第 43 节为准。
+
 ### 26.2 公告 XSS：为什么不能用正则
 
 `SysNotice.noticeContent` 是 WangEditor 提交的 HTML。此前注释写的是“上线前必须补”，
@@ -4083,3 +4086,110 @@ admin 复查：用户页有新增 / 编辑 / 重置密码 / 删除，文件中�
 ### 42.5 下一项
 
 `docs/13` §12.2：数据范围「2 自定义」——`sys_role_dept` 表 + 自定义部门树 + 列表过滤。
+
+---
+
+## 43. 第二十三轮：数据范围「2 自定义」
+
+### 43.1 目标与现状
+
+`sys_role.data_scope='2'`（自定义部门）在 v1.0 早期只有枚举与降级逻辑：
+没有 `sys_role_dept` 表，保存时直接拒绝，历史数据按“仅本人”处理；
+部门 / 角色列表也没有按数据范围过滤。本轮把这条链路补齐，并顺手堵住
+“知道 ID 直接调接口”的越权口子。
+
+### 43.2 数据库
+
+新增 `V15__system_role_dept.sql`：
+
+```sql
+CREATE TABLE sys_role_dept (
+  role_id bigint NOT NULL,
+  dept_id bigint NOT NULL,
+  PRIMARY KEY (role_id, dept_id),
+  KEY idx_role_dept_dept (dept_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+- 不加外键，与 V1 的约定一致（跨表一致性由应用层保证）；
+- 联合主键天然去重；`dept_id` 索引用于删除部门时清理关联；
+- 语义是**精确集合**：勾父部门不自动包含下级，需要下级显式勾选或改用 4。
+
+### 43.3 后端
+
+| 文件 | 改动 |
+|---|---|
+| `SysRoleDept` / `SysRoleDeptMapper` | 新增；角色维度查部门、用户维度查并集、按角色 / 部门清理 |
+| `SysRole` | 新增 `@TableField(exist=false) List<Long> deptIds` |
+| `SysRoleService` | 保存 / 详情带 `deptIds`；先清后插；`null` = 不修改；空集合、越权部门、切到 2 却不带部门均拒绝；删除角色清理关联 |
+| `DataScopeService` | `2` 返回 `sys_role_dept` 部门集合；多角色 1 > 4 > 3 > 2 > 5、自定义取并集；空集合收紧为仅本人；新增 `applyDeptScope` / `applyRoleScope` / `visibleDeptIds` / `assertDeptManageable` / `assertRootDeptAllowed` |
+| `SysDeptService` | 列表 / 树按范围过滤；详情 / 新增 / 修改 / 删除断言部门范围；非全部范围不能建根部门；删除部门清理 `sys_role_dept` |
+
+角色列表的过滤口径：非全部范围账号只看到“可授权”的角色，
+即隐藏内置超管与 `data_scope=1` 的角色，与 `assertAssignableRoles` 一致；
+同时保存自定义范围时不能勾选自己范围之外的部门，避免横向扩权。
+
+> `resolveFor(userId)` 是包内可见的测试入口，生产仍走 `resolve()`；
+> 这样单测不用模拟 Sa-Token 的静态登录上下文。
+
+### 43.4 前端
+
+`system/role/index.vue`：
+
+- 数据范围选「自定义数据」时才渲染部门树；`check-strictly`，与后端的精确集合语义一致；
+- 打开编辑时把 `detail.deptIds` 回显到树上；`openAdd` / 关闭弹窗时清空；
+- 保存前前端先拦截“选自定义但一个部门都没勾”，请求体带 `deptIds`；
+- 非自定义范围提交 `deptIds: null`，避免误清历史数据（后端切回其他范围时仍会主动清理）；
+- 中英文各补 4 个键：`customDept`、`customDeptTip`、`customDeptRequired`、`emptyDept`，
+  `scopeCustom` 去掉“未启用”。
+
+### 43.5 验证
+
+后端：
+
+```text
+mvn test → 92 项全通过（新增 DataScopeServiceTest 6 + SysRoleServiceTest 2）
+```
+
+覆盖：自定义命中、空集合收紧、超管放行、4 > 2、3 > 2、仅本人带 userId。
+
+接口脚本 `.local/uitest/role-dept-check.mjs`（13/13）：
+
+```text
+创建 3 个部门 + 自定义角色（勾 2 个部门）+ 4 个用户
+受限账号登录后：
+  用户列表只包含自定义部门的 3 个用户
+  部门列表 / 树只剩 2 个部门（父节点缺失时子节点提升为根）
+  角色列表不含超管角色、保留可授权角色
+  范围外用户详情 / 部门详情 → 403
+空部门保存 → 拒绝（至少一个部门）
+```
+
+UI：角色页新增 / 编辑弹窗中，选「自定义数据」出现部门树，`凌霄科技` 回显勾选，
+保存后库中 `sys_role_dept` 正确落一行；截图核对无布局问题。
+
+回归：
+
+```text
+smoke.mjs 22/22    theme.mjs 12/12    check-i18n-keys.mjs missing=none
+vite build 5.60s   控制台 0 error
+```
+
+测试部门 / 用户 / 角色已清理，`sys_user`、`sys_role`、`sys_dept` 各剩 1 条，
+`sys_role_dept` 0 条。
+
+### 43.6 取舍与踩坑
+
+| 现象 / 选择 | 说明 |
+|---|---|
+| 自定义范围为什么不含下级 | 与 `docs/04` / `docs/05` 的既有语义一致；需要下级用 4，避免“勾一个父节点悄悄放大整棵树” |
+| 角色列表怎么过滤 | 角色没有部门归属，按“可授权”口径隐藏超管与全部数据角色；比按部门交集更可解释，也和新用户授权校验一致 |
+| 部门写操作为什么也加断言 | 只过滤列表挡不住直接按 ID 调接口；`docs/04` 要求列表 / 详情 / 修改 / 删除同一口径 |
+| 自定义范围内新建子部门 | 新部门不会自动进范围，建完可能看不见；README 已注明部门树维护建议交给全部范围管理员 |
+| 保存空部门为什么拒绝而不是存空 | 空集合会被收紧成仅本人，属于静默失败；直接报错更早暴露配置问题 |
+| `wrapper` 条件加在 `orderBy` 之后 | MyBatis-Plus 按调用顺序拼 SQL，会生成 `ORDER BY ... AND ...`；本轮把数据范围条件统一放在排序之前 |
+
+### 43.7 下一项
+
+`docs/13` §12.3：L2 多语言设计（只写方案，v1.2 再实现）——
+`i18n_language` / `i18n_key` / `i18n_text` 三张表与回退链，先评审再排期。

@@ -57,7 +57,7 @@ $z.Dispose()
 | `lx-common/` `lx-framework/` `lx-modules/` `lx-api/` `lx-boot/` | ✅ | 后端源码、Flyway 脚本、`application.yml` |
 | `lx-ui-admin/`（不含 `node_modules/` `dist/`） | ✅ | 前端源码、`package-lock.json`、`.env.development` |
 | `docs/` `deploy/` `README.md` `.github/` | ✅ | 文档、部署脚本、CI |
-| 各模块 `src/test/` | ✅ | 66 项单测 |
+| 各模块 `src/test/` | ✅ | 92 项单测 |
 | `deploy/sql/lingxiao-1.0.0.sql` | ✅ | 48 KB 数据库快照，clone 后可直接导入（见 3.3 方式 B） |
 | `lx-ui-admin/public/ueditor-plus/` | ❌ | `prebuild` 从 npm 包生成，不入库 |
 | `target/` `dist/` `release/` | ❌ | 构建产物，重新生成 |
@@ -309,7 +309,7 @@ VITE_PORT=5173
 - 后端 v1.0 基座：登录鉴权、8 组系统管理、文件中心、监控、定时任务、代码生成器、模块开关；
 - 前端 18 个业务页面 + 动态路由 + 主题切换 + 个人中心；
 - 登录安全（失败锁定、密码策略）、发布包与部署脚本；
-- 66 项 JUnit 单测 + GitHub Actions 最小 CI；
+- 92 项 JUnit 单测 + GitHub Actions 最小 CI；
 - 文档 01~27。
 
 下一轮候选（按优先级）：

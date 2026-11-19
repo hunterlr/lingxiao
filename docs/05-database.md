@@ -421,8 +421,9 @@ CREATE TABLE sys_dept_closure (
 CREATE TABLE sys_role_dept (
   role_id bigint NOT NULL,
   dept_id bigint NOT NULL,
-  PRIMARY KEY (role_id, dept_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色数据范围';
+  PRIMARY KEY (role_id, dept_id),
+  KEY idx_role_dept_dept (dept_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色自定义数据范围';
 ```
 
 > `ancestors` 仅用于展示与兼容；查子树 / 祖先统一走 `sys_dept_closure`，避免 `find_in_set`。栏目树同理使用 `cms_category_closure`。

@@ -465,6 +465,7 @@ v1.0 先把中文写死没关系；要做的时候按本文 L1 走，4~5 天能�
 | `I18nMessageSourceTest` | 5 | 中英键集合一致、每个 `ErrorCode` 都有文案、占位符替换、缺 key 返回 null |
 
 合计 **84 项**（原 66 + 新增 18），`mvn test` 不依赖 MySQL / Redis。
+2026-11-19 数据范围「2 自定义」再新增 8 项（`DataScopeServiceTest` 6 + `SysRoleServiceTest` 2），当前为 **92 项 / 18 个类**。
 
 ### 10.4 第二轮（前端）：已完成（2026-11-17）
 

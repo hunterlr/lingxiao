@@ -26,7 +26,7 @@ spring:
       connection-timeout: 30000
   flyway:
     enabled: true
-    # 按模块分目录：system 先建，file / job / generator 后建；版本号全局递增（当前到 V12）
+    # 按模块分目录：system 先建，file / job / generator 后建；版本号全局递增（当前到 V15）
     locations: classpath:db/migration/system,classpath:db/migration/file,classpath:db/migration/job,classpath:db/migration/generator
     baseline-on-migrate: true
     clean-disabled: true

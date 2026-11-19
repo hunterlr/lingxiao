@@ -5,9 +5,12 @@ import com.lingxiao.common.core.constant.CommonConstants;
 import com.lingxiao.common.core.enums.ErrorCode;
 import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.common.security.util.LoginHelper;
+import com.lingxiao.modules.system.entity.SysDept;
 import com.lingxiao.modules.system.entity.SysDeptClosure;
+import com.lingxiao.modules.system.entity.SysRole;
 import com.lingxiao.modules.system.entity.SysUser;
 import com.lingxiao.modules.system.mapper.SysDeptClosureMapper;
+import com.lingxiao.modules.system.mapper.SysRoleDeptMapper;
 import com.lingxiao.modules.system.mapper.SysRoleMapper;
 import com.lingxiao.modules.system.mapper.SysUserMapper;
 import lombok.Getter;
@@ -29,22 +32,20 @@ import java.util.stream.Collectors;
  * <p>取值与策略：</p>
  * <ul>
  *   <li>{@code 1} 全部数据：不加任何条件（等同超管）；</li>
+ *   <li>{@code 2} 自定义：{@code sys_role_dept} 中勾选的部门集合（精确匹配，不含下级）；</li>
  *   <li>{@code 3} 本部门：{@code dept_id = 当前用户部门}；</li>
  *   <li>{@code 4} 本部门及以下：用闭包表 {@code sys_dept_closure} 取整棵子树，含自己；</li>
- *   <li>{@code 5} 仅本人：{@code user_id = 当前用户}；</li>
- *   <li>{@code 2} 自定义：v1.0 没有 {@code sys_role_dept} 关联表，<b>降级为仅本人</b>
- *       并打 warn 日志；角色保存接口也拒绝写入 2。</li>
+ *   <li>{@code 5} 仅本人：{@code user_id = 当前用户}。</li>
  * </ul>
  *
- * <p>多角色时取“最大范围”（1 &gt; 4 &gt; 3 &gt; 5），这是权限系统的常规语义：
- * 角色是授权叠加，不是取交集。</p>
+ * <p>多角色时取“最大范围”（1 &gt; 4 &gt; 3 &gt; 2 &gt; 5），这是权限系统的常规语义：
+ * 角色是授权叠加，不是取交集。自定义范围在多个角色之间取并集。</p>
  *
- * <p>兜底原则：拿不到登录上下文、用户没分配部门、角色列表为空时，一律按
- * “仅本人”处理，<b>失败必须收紧，不能放开</b>。</p>
+ * <p>兜底原则：拿不到登录上下文、用户没分配部门、自定义范围没勾任何部门、
+ * 角色列表为空时，一律按“仅本人”处理，<b>失败必须收紧，不能放开</b>。</p>
  *
- * <p>当前作用点：用户列表、用户详情 / 修改 / 删除 / 重置密码 / 启停用，
- * 以及新增 / 修改用户时的部门归属校验。部门列表、角色列表暂不做过滤
- * （见 docs/21-build-log.md 遗留项）。</p>
+ * <p>作用点：用户列表 / 详情 / 写操作、部门列表 / 详情 / 写操作、
+ * 角色列表与下拉选项（非全部范围只展示“可授权”的角色）。</p>
  */
 @Slf4j
 @Service
@@ -53,7 +54,7 @@ public class DataScopeService {
 
     /** 1 全部数据 */
     public static final String DATA_SCOPE_ALL = "1";
-    /** 2 自定义数据（v1.0 未实现） */
+    /** 2 自定义数据 */
     public static final String DATA_SCOPE_CUSTOM = "2";
     /** 3 本部门 */
     public static final String DATA_SCOPE_DEPT = "3";
@@ -63,6 +64,7 @@ public class DataScopeService {
     public static final String DATA_SCOPE_SELF = "5";
 
     private final SysRoleMapper roleMapper;
+    private final SysRoleDeptMapper roleDeptMapper;
     private final SysUserMapper userMapper;
     private final SysDeptClosureMapper deptClosureMapper;
 
@@ -91,6 +93,75 @@ public class DataScopeService {
                 } else {
                     wrapper.eq(SysUser::getUserId, scope.getUserId());
                 }
+        }
+    }
+
+    /**
+     * 给部门查询追加数据范围条件。
+     *
+     * <p>与用户列表同一口径：自定义范围只返回勾选的部门（精确集合）；
+     * 仅本人返回自己所在部门；全部数据不过滤。父部门不在结果集时，
+     * 部门树会把可见子节点直接提升为根节点，不会整块消失。</p>
+     */
+    public void applyDeptScope(LambdaQueryWrapper<SysDept> wrapper) {
+        Scope scope = resolve();
+        switch (scope.getType()) {
+            case ALL:
+                return;
+            case DEPT:
+                if (scope.getDeptIds().isEmpty()) {
+                    wrapper.apply("1 = 0");
+                } else {
+                    wrapper.in(SysDept::getDeptId, scope.getDeptIds());
+                }
+                return;
+            case SELF:
+            default:
+                Long ownDeptId = currentDeptId(scope.getUserId());
+                if (ownDeptId == null) {
+                    wrapper.apply("1 = 0");
+                } else {
+                    wrapper.eq(SysDept::getDeptId, ownDeptId);
+                }
+        }
+    }
+
+    /**
+     * 给角色列表 / 下拉补“可授权”过滤。
+     *
+     * <p>数据范围不是“全部”的账号，只能看到自己能授出去的角色：
+     * 隐藏内置超管角色和 {@code data_scope=1} 的角色，与
+     * {@code SysUserService.assertAssignableRoles} 的规则保持一致。
+     * 否则低权限管理员能在列表里看到超管角色并尝试编辑。</p>
+     */
+    public void applyRoleScope(LambdaQueryWrapper<SysRole> wrapper) {
+        if (resolve().getType() == ScopeType.ALL) {
+            return;
+        }
+        wrapper.ne(SysRole::getRoleId, CommonConstants.SUPER_ADMIN_ROLE_ID)
+                .and(w -> w.ne(SysRole::getDataScope, DATA_SCOPE_ALL)
+                        .or().isNull(SysRole::getDataScope));
+    }
+
+    /**
+     * 当前账号可见的部门 ID；全部数据范围返回 {@code null} 表示“不限制”。
+     *
+     * <p>用于“保存自定义数据范围时，不能把部门勾到自己的数据范围之外”，
+     * 否则拿到角色编辑权限即可横向扩大可见范围。</p>
+     */
+    public List<Long> visibleDeptIds() {
+        Scope scope = resolve();
+        switch (scope.getType()) {
+            case ALL:
+                return null;
+            case DEPT:
+                return scope.getDeptIds();
+            case SELF:
+            default:
+                Long ownDeptId = currentDeptId(scope.getUserId());
+                return ownDeptId == null
+                        ? Collections.emptyList()
+                        : Collections.singletonList(ownDeptId);
         }
     }
 
@@ -125,7 +196,7 @@ public class DataScopeService {
      * <p>用于新增 / 修改用户：防止把用户建到别人的部门，从而“造”出一条自己
      * 看不到、但脱离原部门管理的数据；也防止把用户塞进更高的部门节点。</p>
      *
-     * <p>非超管必须指定部门；{@code 3 / 4} 只能选范围内的部门，
+     * <p>非超管必须指定部门；{@code 2 / 3 / 4} 只能选范围内的部门，
      * {@code 5} 只能选自己所在部门。</p>
      */
     public void assertDeptVisible(Long deptId) {
@@ -148,6 +219,45 @@ public class DataScopeService {
         throw new ServiceException(ErrorCode.FORBIDDEN, "没有权限把用户分配到该系统外部门");
     }
 
+    /**
+     * 断言部门在当前账号的数据范围内（部门详情 / 修改 / 删除 / 选择上级）。
+     *
+     * <p>与用户接口同理：只过滤列表挡不住“知道 ID 直接调接口”。
+     * 自定义范围是精确集合，不含下级；在这类部门下新建子部门后，
+     * 新部门不会自动进入范围，因此部门树维护建议交给全部数据范围管理员。</p>
+     */
+    public void assertDeptManageable(Long deptId) {
+        Scope scope = resolve();
+        if (scope.getType() == ScopeType.ALL) {
+            return;
+        }
+        if (deptId != null) {
+            if (scope.getType() == ScopeType.DEPT && scope.getDeptIds().contains(deptId)) {
+                return;
+            }
+            if (scope.getType() == ScopeType.SELF) {
+                Long ownDeptId = currentDeptId(scope.getUserId());
+                if (ownDeptId != null && ownDeptId.equals(deptId)) {
+                    return;
+                }
+            }
+        }
+        throw new ServiceException(ErrorCode.FORBIDDEN, "没有权限操作该部门");
+    }
+
+    /**
+     * 断言当前账号可以创建 / 移动到根部门（{@code parent_id = 0}）。
+     *
+     * <p>非全部数据范围账号看不到根层，允许其创建根部门会出现
+     * “建完自己就看不见”的孤儿数据，直接拒绝。</p>
+     */
+    public void assertRootDeptAllowed() {
+        if (resolve().getType() != ScopeType.ALL) {
+            throw new ServiceException(ErrorCode.FORBIDDEN,
+                    "只有全部数据范围的管理员可以创建或移动到根部门");
+        }
+    }
+
     /** 当前登录用户 ID；无请求上下文（定时任务等）返回 null。 */
     public Long currentUserId() {
         try {
@@ -160,7 +270,16 @@ public class DataScopeService {
     // ==================== 内部方法 ====================
 
     private Scope resolve() {
-        Long userId = currentUserId();
+        return resolveFor(currentUserId());
+    }
+
+    /**
+     * 解析指定用户的数据范围。
+     *
+     * <p>包内可见：单测直接传入 userId，避免为了测这段逻辑去模拟
+     * Sa-Token 的静态登录上下文。生产入口统一走无参 {@link #resolve()}。</p>
+     */
+    Scope resolveFor(Long userId) {
         if (userId == null) {
             log.debug("无登录上下文，数据范围按仅本人（空）处理");
             return Scope.self(null);
@@ -178,11 +297,8 @@ public class DataScopeService {
         }
 
         Long deptId = currentDeptId(userId);
-        if (deptId == null) {
-            log.warn("用户 {} 未分配部门，数据范围降级为仅本人", userId);
-            return Scope.self(userId);
-        }
-        if (scopes.contains(DATA_SCOPE_DEPT_AND_CHILD)) {
+        // 4 > 3：本部门及以下覆盖面更大，多个角色时优先
+        if (deptId != null && scopes.contains(DATA_SCOPE_DEPT_AND_CHILD)) {
             List<Long> deptIds = deptClosureMapper.selectSubtree(deptId).stream()
                     .map(SysDeptClosure::getDescendantId)
                     .collect(Collectors.toList());
@@ -191,11 +307,20 @@ public class DataScopeService {
             }
             return Scope.dept(deptIds);
         }
-        if (scopes.contains(DATA_SCOPE_DEPT)) {
+        if (deptId != null && scopes.contains(DATA_SCOPE_DEPT)) {
             return Scope.dept(Collections.singletonList(deptId));
         }
+        // 2：多角色在 SQL 里已经并集去重；空集合必须收紧，不能当作“不限制”
         if (scopes.contains(DATA_SCOPE_CUSTOM)) {
-            log.warn("用户 {} 的角色包含自定义数据范围（v1.0 未实现），降级为仅本人", userId);
+            List<Long> customDeptIds = roleDeptMapper.selectDeptIdsByUserId(userId);
+            if (customDeptIds != null && !customDeptIds.isEmpty()) {
+                return Scope.dept(customDeptIds);
+            }
+            log.warn("用户 {} 的自定义数据范围没有勾选任何部门，降级为仅本人", userId);
+        }
+        if (deptId == null && (scopes.contains(DATA_SCOPE_DEPT)
+                || scopes.contains(DATA_SCOPE_DEPT_AND_CHILD))) {
+            log.warn("用户 {} 未分配部门，数据范围降级为仅本人", userId);
         }
         return Scope.self(userId);
     }
@@ -218,9 +343,9 @@ public class DataScopeService {
         SELF
     }
 
-    /** 一次解析得到的数据范围快照。 */
+    /** 一次解析得到的数据范围快照；包内可见，供单测断言。 */
     @Getter
-    private static final class Scope {
+    static final class Scope {
 
         private final ScopeType type;
         private final Long userId;

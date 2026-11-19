@@ -32,7 +32,7 @@ Version **v1.0** ships the admin foundation. CMS, membership, workflow and SaaS 
 
 - Full CRUD for users, roles, menus, departments, posts, dictionaries, settings and notices
 - Menu-driven dynamic routing with button-level permission codes (`platform:system:user:add`)
-- Four data scopes: all, own department, own department and below, self only
+- Five data scopes: all, custom departments, own department, own department and below, self only
 - Department tree with drag-to-move subtree support
 
 **Authentication & security**
@@ -66,7 +66,7 @@ Version **v1.0** ships the admin foundation. CMS, membership, workflow and SaaS 
 **Engineering**
 
 - Maven multi-module with auto-configuration and three-layer module switches; **disabled means not loaded** (beans, endpoints, migrations and frontend routes all go away)
-- 66 unit tests that need neither MySQL nor Redis; GitHub Actions covers JDK 8 / 11 / 17 plus the frontend build
+- 92 unit tests that need neither MySQL nor Redis; GitHub Actions covers JDK 8 / 11 / 17 plus the frontend build
 - One jar runs on JDK 8, 11 and 17
 - Production profile and packaging scripts included: `java -jar` + Nginx; prod disables the generator, API docs and SQL logging
 

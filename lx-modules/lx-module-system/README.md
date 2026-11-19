@@ -4,8 +4,7 @@
 
 后台的“骨架中的骨架”：认证、用户、角色、菜单、部门、岗位、字典、参数、公告、日志。
 
-**v1.0 已实装**：认证闭环（验证码 / 登录 / 登出 / 当前用户 / 菜单树）、个人中心（自助改昵称 / 邮箱 / 手机号、校验原密码改密并注销全部会话）、平台域权限查询、用户 / 角色 / 菜单 / 部门 / 岗位 / 字典 / 参数 / 公告八组 CRUD、操作日志落库与两个日志查询页、日志保留清理（Service + 条件化兜底调度 + 定时任务执行器）、公告富文本 Jsoup 白名单清洗、用户数据范围过滤（1 / 3 / 4 / 5）、系统监控三页（在线用户 / 强退、服务监控、缓存监控）。
-**待补**：`2 自定义数据范围`（缺 `sys_role_dept` 关联表，当前保存拒绝、按仅本人降级）；部门 / 角色列表暂未做数据范围过滤。
+**v1.0 已实装**：认证闭环（验证码 / 登录 / 登出 / 当前用户 / 菜单树）、个人中心（自助改昵称 / 邮箱 / 手机号、校验原密码改密并注销全部会话）、平台域权限查询、用户 / 角色 / 菜单 / 部门 / 岗位 / 字典 / 参数 / 公告八组 CRUD、操作日志落库与两个日志查询页、日志保留清理（Service + 条件化兜底调度 + 定时任务执行器）、公告富文本 Jsoup 白名单清洗、用户 / 部门 / 角色数据范围过滤（1 / 2 / 3 / 4 / 5）、系统监控三页（在线用户 / 强退、服务监控、缓存监控）。
 
 ## 包结构
 
@@ -30,13 +29,14 @@ com.lingxiao.modules.system
 ├─ security/     StpInterfaceImpl（平台域权限提供者）
 ├─ entity/       SysUser、SysRole、SysMenu、SysDept、SysDeptClosure、SysPost、
 │               SysDictType、SysDictData、SysConfig、SysNotice、
-│               SysUserRole、SysUserPost、SysRoleMenu、SysLoginLog、SysOperLog
-├─ mapper/       对应 14 个 Mapper（关联表用纯注解，不继承 BaseMapper）
+│               SysUserRole、SysUserPost、SysRoleMenu、SysRoleDept、
+│               SysLoginLog、SysOperLog
+├─ mapper/       对应 16 个 Mapper（关联表用纯注解，不继承 BaseMapper）
 ├─ dto/          TreeSelect、PasswordResetRequest、OnlineUserVO、KickoutRequest、
 │               KickoutResultVO、ServerInfoVO、CacheInfoVO
 ├─ config/       PasswordConfig（BCrypt）
 └─ resources/db/migration/system/   V1 建表、V2 种子、V4 按钮权限、V8 日志清空权限、
-                                   V9 参数控件、V10 在线强退权限
+                                   V9 参数控件、V10 在线强退权限、V14 登录安全、V15 自定义数据范围
                                    （V11 定时任务相关结构由 lx-module-job 提供）
 ```
 
@@ -177,10 +177,10 @@ job 模块开启时运维能改 cron、能暂停、能看到每次删除条数�
 | 物理删除 | `sys_user` / `sys_role` / `sys_menu` / `sys_post` / `sys_dict_type` / `sys_config` / `sys_notice` 均物理删除；逻辑删除会与唯一索引冲突，删了 `test` 就不能再建 `test` |
 | 唯一性校验 | 用户名、角色标识、菜单标识、岗位编码、字典类型编码、参数键名，改前先查重（排除自身） |
 | 内置保护 | `user_id=1` 不可停用/删除；不能停用或删除当前登录账号；`role_id=1` 不可删除/停用/改标识；`config_type='Y'` 不可改 key、控件类型、选项，不可删除 |
-| 关联清理 | 删用户清 `user_role` / `user_post`；删角色清 `role_menu`；删菜单清 `role_menu`；删部门清闭包表；岗位被占用时**拒绝删除**而非静默解除 |
-| 授权方式 | 角色 `menuIds`、用户 `roleIds` / `postIds` 随保存一起提交，Service 先清后插；字段为 `null` 表示“不修改授权” |
+| 关联清理 | 删用户清 `user_role` / `user_post`；删角色清 `role_menu` / `role_dept`；删菜单清 `role_menu`；删部门清闭包表与 `sys_role_dept`；岗位被占用时**拒绝删除**而非静默解除 |
+| 授权方式 | 角色 `menuIds` / `deptIds`、用户 `roleIds` / `postIds` 随保存一起提交，Service 先清后插；字段为 `null` 表示“不修改授权” |
 | 角色授予 | 非超管不能新增 `role_id=1`，也不能新增 `data_scope=1` 的角色（只校验本次新增，避免正常编辑被历史高权限角色卡死） |
-| 数据范围 | 角色只接受 1 / 3 / 4 / 5，`2 自定义` 保存直接拒绝；非超管不能把角色范围提升为 1 |
+| 数据范围 | 角色接受 1 / 2 / 3 / 4 / 5；`2 自定义` 必须至少勾 1 个部门，且只能勾自己可见范围内的部门；非超管不能把角色范围提升为 1 |
 | 密码 | 新增必填（6~64）BCrypt；修改资料不碰密码；重置密码独立接口且用请求体；实体 `password` 只写不回 |
 | 分页上限 | 所有列表 `pageSize` 夹在 1~100，防止被拉全表 |
 
@@ -223,16 +223,20 @@ job 模块开启时运维能改 cron、能暂停、能看到每次删除条数�
 | 值 | 含义 | 行为 |
 |---|---|---|
 | 1 | 全部 | 不加条件；超管等价于此 |
-| 2 | 自定义部门 | v1.0 无 `sys_role_dept`，降级为仅本人 + warn；保存角色时拒绝 |
+| 2 | 自定义部门 | `sys_role_dept` 中勾选的部门集合，精确匹配、不含下级 |
 | 3 | 本部门 | `dept_id = 当前用户部门` |
 | 4 | 本部门及以下 | 闭包表取子树（含自己） |
 | 5 | 仅本人 | `user_id = 当前用户` |
 
-- 多角色取最大范围（1 > 4 > 3 > 5）；停用角色不参与；
-- 无上下文 / 无角色 / 无部门 → 仅本人，**失败收紧，不放开**；
-- 作用点：用户列表、详情、修改、删除、重置密码、启停用，以及新增 / 修改的部门归属；
+- 多角色取最大范围（1 > 4 > 3 > 2 > 5），自定义范围跨角色取并集；停用角色不参与；
+- 无上下文 / 无角色 / 无部门 / 自定义未勾部门 → 仅本人，**失败收紧，不放开**；
+- 作用点：用户列表 / 详情 / 写操作，部门列表 / 树 / 详情 / 写操作；
+  角色列表与下拉对非全部范围账号只展示“可授权”角色（隐藏内置超管与全部数据角色）；
 - 非超管授予角色时，禁止新增 `role_id=1` 或 `data_scope=1` 的角色；
-- 部门 / 角色列表暂未过滤，导出接口实现时必须复用 `applyUserScope`。
+  保存自定义范围时也不能勾选自己数据范围之外的部门；
+- 自定义范围是精确集合：在自定义部门下新建子部门不会自动进入范围，
+  部门树维护建议交给全部数据范围管理员；删除部门会同步清理 `sys_role_dept`；
+- 导出接口尚未实现；实现时必须复用 `applyUserScope`。
 
 ### 按钮权限
 

@@ -2,7 +2,7 @@
 
 > 本文回答两个问题：**哪些逻辑必须用单测锁住？没有数据库的机器上怎么自动验证？**
 >
-> 结论：v1.0 先做“纯逻辑 + 安全回归”的 66 个单测（13 个测试类），
+> 结论：v1.0 先做“纯逻辑 + 安全回归”的 92 个单测（18 个测试类），
 > 完全不依赖 MySQL / Redis，`mvn test` 一条命令跑完；
 > 再用 GitHub Actions 覆盖 JDK 8/11/17 与前端构建。
 
@@ -68,7 +68,7 @@ mvn -B -ntp -DskipTests package
 
 ---
 
-## 3. 当前测试清单（66 项 / 13 个类）
+## 3. 当前测试清单（92 项 / 18 个类）
 
 | 模块 | 测试类 | 项数 | 锁住什么 |
 |---|---|---|---|
@@ -80,13 +80,18 @@ mvn -B -ntp -DskipTests package
 | `lx-module-system` | `PasswordPolicyTest` | 5 | off / basic / strong 三档、非法值回退 basic、错误码 1001 |
 | `lx-module-system` | `HtmlSanitizerTest` | 9 | script、事件属性、伪协议、iframe、内联样式、安全标签保留 |
 | `lx-module-system` | `SysMenuServiceTest` | 4 | 两层树、父节点缺失作为根、空列表、详情 1004 |
+| `lx-common-core` | `MessageUtilsTest` | 6 | 语言包未接入 / 解析异常时回退默认文案，不污染主流程 |
+| `lx-common-web` | `I18nMessageSourceTest` | 5 | 中英文资源齐全、参数占位、缺 key 回退、编码正常 |
+| `lx-common-web` | `LingxiaoLocaleResolverTest` | 7 | `X-Lang` > `?lang=` > `Accept-Language` > `zh-CN` 的优先级 |
+| `lx-module-system` | `DataScopeServiceTest` | 6 | 自定义部门命中 / 空集合收紧为仅本人 / 超管放行 / 4 > 2、3 > 2 |
+| `lx-module-system` | `SysRoleServiceTest` | 2 | 自定义范围空部门集合拒绝保存、`deptIds` 为空时不误清历史关联 |
 | `lx-module-file` | `LocalStorageServiceTest` | 4 | store/load/delete 闭环、路径穿越拒绝、文件不存在异常 |
 | `lx-module-job` | `SysJobServiceTest` | 7 | 空 cron、5 段 cron、执行器不存在、重名、状态/并发枚举 |
 | `lx-module-generator` | `NamingUtilsTest` | 5 | 下划线 / 连字符 / 多段命名、Java 关键字避让 |
 | `lx-module-generator` | `JavaTypeResolverTest` | 5 | MySQL / PG / 达梦常见类型映射，未知类型回退 String |
 | `lx-module-generator` | `TextUtilsTest` | 8 | 注释折叠、Javadoc 截断、JS / HTML / Java / SQL 四类转义 |
 
-合计：**Tests run: 66, Failures: 0, Errors: 0, Skipped: 0**（2026-11-15，JDK 8 与 JDK 11 各跑一遍）。
+合计：**Tests run: 92, Failures: 0, Errors: 0, Skipped: 0**（2026-11-19，JDK 8 跑通；66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
 
 ---
 

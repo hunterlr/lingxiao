@@ -18,8 +18,8 @@ import java.util.List;
  * <p>平台域角色与租户域 / 会员域角色是三套独立表，不共用本表。</p>
  *
  * <p>{@code dataScope} 决定数据可见范围（1 全部 / 2 自定义 / 3 本部门 / 4 本部门及以下 / 5 仅本人）。
- * v1.0 由 {@code DataScopeService} 在用户查询 / 写操作上落地；2 自定义因没有
- * {@code sys_role_dept} 关联表，暂按“仅本人”降级处理。</p>
+ * v1.0 由 {@code DataScopeService} 在用户 / 部门查询与写操作上落地；2 自定义的部门集合
+ * 存在 {@code sys_role_dept}，随保存接口的 {@code deptIds} 一起提交。</p>
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -58,4 +58,8 @@ public class SysRole extends BaseEntity {
     /** 保存时一并授权的菜单；null 表示“不修改” */
     @TableField(exist = false)
     private List<Long> menuIds;
+
+    /** 自定义数据范围勾选的部门；null 表示“不修改”，仅 dataScope=2 时生效 */
+    @TableField(exist = false)
+    private List<Long> deptIds;
 }

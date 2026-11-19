@@ -11,6 +11,7 @@ import com.lingxiao.modules.system.entity.SysDeptClosure;
 import com.lingxiao.modules.system.entity.SysUser;
 import com.lingxiao.modules.system.mapper.SysDeptClosureMapper;
 import com.lingxiao.modules.system.mapper.SysDeptMapper;
+import com.lingxiao.modules.system.mapper.SysRoleDeptMapper;
 import com.lingxiao.modules.system.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,14 +46,17 @@ public class SysDeptService {
     private final SysDeptMapper deptMapper;
     private final SysDeptClosureMapper deptClosureMapper;
     private final SysUserMapper userMapper;
+    private final SysRoleDeptMapper roleDeptMapper;
+    private final DataScopeService dataScopeService;
 
-    /** 平铺列表（表格 / 导出用）。 */
+    /** 平铺列表（表格 / 导出用），按数据范围裁剪。 */
     public List<SysDept> list(String deptName, String status) {
-        return deptMapper.selectList(new LambdaQueryWrapper<SysDept>()
+        LambdaQueryWrapper<SysDept> wrapper = new LambdaQueryWrapper<SysDept>()
                 .like(StringUtils.hasText(deptName), SysDept::getDeptName, deptName)
-                .eq(StringUtils.hasText(status), SysDept::getStatus, status)
-                .orderByAsc(SysDept::getParentId)
-                .orderByAsc(SysDept::getOrderNum));
+                .eq(StringUtils.hasText(status), SysDept::getStatus, status);
+        dataScopeService.applyDeptScope(wrapper);
+        wrapper.orderByAsc(SysDept::getParentId).orderByAsc(SysDept::getOrderNum);
+        return deptMapper.selectList(wrapper);
     }
 
     /** 部门树（下拉选择用）。 */
@@ -61,7 +65,9 @@ public class SysDeptService {
     }
 
     public SysDept detail(Long deptId) {
-        return mustGet(deptId);
+        SysDept dept = mustGet(deptId);
+        dataScopeService.assertDeptManageable(deptId);
+        return dept;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -69,6 +75,9 @@ public class SysDeptService {
         Long parentId = dept.getParentId() == null ? 0L : dept.getParentId();
         if (parentId != 0L) {
             mustGet(parentId);
+            dataScopeService.assertDeptManageable(parentId);
+        } else {
+            dataScopeService.assertRootDeptAllowed();
         }
         dept.setDeptId(null);
         dept.setParentId(parentId);
@@ -84,7 +93,9 @@ public class SysDeptService {
     @Transactional(rollbackFor = Exception.class)
     public void update(Long deptId, SysDept dept) {
         SysDept existing = mustGet(deptId);
+        dataScopeService.assertDeptManageable(deptId);
         Long newParentId = dept.getParentId() == null ? 0L : dept.getParentId();
+        boolean parentChanged = !Objects.equals(existing.getParentId(), newParentId);
 
         if (newParentId != 0L) {
             if (newParentId.equals(deptId)) {
@@ -97,9 +108,10 @@ public class SysDeptService {
                 throw new ServiceException(ErrorCode.BAD_REQUEST, "上级部门不能是自己的下级");
             }
             mustGet(newParentId);
+            dataScopeService.assertDeptManageable(newParentId);
+        } else if (parentChanged) {
+            dataScopeService.assertRootDeptAllowed();
         }
-
-        boolean parentChanged = !Objects.equals(existing.getParentId(), newParentId);
 
         existing.setParentId(newParentId);
         existing.setDeptName(dept.getDeptName());
@@ -120,6 +132,7 @@ public class SysDeptService {
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long deptId) {
         mustGet(deptId);
+        dataScopeService.assertDeptManageable(deptId);
         Long childCount = deptMapper.selectCount(new LambdaQueryWrapper<SysDept>()
                 .eq(SysDept::getParentId, deptId));
         if (childCount != null && childCount > 0) {
@@ -131,6 +144,8 @@ public class SysDeptService {
             throw new ServiceException(ErrorCode.FAIL, "部门下还有 " + userCount + " 个用户，请先调整用户部门");
         }
         deptClosureMapper.deleteByNode(deptId);
+        // 部门没了，自定义数据范围里指向它的关联也必须清掉，避免脏数据
+        roleDeptMapper.deleteByDeptId(deptId);
         deptMapper.hardDeleteById(deptId);
     }
 

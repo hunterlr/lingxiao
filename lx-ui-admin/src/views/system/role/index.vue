@@ -157,7 +157,6 @@
                   :key="item.value"
                   :label="item.label"
                   :value="item.value"
-                  :disabled="item.disabled"
                 />
               </el-select>
             </el-form-item>
@@ -170,6 +169,31 @@
                 :disabled="isBuiltinRole"
               />
               <div v-if="isBuiltinRole" class="form-tip">{{ t('page.role.builtinDisableTip') }}</div>
+            </el-form-item>
+          </el-col>
+          <el-col v-if="showCustomDept" :span="24">
+            <el-form-item :label="t('page.role.customDept')">
+              <div class="menu-tree-box">
+                <div class="menu-tree-toolbar">
+                  <span class="text-secondary">{{ t('page.role.customDeptTip') }}</span>
+                  <div>
+                    <el-button link type="primary" @click="toggleDeptAll(true)">{{ t('page.role.selectAll') }}</el-button>
+                    <el-button link type="primary" @click="toggleDeptAll(false)">{{ t('page.role.clearAll') }}</el-button>
+                  </div>
+                </div>
+                <el-scrollbar height="220px">
+                  <el-tree
+                    ref="deptTreeRef"
+                    :data="deptTree"
+                    node-key="id"
+                    show-checkbox
+                    check-strictly
+                    default-expand-all
+                    :props="{ label: 'label', children: 'children' }"
+                    :empty-text="t('page.role.emptyDept')"
+                  />
+                </el-scrollbar>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -239,6 +263,7 @@ import DictSelect from '@/components/DictSelect.vue'
 import DictTag from '@/components/DictTag.vue'
 import { addRole, deleteRole, getRole, listRoles, updateRole } from '@/api/role'
 import { getMenuTree } from '@/api/menu'
+import { getDeptTree } from '@/api/dept'
 import { useI18n } from 'vue-i18n'
 
 /**
@@ -250,12 +275,15 @@ import { useI18n } from 'vue-i18n'
  *
  * <p>菜单树用 {@code check-strictly}（父子不联动）：
  * 角色可能只被授权某个子菜单而不包含父目录，联动勾选会强行放大权限。</p>
+ *
+ * <p>数据范围选“自定义”时额外提交 {@code deptIds}：部门树同样用
+ * {@code check-strictly}，因为自定义范围是精确集合，勾父部门不等于勾下级。</p>
  */
 const { t } = useI18n()
 
 const dataScopeOptions = [
   { value: '1', label: t('page.role.scopeAll') },
-  { value: '2', label: t('page.role.scopeCustom'), disabled: true },
+  { value: '2', label: t('page.role.scopeCustom') },
   { value: '3', label: t('page.role.scopeDept') },
   { value: '4', label: t('page.role.scopeDeptChild') },
   { value: '5', label: t('page.role.scopeSelf') }
@@ -267,6 +295,7 @@ const total = ref(0)
 const query = reactive({ pageNum: 1, pageSize: 10, roleName: '', roleKey: '', status: '' })
 
 const menuTree = ref([])
+const deptTree = ref([])
 
 async function loadList() {
   loading.value = true
@@ -320,7 +349,12 @@ function typeLabel(type) {
 
 onMounted(async () => {
   loadList()
-  menuTree.value = (await getMenuTree(false).catch(() => [])) || []
+  const [menus, depts] = await Promise.all([
+    getMenuTree(false).catch(() => []),
+    getDeptTree().catch(() => [])
+  ])
+  menuTree.value = menus || []
+  deptTree.value = depts || []
 })
 
 /* ==================== 新增 / 编辑 ==================== */
@@ -331,7 +365,9 @@ const isEdit = ref(false)
 const editingId = ref('')
 const formRef = ref(null)
 const menuTreeRef = ref(null)
+const deptTreeRef = ref(null)
 const isBuiltinRole = computed(() => isEdit.value && String(editingId.value) === '1')
+const showCustomDept = computed(() => form.dataScope === '2')
 
 const emptyForm = () => ({
   roleName: '',
@@ -367,6 +403,7 @@ function openAdd() {
   dialogVisible.value = true
   nextTick(() => {
     menuTreeRef.value && menuTreeRef.value.setCheckedKeys([])
+    deptTreeRef.value && deptTreeRef.value.setCheckedKeys([])
   })
 }
 
@@ -394,9 +431,14 @@ async function openEdit(row) {
       status: detail.status || '0',
       remark: detail.remark || ''
     })
+    if (!deptTree.value.length) {
+      deptTree.value = (await getDeptTree().catch(() => [])) || []
+    }
     await nextTick()
     const ids = (detail.menuIds || []).map((id) => String(id))
     menuTreeRef.value && menuTreeRef.value.setCheckedKeys(ids)
+    const deptIds = (detail.deptIds || []).map((id) => String(id))
+    deptTreeRef.value && deptTreeRef.value.setCheckedKeys(deptIds)
   } finally {
     dialogLoading.value = false
   }
@@ -419,14 +461,39 @@ function toggleAll(checked) {
   menuTreeRef.value.setCheckedKeys(allIds)
 }
 
+function toggleDeptAll(checked) {
+  if (!deptTreeRef.value) return
+  if (!checked) {
+    deptTreeRef.value.setCheckedKeys([])
+    return
+  }
+  const allIds = []
+  const walk = (nodes) => {
+    for (const node of nodes || []) {
+      allIds.push(String(node.id))
+      if (node.children) walk(node.children)
+    }
+  }
+  walk(deptTree.value)
+  deptTreeRef.value.setCheckedKeys(allIds)
+}
+
 function handleDialogClosed() {
   formRef.value && formRef.value.clearValidate()
   menuTreeRef.value && menuTreeRef.value.setCheckedKeys([])
+  deptTreeRef.value && deptTreeRef.value.setCheckedKeys([])
 }
 
 async function submitForm() {
   await formRef.value.validate(async (valid) => {
     if (!valid) return
+    const deptIds = form.dataScope === '2'
+      ? (deptTreeRef.value ? deptTreeRef.value.getCheckedKeys().map((id) => String(id)) : [])
+      : null
+    if (form.dataScope === '2' && deptIds.length === 0) {
+      ElMessage.warning(t('page.role.customDeptRequired'))
+      return
+    }
     saving.value = true
     try {
       const menuIds = menuTreeRef.value ? menuTreeRef.value.getCheckedKeys() : []
@@ -437,7 +504,8 @@ async function submitForm() {
         dataScope: form.dataScope,
         status: form.status,
         remark: form.remark || null,
-        menuIds
+        menuIds,
+        deptIds
       }
       if (!isEdit.value) {
         await addRole(payload)

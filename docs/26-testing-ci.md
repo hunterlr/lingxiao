@@ -2,7 +2,7 @@
 
 > 本文回答两个问题：**哪些逻辑必须用单测锁住？没有数据库的机器上怎么自动验证？**
 >
-> 结论：v1.0 先做“纯逻辑 + 安全回归”的 92 个单测（18 个测试类），
+> 结论：v1.0 先做“纯逻辑 + 安全回归”的 95 个单测（19 个测试类），
 > 完全不依赖 MySQL / Redis，`mvn test` 一条命令跑完；
 > 再用 GitHub Actions 覆盖 JDK 8/11/17 与前端构建。
 
@@ -68,7 +68,7 @@ mvn -B -ntp -DskipTests package
 
 ---
 
-## 3. 当前测试清单（92 项 / 18 个类）
+## 3. 当前测试清单（95 项 / 19 个类）
 
 | 模块 | 测试类 | 项数 | 锁住什么 |
 |---|---|---|---|
@@ -78,6 +78,7 @@ mvn -B -ntp -DskipTests package
 | `lx-common-core` | `ServiceExceptionTest` | 4 | 错误码与自定义消息的优先级、可被全局异常处理器捕获 |
 | `lx-common-core` | `ConfigProviderTest` | 3 | 参数脏值（空串 / 非数字 / 大小写）回退默认值 |
 | `lx-module-system` | `PasswordPolicyTest` | 5 | off / basic / strong 三档、非法值回退 basic、错误码 1001 |
+| `lx-module-system` | `SessionPolicyTest` | 3 | 参数缺失 / 空白 / 非法值都按单会话处理，只有 `true` 才放开多端 |
 | `lx-module-system` | `HtmlSanitizerTest` | 9 | script、事件属性、伪协议、iframe、内联样式、安全标签保留 |
 | `lx-module-system` | `SysMenuServiceTest` | 4 | 两层树、父节点缺失作为根、空列表、详情 1004 |
 | `lx-common-core` | `MessageUtilsTest` | 6 | 语言包未接入 / 解析异常时回退默认文案，不污染主流程 |
@@ -91,7 +92,7 @@ mvn -B -ntp -DskipTests package
 | `lx-module-generator` | `JavaTypeResolverTest` | 5 | MySQL / PG / 达梦常见类型映射，未知类型回退 String |
 | `lx-module-generator` | `TextUtilsTest` | 8 | 注释折叠、Javadoc 截断、JS / HTML / Java / SQL 四类转义 |
 
-合计：**Tests run: 92, Failures: 0, Errors: 0, Skipped: 0**（2026-11-19，JDK 8 跑通；66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
+合计：**Tests run: 95, Failures: 0, Errors: 0, Skipped: 0**（2026-11-20，JDK 8 跑通；66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
 
 ---
 

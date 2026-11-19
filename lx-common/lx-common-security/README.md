@@ -61,7 +61,7 @@ public R<Long> add(@Valid @RequestBody SysUser user) { ... }
 sa-token:
   token-name: lx-platform-token   # 请求头名称
   timeout: 43200                  # 12 小时
-  is-concurrent: true             # 允许同账号多端
+  is-concurrent: true             # 存储层允许并发；是否踢旧会话看 sys.account.multiDeviceLogin
   is-share: false                 # 每次登录发新 Token
   is-read-cookie: false           # 只读请求头，减少 CSRF 面
 ```

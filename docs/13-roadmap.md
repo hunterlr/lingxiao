@@ -437,9 +437,25 @@ tool:gen:import|edit|preview|remove|download
   部门列表 / 树只剩这 2 个节点；范围外用户 / 部门详情直接 403；
   角色列表不再出现超管与「全部数据」角色。
 - 空部门保存返回 `自定义数据范围必须选择至少一个部门`。
-- 单测 `DataScopeServiceTest` 6 项 + `SysRoleServiceTest` 2 项；`mvn test` 92 项全通过。
+- 单测 `DataScopeServiceTest` 6 项 + `SysRoleServiceTest` 2 项；`mvn test` 95 项全通过。
 - `smoke.mjs` 22/22、`theme.mjs` 12/12、`vite build` 通过、控制台 0 error。
 - 验证脚本 `.local/uitest/role-dept-check.mjs`；测试部门 / 用户 / 角色已全部清理。
+
+### 12.2.1 P0 补充：会话策略（已完成，2026-11-20）
+
+**问题**：在线用户页同一账号出现多行。定位后确认是多次真实登录（`is-concurrent=true`
++ `is-share=false`，旧 Token 要等 12 小时过期）；同时发现删除 / 停用 / 重置密码都没有
+注销会话，被删用户会留下“空白账号”。
+
+**完成内容**：
+- 新增参数 `sys.account.multiDeviceLogin`（switch，默认 `false`），`V16` 迁移落库；
+- 默认单会话：`AuthService.login` 在发 Token 前 `logoutByUserId` 踢掉旧会话；
+- 开启参数后恢复多端同时在线，在线列表仍按 Token 一行，可单独强退；
+- 删除、停用、管理员重置密码立即注销该账号全部会话；
+- 参数每次登录实时读取，改完无需重启（不改 `sa-token.is-concurrent`）。
+
+**验收**：`.local/uitest/session-policy-check.mjs` 18/18——默认连登两次只剩 1 个会话；
+开启后两个 Token 都可用；停用 / 重置 / 删除后旧 Token 立即 401。
 
 ### 12.3 P1：L2 多语言设计（只写方案，v1.2 再实现）
 

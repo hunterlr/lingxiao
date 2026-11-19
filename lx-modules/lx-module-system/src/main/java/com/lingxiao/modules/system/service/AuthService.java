@@ -52,6 +52,7 @@ public class AuthService {
     private final CaptchaService captchaService;
     private final PasswordEncoder passwordEncoder;
     private final PasswordPolicy passwordPolicy;
+    private final SessionPolicy sessionPolicy;
     private final ConfigProvider configProvider;
 
     /** 连续失败几次后锁定；参数缺失或非法时按 5 次 */
@@ -60,7 +61,7 @@ public class AuthService {
     private static final int DEFAULT_LOCK_MINUTES = 10;
 
     /**
-     * 登录：验证码 → 锁定判断 → 查用户 → 校验密码 → 写登录日志 → 发 Token。
+     * 登录：验证码 → 锁定判断 → 查用户 → 校验密码 → 写登录日志 → 踢旧会话 → 发 Token。
      *
      * <p>失败计数落 {@code sys_user.login_fail_count / lock_time}，不依赖 Redis：
      * 单机、重启、后续多实例都读同一份状态。</p>
@@ -106,7 +107,14 @@ public class AuthService {
                 .set(SysUser::getLoginFailCount, 0)
                 .set(SysUser::getLockTime, null));
 
-        // 5. 平台域发 Token，并把展示信息写入 Session
+        // 5. 单会话模式下先踢掉该账号的旧 Token，再发新 Token。
+        //    参数是运行期读取的，改完下一次登录立即生效，不需要重启。
+        if (!sessionPolicy.isMultiDeviceLoginEnabled()) {
+            StpPlatformUtil.logoutByUserId(user.getUserId());
+            log.info("单会话模式：账号 {} 新登录，已注销旧会话", user.getUsername());
+        }
+
+        // 6. 平台域发 Token，并把展示信息写入 Session
         StpPlatformUtil.login(user.getUserId());
         LoginHelper.setLoginUser(user.getUserId(), user.getUsername(), user.getNickname());
         // IP / 浏览器写到 Token-Session：同一账号多端登录时各会话要各记各的

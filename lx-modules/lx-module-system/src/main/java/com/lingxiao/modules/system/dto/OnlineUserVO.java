@@ -7,9 +7,10 @@ import java.time.LocalDateTime;
 /**
  * 在线用户（一个 Token 一行）。
  *
- * <p><b>为什么按 Token 而不是按用户：</b>平台允许同一账号并发登录
- * （{@code sa-token.is-concurrent=true}）。用户在办公室和家里各登录一次，
- * 在线列表应该看到两条来源不同的会话，强退时也能只踢掉其中一条。</p>
+ * <p><b>为什么按 Token 而不是按用户：</b>平台默认单会话
+ * （{@code sys.account.multiDeviceLogin=false}），开启多端后同一账号可以有多条会话。
+ * 列表按 Token 一行，既能如实反映“人在办公室和家里各登录一次”，
+ * 也能在多端模式下只踢掉其中一条。</p>
  *
  * <p><b>为什么 tokenId 是脱敏值：</b>Token 是可直接冒充用户的凭证，
  * 不能出现在列表响应里。后端返回“首 4 + 末 4”的脱敏串，强退时再按

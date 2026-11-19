@@ -21,6 +21,7 @@
 | 定时任务模块 | ✅ 完成 | Spring Task + 数据库锁；后端 51 项 + 模块关闭 5 项 + UI 9 项（见第 29 节） |
 | 接口文档 | ✅ 完成 | SpringDoc 1.7 + Knife4j 4.4，`/doc.html` 200、68 条路径；后端 26 项 + UI 10 项（见第 30 节） |
 | 个人中心自助 | ✅ 完成 | 改资料 / 原密码校验改密 / 全部会话失效；后端 31 项 + UI 13 项（见第 30 节） |
+| 会话策略 | ✅ 完成 | 默认单会话踢旧、参数可开多端；删除 / 停用 / 重置立即踢下线；接口 18 项（见第 44 节） |
 | 系统管理 CRUD | ✅ 完成 | 8 个控制器、25 个按钮权限、74 项接口验证全部通过（见第 13 节） |
 | 前端 `lx-ui-admin` | ✅ 完成 | 17 个页面、动态路由、22 项 UI 冒烟全通过、验证码开启下真人登录成功（见第 20 / 29 / 30 节） |
 
@@ -2018,6 +2019,10 @@ if (key === 'sys.editor.type') return <Select ... />
 同一账号允许多端登录（`sa-token.is-concurrent=true`），所以列表以 **Token 为行**，
 而不是以用户为行。用户在办公室和家里各登录一次会看到两条来源不同的记录，
 强退时可以只踢掉其中一条。
+
+> 2026-11-20 更新：默认改为**单会话**，新登录会踢掉旧 Token；
+> 需要多端时在参数设置开启 `sys.account.multiDeviceLogin`。详见第 44 节。
+> 下面的字段说明在两种模式下都成立。
 
 | 字段 | 来源 | 说明 |
 |---|---|---|
@@ -4190,6 +4195,96 @@ vite build 5.60s   控制台 0 error
 | `wrapper` 条件加在 `orderBy` 之后 | MyBatis-Plus 按调用顺序拼 SQL，会生成 `ORDER BY ... AND ...`；本轮把数据范围条件统一放在排序之前 |
 
 ### 43.7 下一项
+
+原计划是 `docs/13` §12.3（L2 多语言设计）；中途先处理了在线会话的
+“同账号多行 + 失效会话残留”，见第 44 节。L2 方案仍待评审。
+
+---
+
+## 44. 第二十四轮：会话策略（默认单会话 + 失效清理）
+
+### 44.1 现象与定位
+
+在线用户页出现 5 条 `admin`，但 `current=true` 只有 1 条。逐条核对
+`login_time` / `browser` 后确认：不是接口重复计数，而是**5 次真实登录**
+（联调脚本 `role-dept-check`、两个无头浏览器回归、OpenCode 浏览器、排查用的 node 探测）。
+
+根因是当时的设计：
+
+```yaml
+sa-token:
+  is-concurrent: true   # 存储层允许并发
+  is-share: false       # 每次登录发新 Token
+```
+
+`docs/21` §28.3 也明确写过“列表以 Token 为行”。所以一个账号登录 N 次就有 N 行，
+旧 Token 要等 12 小时自然过期。
+
+排查时还发现两个真问题：
+
+1. 被删除的测试用户仍有一条会话挂在列表里，`username / nickname` 为空——
+   `SysUserService.delete()` 没有注销该用户的 Token；
+2. 停用账号、管理员重置密码同样没有注销会话，旧 Token 能继续用到过期。
+
+### 44.2 方案
+
+| 决策 | 做法 |
+|---|---|
+| 默认口径 | 单会话：新登录先踢掉该账号的全部旧 Token |
+| 可配置 | 参数 `sys.account.multiDeviceLogin`（switch，默认 `false`），开启后恢复多端 |
+| 不改 `is-concurrent` | 那是启动期配置；改成登录前按参数主动踢，改完下一次登录立即生效，不用重启 |
+| 参数非法 / 缺失 | 按单会话处理（失败收紧，不意外放开多端） |
+| 失效时机 | 新登录、自助改密、管理员重置密码、停用、删除 |
+
+### 44.3 改动
+
+| 文件 | 改动 |
+|---|---|
+| `SessionPolicy` | 新增；读取 `sys.account.multiDeviceLogin`，默认单会话 |
+| `AuthService.login` | 校验通过后、发 Token 前调用 `logoutByUserId`（单会话模式） |
+| `SysUserService.resetPassword` | 落新密码后注销该账号全部会话 |
+| `SysUserService.changeStatus` | 停用时立即注销会话 |
+| `SysUserService.delete` | 物理删除后注销会话，避免“空白账号”残留 |
+| `V16__system_session_policy.sql` | 新增参数 `config_id=10`，`switch`，默认 `false` |
+| `zh-CN.js` / `en-US.js` | 参数名翻译 `config.sys.account.multiDeviceLogin` |
+
+> 顺序固定为“先写库、再踢会话”。写库失败时不能先把人登出。
+
+### 44.4 验证
+
+```text
+mvn -B -ntp test                95 项全通过（新增 SessionPolicyTest 3 项）
+session-policy-check.mjs        18/18
+smoke.mjs                       22/22，控制台 0 error
+theme.mjs                       12/12
+check-i18n-keys.mjs             zh=902 en=902，missing=none
+```
+
+接口脚本覆盖：
+
+```text
+默认参数 = false
+单会话：连登两次 → 旧 Token 401，在线列表 admin 只有 1 行
+多端：参数改 true → 两个 Token 都可用，列表至少 2 行
+切回 false：下一次登录后旧多端会话被清理
+停用账号 → 旧 Token 立即失效；重新启用可登录
+管理员重置密码 → 旧 Token 立即失效，新密码可登录
+删除用户 → 旧 Token 立即失效
+```
+
+清理后 `sys_user` / `sys_role` / `sys_dept` 各 1 条，`sys_role_dept` 0 条，
+参数恢复 `false`，Flyway 当前 V16。
+
+### 44.5 取舍
+
+| 问题 | 说明 |
+|---|---|
+| 为什么不直接 `is-concurrent: false` | 那是启动配置，且会把“允许多端”做成不可运行期切换；现在的实现参数改完即可生效 |
+| 为什么默认踢旧会话 | 后台管理以安全为先，一人一个有效会话；确实需要手机 + 电脑同时用再开参数 |
+| 多端模式下列表还按 Token 吗 | 是。多端时每个会话来源不同，按 Token 才能单独强退；单会话时自然只有 1 行 |
+| 删除 / 停用为什么不靠 Token 过期 | 12 小时窗口太长，且删人后列表出现空白账号，运维无法判断来源 |
+
+### 44.6 下一项
 
 `docs/13` §12.3：L2 多语言设计（只写方案，v1.2 再实现）——
 `i18n_language` / `i18n_key` / `i18n_text` 三张表与回退链，先评审再排期。

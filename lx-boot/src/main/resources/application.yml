@@ -26,7 +26,7 @@ spring:
       connection-timeout: 30000
   flyway:
     enabled: true
-    # 按模块分目录：system 先建，file / job / generator 后建；版本号全局递增（当前到 V15）
+    # 按模块分目录：system 先建，file / job / generator 后建；版本号全局递增（当前到 V16）
     locations: classpath:db/migration/system,classpath:db/migration/file,classpath:db/migration/job,classpath:db/migration/generator
     baseline-on-migrate: true
     clean-disabled: true
@@ -83,7 +83,8 @@ sa-token:
   token-name: lx-platform-token
   # 12 小时
   timeout: 43200
-  # 允许同一账号多端登录
+  # 存储层允许并发 Token；是否“新登录踢旧会话”由运行期参数
+  # sys.account.multiDeviceLogin 决定（默认单会话，见 AuthService）
   is-concurrent: true
   # 每次登录发新 Token，不共用
   is-share: false

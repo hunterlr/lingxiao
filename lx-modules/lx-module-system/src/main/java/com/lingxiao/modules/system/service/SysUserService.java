@@ -8,6 +8,7 @@ import com.lingxiao.common.core.domain.PageResult;
 import com.lingxiao.common.core.enums.ErrorCode;
 import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.common.security.util.LoginHelper;
+import com.lingxiao.common.security.util.StpPlatformUtil;
 import com.lingxiao.modules.system.entity.SysDept;
 import com.lingxiao.modules.system.entity.SysDeptClosure;
 import com.lingxiao.modules.system.entity.SysRole;
@@ -206,6 +207,8 @@ public class SysUserService {
                 .set(SysUser::getLoginFailCount, 0)
                 .set(SysUser::getLockTime, null)
                 .set(SysUser::getUpdateBy, LoginHelper.getUserId()));
+        // 管理员重置密码后旧密码会话必须失效，否则旧密码仍能继续用
+        StpPlatformUtil.logoutByUserId(userId);
         log.info("重置用户密码: userId={}, operator={}", userId, LoginHelper.getUsername());
     }
 
@@ -237,6 +240,11 @@ public class SysUserService {
         user.setStatus(status);
         user.setUpdateBy(LoginHelper.getUserId());
         userMapper.updateById(user);
+        if (CommonConstants.STATUS_DISABLED.equals(status)) {
+            // 停用必须立即生效，不能等 Token 自然过期
+            StpPlatformUtil.logoutByUserId(userId);
+            log.info("停用用户并注销会话: userId={}, operator={}", userId, LoginHelper.getUsername());
+        }
     }
 
     /** 删除用户（物理删除，级联清理角色 / 岗位关联）。 */
@@ -253,6 +261,9 @@ public class SysUserService {
         userRoleMapper.deleteByUserId(userId);
         userPostMapper.deleteByUserId(userId);
         userMapper.hardDeleteById(userId);
+        // 用户删了，Token 还在线会出现“空白账号”并一直挂到过期
+        StpPlatformUtil.logoutByUserId(userId);
+        log.info("删除用户并注销会话: userId={}, operator={}", userId, LoginHelper.getUsername());
     }
 
     // ==================== 内部方法 ====================

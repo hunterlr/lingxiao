@@ -994,6 +994,7 @@ export default {
     'sys.gen.author': '代码生成作者',
     'sys.account.maxRetryCount': '登录失败锁定阈值',
     'sys.account.lockMinutes': '账号锁定时长',
-    'sys.account.passwordPolicy': '密码复杂度策略'
+    'sys.account.passwordPolicy': '密码复杂度策略',
+    'sys.account.multiDeviceLogin': '允许多端登录'
   }
 }

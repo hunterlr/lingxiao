@@ -41,6 +41,8 @@ Version **v1.0** ships the admin foundation. CMS, membership, workflow and SaaS 
 - Account locked for 10 minutes after 5 consecutive failures; the counter lives in the database, not in cache
 - Password policy in three levels (`off` / `basic` / `strong`), enforced on create, reset and self-service change
 - Changing a password invalidates every session of that account; passwords are masked in audit logs
+- Single session by default: a new login kicks the old one; multi-device login can be enabled in settings
+- Deleting, disabling, or resetting a password immediately invalidates all sessions of that account
 - Two-sided XSS sanitization for rich text (on write and on read, verified against the raw database row)
 
 **File center**

@@ -992,6 +992,7 @@ export default {
     'sys.gen.author': 'Codegen author',
     'sys.account.maxRetryCount': 'Failed-login lock threshold',
     'sys.account.lockMinutes': 'Account lock duration (minutes)',
-    'sys.account.passwordPolicy': 'Password policy'
+    'sys.account.passwordPolicy': 'Password policy',
+    'sys.account.multiDeviceLogin': 'Allow multiple device logins'
   }
 }

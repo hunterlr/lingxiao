@@ -372,7 +372,7 @@ sequenceDiagram
 | 传递 | Header / Cookie | Header / Cookie / 小程序 storage |
 | 有效期 | 12h | 7d |
 | 活跃续期 | 30m | 2h |
-| 并发登录 | 允许，可限制 | 允许，可挤下线 |
+| 并发登录 | 默认单会话，可开启多端 | 允许，可挤下线 |
 | 刷新 | refresh token，旋转 | refresh token，旋转 |
 | 改密 / 重置 | 全部 Token 失效 | 全部 Token 失效 |
 | 停用 / 注销 | 立即踢下线 | 立即踢下线 |

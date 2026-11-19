@@ -36,7 +36,7 @@ com.lingxiao.modules.system
 │               KickoutResultVO、ServerInfoVO、CacheInfoVO
 ├─ config/       PasswordConfig（BCrypt）
 └─ resources/db/migration/system/   V1 建表、V2 种子、V4 按钮权限、V8 日志清空权限、
-                                   V9 参数控件、V10 在线强退权限、V14 登录安全、V15 自定义数据范围
+                                   V9 参数控件、V10 在线强退权限、V14 登录安全、V15 自定义数据范围、V16 会话策略
                                    （V11 定时任务相关结构由 lx-module-job 提供）
 ```
 
@@ -56,11 +56,26 @@ lx-module-system → lx-common-{core,web,security,mybatis,log,redis} + lx-admin-
 
 ### 登录
 
-`AuthService.login` 顺序：验证码 → 查用户 → BCrypt 校验 → 状态校验 → 更新登录信息 → 发 Token → 写 Session → 写登录日志。
+`AuthService.login` 顺序：验证码 → 查用户 → BCrypt 校验 → 状态校验 → 更新登录信息 → 踢旧会话（可选）→ 发 Token → 写 Session → 写登录日志。
 
 - 验证码**先校验**，避免用登录接口做用户名枚举；
 - 登录失败也写 `sys_login_log`（含失败原因），为后续账号锁定留数据；
-- 日志写入失败只打 warn，不影响登录主流程。
+- 日志写入失败只打 warn，不影响登录主流程；
+- 会话策略由 `sys.account.multiDeviceLogin` 控制：默认 `false`（单会话，新登录调用
+  `logoutByUserId` 踢掉旧 Token），改成 `true` 才允许多端同时在线；
+  参数每次登录实时读取，不需要重启。
+
+### 会话失效（什么时候必须踢人）
+
+| 操作 | 行为 | 原因 |
+|---|---|---|
+| 新登录（默认单会话） | `logoutByUserId` 注销该账号全部旧 Token | 后台默认一人一个有效会话 |
+| 自助改密 | 先落新密码，再注销全部会话 | 旧密码会话不能继续存活 |
+| 管理员重置密码 | 落新密码后注销全部会话 | 同上，避免旧密码继续用 |
+| 停用账号 | `logoutByUserId` 立即失效 | 停用必须立刻生效，不能等 Token 过期 |
+| 删除账号 | 物理删除后注销全部会话 | 防止在线列表出现“空白账号” |
+
+> 会话清理放在数据库操作**之后**：写库失败时不应该先把人踢下线。
 
 ### 个人中心（自助资料 / 改密）
 

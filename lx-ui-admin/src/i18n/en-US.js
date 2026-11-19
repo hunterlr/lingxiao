@@ -984,15 +984,29 @@ export default {
   },
 
   config: {
-    'sys.account.captchaEnabled': 'Login captcha',
-    'sys.log.keepDays': 'Log retention (days)',
-    'sys.file.uploadMaxMb': 'Max upload size (MB)',
-    'sys.editor.type': 'Rich text editor',
-    'sys.job.logKeepDays': 'Job log retention (days)',
-    'sys.gen.author': 'Codegen author',
-    'sys.account.maxRetryCount': 'Failed-login lock threshold',
-    'sys.account.lockMinutes': 'Account lock duration (minutes)',
-    'sys.account.passwordPolicy': 'Password policy',
-    'sys.account.multiDeviceLogin': 'Allow multiple device logins'
+    sys: {
+      account: {
+        captchaEnabled: 'Login captcha',
+        maxRetryCount: 'Failed-login lock threshold',
+        lockMinutes: 'Account lock duration (minutes)',
+        passwordPolicy: 'Password policy',
+        multiDeviceLogin: 'Allow multiple device logins'
+      },
+      log: {
+        keepDays: 'Log retention (days)'
+      },
+      file: {
+        uploadMaxMb: 'Max upload size (MB)'
+      },
+      editor: {
+        type: 'Rich text editor'
+      },
+      job: {
+        logKeepDays: 'Job log retention (days)'
+      },
+      gen: {
+        author: 'Codegen author'
+      }
+    }
   }
 }

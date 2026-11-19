@@ -14,12 +14,16 @@ const root = path.resolve('src')
 const zh = (await import(pathToFileURL(path.join(root, 'i18n/zh-CN.js')).href)).default
 const en = (await import(pathToFileURL(path.join(root, 'i18n/en-US.js')).href)).default
 
+const dottedLeaves = new Set()
 function flatten(object, prefix = '', result = new Map()) {
   for (const [key, value] of Object.entries(object)) {
     const full = prefix ? `${prefix}.${key}` : key
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       flatten(value, full, result)
     } else {
+      // vue-i18n 把点号当路径分隔符；叶子键自身带点会让 t() 永远取不到，
+      // 只能静默回退到数据库原文（参数名乱码就是这么来的）。
+      if (key.includes('.')) dottedLeaves.add(full)
       result.set(full, value)
     }
   }
@@ -35,6 +39,7 @@ const enOnly = [...enKeys.keys()].filter((key) => !zhKeys.has(key))
 console.log(`zh=${zhKeys.size} en=${enKeys.size}`)
 console.log('zh-only=' + (zhOnly.join(', ') || 'none'))
 console.log('en-only=' + (enOnly.join(', ') || 'none'))
+console.log('dotted-leaf=' + ([...dottedLeaves].join(', ') || 'none'))
 
 const files = []
 function walk(dir) {
@@ -61,6 +66,6 @@ console.log('missing=' + (missing.join(', ') || 'none'))
 const unused = [...zhKeys.keys()].filter((key) => !used.has(key) && !key.startsWith('error.')).sort()
 console.log('unused=' + (unused.join(', ') || 'none'))
 
-if (zhOnly.length || enOnly.length || missing.length) {
+if (zhOnly.length || enOnly.length || missing.length || dottedLeaves.size) {
   process.exitCode = 1
 }

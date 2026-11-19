@@ -986,15 +986,29 @@ export default {
   },
 
   config: {
-    'sys.account.captchaEnabled': '登录验证码开关',
-    'sys.log.keepDays': '日志保留天数',
-    'sys.file.uploadMaxMb': '单文件上传上限',
-    'sys.editor.type': '富文本编辑器',
-    'sys.job.logKeepDays': '任务日志保留天数',
-    'sys.gen.author': '代码生成作者',
-    'sys.account.maxRetryCount': '登录失败锁定阈值',
-    'sys.account.lockMinutes': '账号锁定时长',
-    'sys.account.passwordPolicy': '密码复杂度策略',
-    'sys.account.multiDeviceLogin': '允许多端登录'
+    sys: {
+      account: {
+        captchaEnabled: '登录验证码开关',
+        maxRetryCount: '登录失败锁定阈值',
+        lockMinutes: '账号锁定时长',
+        passwordPolicy: '密码复杂度策略',
+        multiDeviceLogin: '允许多端登录'
+      },
+      log: {
+        keepDays: '日志保留天数'
+      },
+      file: {
+        uploadMaxMb: '单文件上传上限'
+      },
+      editor: {
+        type: '富文本编辑器'
+      },
+      job: {
+        logKeepDays: '任务日志保留天数'
+      },
+      gen: {
+        author: '代码生成作者'
+      }
+    }
   }
 }

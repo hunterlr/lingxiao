@@ -36,7 +36,7 @@ com.lingxiao.modules.system
 │               KickoutResultVO、ServerInfoVO、CacheInfoVO
 ├─ config/       PasswordConfig（BCrypt）
 └─ resources/db/migration/system/   V1 建表、V2 种子、V4 按钮权限、V8 日志清空权限、
-                                   V9 参数控件、V10 在线强退权限、V14 登录安全、V15 自定义数据范围、V16 会话策略
+                                   V9 参数控件、V10 在线强退权限、V14 登录安全、V15 自定义数据范围、V16 会话策略、V17 参数名乱码修复
                                    （V11 定时任务相关结构由 lx-module-job 提供）
 ```
 

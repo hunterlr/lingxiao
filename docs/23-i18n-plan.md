@@ -284,6 +284,14 @@ const label = menu.menu_key ? t(`menu.${menu.menu_key}`, menu.menu_name) : menu.
 - `DictTag` / `DictSelect` 用 `t('dict.' + type + '.' + value, label)`；
 - 参数设置页用 `t('config.' + key, 原 label)`。
 
+> **点号即路径**：vue-i18n 会把 `t()` 的 key 按 `.` 拆成层级路径。
+> `config.sys.account.maxRetryCount` 在语言包里必须写成
+> `config: { sys: { account: { maxRetryCount: '…' } } }`，
+> **不能**写成 `config: { 'sys.account.maxRetryCount': '…' }`——后者运行时永远取不到，
+> `te()` 返回 `false` 后静默回退数据库原文。2026-11-20 的参数名乱码就是这个坑
+> （叠加了数据库被脚本写脏），`scripts/check-i18n-keys.mjs` 已增加
+> “叶子键自身带点”检测并直接判失败。
+
 #### （7）路由标题
 
 `router` 的 `meta.title` 改成 key（如 `menu.system.user`），

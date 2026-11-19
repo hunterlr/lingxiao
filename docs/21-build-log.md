@@ -4288,3 +4288,47 @@ check-i18n-keys.mjs             zh=902 en=902，missing=none
 
 `docs/13` §12.3：L2 多语言设计（只写方案，v1.2 再实现）——
 `i18n_language` / `i18n_key` / `i18n_text` 三张表与回退链，先评审再排期。
+
+---
+
+## 45. 第二十五轮：参数名乱码修复（i18n 键解析）
+
+### 45.1 现象
+
+参数设置页 `sys.account.maxRetryCount` 的参数名显示成 `????????`；
+切到英文后，其他参数名也仍是中文。
+
+### 45.2 两个根因
+
+1. **数据被写脏**：V14 的种子数据本身是正确的 UTF-8 中文，但迁移应用后 28 秒，
+   一个验证脚本通过 `PUT /api/admin/system/config/7` 改值，请求体不是 UTF-8，
+   把 `config_name` / `remark` 覆盖成了问号（`update_by=1` 与 `update_time` 可佐证）。
+   同一条 INSERT 里的另外两行正常，所以不是迁移文件编码问题。
+2. **i18n 键写法错**：语言包写成了 `config: { 'sys.account.maxRetryCount': '…' }`，
+   而 vue-i18n 把 `t()` 的 key 按点号拆成路径。`config.sys.account.maxRetryCount`
+   找不到，`te()` 返回 `false`，`configLabel()` 静默回退数据库原文。
+   也就是说 10 个参数名其实**一直没有走翻译**，英文界面下也是中文。
+
+### 45.3 修复
+
+| 文件 | 改动 |
+|---|---|
+| `V17__fix_config_encoding.sql` | 按 `config_key` 恢复 `config_name` / `remark`，可重复执行 |
+| `zh-CN.js` / `en-US.js` | `config` 改为嵌套结构，10 个参数名中英都可解析 |
+| `scripts/check-i18n-keys.mjs` | 新增 `dotted-leaf` 检测：叶子键自身带点直接判失败 |
+| `deploy/sql/lingxiao-1.0.0.sql` | 同步修正第 7 行参数名 / 说明 |
+
+浏览器回归 `.local/uitest/config-label-check.mjs` 3/3：
+
+```text
+中文：参数名 = 登录失败锁定阈值，无问号
+英文：参数名 = Failed-login lock threshold
+```
+
+### 45.4 取舍
+
+| 问题 | 说明 |
+|---|---|
+| 为什么不给 `createI18n` 加 `flatJson: true` | 一行能修，但会改变全局键解析行为；改成嵌套是 vue-i18n 的标准写法，影响面最小 |
+| 为什么 V17 不改 `update_by` | 迁移只修数据，不伪造操作人；真实改动人已由 `update_by=1` 保留 |
+| 参数名到底以哪边为准 | 页面显示以 i18n 为准，数据库文本仅作缺项回退；L2 再统一迁到 `i18n_*` 表 |

@@ -465,15 +465,20 @@ tool:gen:import|edit|preview|remove|download
 - 给出回退链：`请求语言 → 默认语言 → 数据库原文`，以及缓存策略（Caffeine / Redis）；
 - 产出评审结论后再排期，避免先写代码后改表。
 
-### 12.4 P1：发布包演练
+### 12.4 P1：发布包演练（✅ 已完成，见 `docs/21` §47）
 
 - `deploy/package.ps1` / `.sh` 打包（jar + 前端 dist + SQL + 脚本）；
 - 解压到干净目录，用 `application-prod.yml` + Nginx 跑通登录 / 上传 / 生成器关闭；
 - 写部署核对清单（JDK、时区、上传目录权限、Flyway、健康检查、回滚）。
 
+**结果**：`lingxiao-1.0.0-SNAPSHOT.zip` 解压到临时目录，`--spring.profiles.active=prod`
+连空白库 `lingxiao_drill`，Flyway V1~V17 全部 applied；登录 / 参数 / 在线用户 / 上传 / 文件列表
+全部通过，`/v3/api-docs` 与 `/api/admin/tool/gen/list` 按 prod 设计返回 404。
+本机没有 Nginx，用最小 Node 静态服务器 + `/api` 反向代理模拟，浏览器验收 4/4。
+
 ### 12.5 P2：零散小活（各 30 分钟内）
 
-- README / README.en 补 3 张英文界面截图（登录、列表、监控），双语现在只有中文图；
-- `docs/21-build-log.md` 目录 / 索引补 §41；
-- 清理 `docs/23` §7 中已被本轮实现覆盖的“暂缓”条目；
-- 核对 `docs/22` 前端依赖表与 `package-lock.json` 是否仍有偏差。
+- ✅ README / README.en 英文界面截图：12 张（`13-*` ~ `24-*`），README.en 已全部换用；
+- ✅ `docs/21-build-log.md` §0 速览已补多语言 / 品牌 / 发布包三行；
+- ✅ 清理 `docs/23` §7 中已被本轮实现覆盖的“暂缓”条目；
+- ✅ 核对 `docs/22` 前端依赖表与 `package-lock.json`：16 个版本号一致，直接依赖数 10 → 11。

@@ -345,8 +345,16 @@ onMounted(refreshCaptcha)
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
   margin-top: 18px;
   font-size: 12px;
+}
+
+/* 英文默认账号文案较长：空间不够时换行并保持右对齐，不压住“记住用户名” */
+.login-extra .text-secondary {
+  margin-left: auto;
+  text-align: right;
 }
 
 .login-copyright {

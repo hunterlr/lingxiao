@@ -21,10 +21,10 @@ LingXiao is a **modular monolith** foundation for back-office systems. It is not
 Version **v1.0** ships the admin foundation. CMS, membership, workflow and SaaS multi-tenancy plug in later as independent modules without touching the core.
 
 <p align="center">
-  <img src="docs/images/02-dashboard.png" width="900" alt="LingXiao dashboard" />
+  <img src="docs/images/14-dashboard-en.png" width="900" alt="LingXiao dashboard" />
 </p>
 
-> The UI is Chinese-only in v1.0. Bilingual UI (zh-CN / en-US) is in progress — see [docs/23-i18n-plan.md](docs/23-i18n-plan.md).
+> The admin UI ships in Chinese and English (`zh-CN` / `en-US`, switchable in the top bar). Business data written by users — menu-free text such as a job name or a remark — stays in the language it was entered; content-level translation (`i18n_*` tables) is a later phase, see [docs/23-i18n-plan.md](docs/23-i18n-plan.md).
 
 ## Features
 
@@ -68,7 +68,7 @@ Version **v1.0** ships the admin foundation. CMS, membership, workflow and SaaS 
 **Engineering**
 
 - Maven multi-module with auto-configuration and three-layer module switches; **disabled means not loaded** (beans, endpoints, migrations and frontend routes all go away)
-- 92 unit tests that need neither MySQL nor Redis; GitHub Actions covers JDK 8 / 11 / 17 plus the frontend build
+- 99 unit tests that need neither MySQL nor Redis; GitHub Actions covers JDK 8 / 11 / 17 plus the frontend build
 - One jar runs on JDK 8, 11 and 17
 - Production profile and packaging scripts included: `java -jar` + Nginx; prod disables the generator, API docs and SQL logging
 
@@ -76,22 +76,22 @@ Version **v1.0** ships the admin foundation. CMS, membership, workflow and SaaS 
 
 | Login | Dashboard |
 |:---:|:---:|
-| <img src="docs/images/01-login.png" width="430" alt="Login" /> | <img src="docs/images/02-dashboard.png" width="430" alt="Dashboard" /> |
+| <img src="docs/images/13-login-en.png" width="430" alt="Login" /> | <img src="docs/images/14-dashboard-en.png" width="430" alt="Dashboard" /> |
 | **Users** | **Role permissions** |
-| <img src="docs/images/03-user.png" width="430" alt="Users" /> | <img src="docs/images/04-role.png" width="430" alt="Role permissions" /> |
+| <img src="docs/images/15-user-en.png" width="430" alt="Users" /> | <img src="docs/images/16-role-en.png" width="430" alt="Role permissions" /> |
 | **Settings (typed controls)** | **Dictionaries** |
-| <img src="docs/images/05-config.png" width="430" alt="Settings" /> | <img src="docs/images/06-dict.png" width="430" alt="Dictionaries" /> |
+| <img src="docs/images/17-config-en.png" width="430" alt="Settings" /> | <img src="docs/images/18-dict-en.png" width="430" alt="Dictionaries" /> |
 
 <details>
 <summary>More screenshots (code generator / server monitor / jobs / file center / dark theme)</summary>
 
 | Code generator | Server monitor |
 |:---:|:---:|
-| <img src="docs/images/07-gen.png" width="430" alt="Code generator" /> | <img src="docs/images/08-server.png" width="430" alt="Server monitor" /> |
+| <img src="docs/images/19-gen-en.png" width="430" alt="Code generator" /> | <img src="docs/images/20-server-en.png" width="430" alt="Server monitor" /> |
 | **Scheduled jobs** | **File center** |
-| <img src="docs/images/09-job.png" width="430" alt="Scheduled jobs" /> | <img src="docs/images/10-file.png" width="430" alt="File center" /> |
+| <img src="docs/images/21-job-en.png" width="430" alt="Scheduled jobs" /> | <img src="docs/images/22-file-en.png" width="430" alt="File center" /> |
 | **Dark theme** | **Theme drawer** |
-| <img src="docs/images/11-dashboard-dark.png" width="430" alt="Dark theme" /> | <img src="docs/images/12-theme-drawer.png" width="430" alt="Theme drawer" /> |
+| <img src="docs/images/23-dashboard-dark-en.png" width="430" alt="Dark theme" /> | <img src="docs/images/24-theme-drawer-en.png" width="430" alt="Theme drawer" /> |
 
 </details>
 

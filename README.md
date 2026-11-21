@@ -66,7 +66,7 @@
 **工程**
 
 - Maven 多模块 + 自动装配 + 三层模块开关，**关闭 = 不加载**（Bean、接口、迁移、前端路由一起下线）
-- 92 项单元测试（不依赖 MySQL / Redis），GitHub Actions 覆盖 JDK 8 / 11 / 17 与前端构建
+- 99 项单元测试（不依赖 MySQL / Redis），GitHub Actions 覆盖 JDK 8 / 11 / 17 与前端构建
 - 一个 jar 同时跑在 JDK 8 / 11 / 17 上
 - 生产配置与发布包组装脚本齐备：`java -jar` + Nginx，prod 关闭生成器 / 接口文档 / SQL 日志
 

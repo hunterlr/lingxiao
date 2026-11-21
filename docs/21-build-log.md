@@ -22,6 +22,9 @@
 | 接口文档 | ✅ 完成 | SpringDoc 1.7 + Knife4j 4.4，`/doc.html` 200、68 条路径；后端 26 项 + UI 10 项（见第 30 节） |
 | 个人中心自助 | ✅ 完成 | 改资料 / 原密码校验改密 / 全部会话失效；后端 31 项 + UI 13 项（见第 30 节） |
 | 会话策略 | ✅ 完成 | 默认单会话踢旧、参数可开多端；删除 / 停用 / 重置立即踢下线；接口 18 项（见第 44 节） |
+| 多语言 L1 | ✅ 完成 | 中英界面键集合 903 / 903 对齐；错误码、菜单、参数、字典全走语言包（见第 41 / 45 节） |
+| 品牌 / 版本收口 | ✅ 完成 | 唯一真源 `lx.app.*` + 根 pom 版本；公开接口 `/api/admin/app/profile`（见第 46 节） |
+| 发布包演练 | ✅ 完成 | `deploy/package.ps1` 打包，空白库 + prod profile + 静态代理跑通登录 / 上传（见第 47 节） |
 | 系统管理 CRUD | ✅ 完成 | 8 个控制器、25 个按钮权限、74 项接口验证全部通过（见第 13 节） |
 | 前端 `lx-ui-admin` | ✅ 完成 | 17 个页面、动态路由、22 项 UI 冒烟全通过、验证码开启下真人登录成功（见第 20 / 29 / 30 节） |
 
@@ -4391,4 +4394,116 @@ vite build        通过
 | 前端为什么还要读接口 | 不读就只能写死；多一次轻量 GET（每会话一次），失败时静默回退语言包，不阻塞登录 |
 | 为什么开发环境显示 `v1.0.0-SNAPSHOT` | 版本直接来自 pom，不手工截断；正式构建把版本改成 `1.0.0` 即显示 `v1.0.0` |
 | 中英文名算不算两处 | 同一个 `lx.app` 配置块里的两个字段，属于一份配置；英文缺省时自动用中文名兜底 |
-| 为什么不做成参数设置项 | 品牌 / 版本是制品与部署属性，不是运行期业务参数；参数表清空不应影响登录页
+| 为什么不做成参数设置项 | 品牌 / 版本是制品与部署属性，不是运行期业务参数；参数表清空不应影响登录页 |
+
+---
+
+## 47. 第二十七轮：发布包演练 + 英文界面截图
+
+### 47.1 做了什么
+
+把“本地能跑”推进到“发出去的包能跑”：
+
+1. 重新构建 jar 与前端 dist，用 `deploy/package.ps1` 组装发布包；
+2. 解压到临时目录，用 `application-prod.yml` + 空白数据库启动；
+3. 逐项验证登录、参数、在线用户、上传、生产禁用项；
+4. 用最小静态服务器 + `/api` 反向代理模拟 Nginx，跑浏览器端关键路径；
+5. 补 12 张英文界面截图，`README.en.md` 全部换用英文图。
+
+### 47.2 打包
+
+```powershell
+mvn -q "-DskipTests" package          # lx-boot/target/lingxiao.jar ≈ 52 MB
+cd lx-ui-admin; npm run build         # dist/index.html
+powershell -ExecutionPolicy Bypass -File deploy\package.ps1 -Version 1.0.0-SNAPSHOT
+```
+
+产物：`release/lingxiao-1.0.0-SNAPSHOT/` 与同名 `.zip`。目录内容：
+
+```
+bin/  config/  data/  logs/  nginx/  run/  sql/  web/
+lingxiao.jar  lingxiao.service  README.md
+```
+
+> 打包时 PowerShell 会打印本机 `fnm` 初始化失败（`fnm_multishells` 权限），
+> 那是终端配置噪音，脚本本身退出码为 0，包内容完整。
+
+### 47.3 干净目录 + prod profile 启动
+
+```sql
+-- 空白库（不影响开发库 lingxiao）
+CREATE DATABASE lingxiao_drill CHARSET utf8mb4 COLLATE utf8mb4_general_ci;
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES
+  ON lingxiao_drill.* TO 'lingxiao'@'%';
+```
+
+```powershell
+# 解压后用环境变量覆盖，不把密码写进 yml
+$env:DB_HOST='127.0.0.1'; $env:DB_PORT='3307'; $env:DB_NAME='lingxiao_drill'
+$env:DB_USER='lingxiao';  $env:DB_PASSWORD='lingxiao123'; $env:SERVER_PORT='8082'
+java -jar lingxiao.jar --spring.profiles.active=prod --lx.captcha.enabled=false
+```
+
+结果：Flyway 在空白库依次应用 **V1 ~ V17**，无校验失败；应用正常启动，
+日志落在包内 `logs/lingxiao.log`，上传目录落在包内 `data/upload/`。
+
+### 47.4 接口验证
+
+| 检查项 | 结果 |
+|---|---|
+| `GET /api/admin/app/profile`（匿名） | 200，`凌霄后台 / LingXiao Admin / 1.0.0-SNAPSHOT` |
+| `POST /api/admin/auth/login` | 200，返回平台 Token |
+| 参数列表 | 200，10 条，参数名正常（无乱码） |
+| 在线用户 | 200，1 个会话 |
+| `POST /api/admin/file/upload` | 200，写入 `data/upload/common/2026/11/...` |
+| 文件列表 | 200，能查到刚上传的文件 |
+| `GET /v3/api-docs` | **404**（prod 按设计关闭） |
+| `GET /api/admin/tool/gen/list` | **404**（prod 按设计关闭生成器） |
+
+### 47.5 模拟 Nginx 的浏览器验收
+
+本机没有安装 Nginx，用约 90 行 Node 脚本承担同样职责：静态文件 + 回退 `index.html`
++ `/api/*` 反向代理到 8082。`drill-check.mjs` 结果 **4/4**：
+
+```
+PASS 登录页：release 包读取版本 :: 后台管理基座 · v1.0.0-SNAPSHOT
+PASS 首页：prod 后端 + release 前端联调 :: 欢迎使用凌霄后台。当前登录账号 admin
+PASS 用户管理：列表渲染 :: 1
+PASS 控制台无 error
+```
+
+### 47.6 遇到的问题
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| 静态服务器返回 `forbidden` | `path.join(ROOT, '/login')` 里的前导 `/` 被当成根路径 | 改为 `path.resolve(ROOT, '.' + urlPath)` 并保留前缀校验 |
+| 代码生成页截图为空 | 开发库还没导入过表 | 通过 `POST /api/admin/tool/gen/import` 导入 `sys_notice` 后重拍 |
+| 登录页英文默认账号文案挤压 | 英文比中文长，“记住我 / 默认账号”挤在一行 | `.login-extra` 允许换行，右侧文案 `margin-left:auto` 右对齐 |
+
+### 47.7 英文截图
+
+`13-login-en.png` ~ `24-theme-drawer-en.png` 共 12 张，全部在 `en-US` 下真实登录后截取：
+
+登录 / 首页 / 用户 / 角色 / 参数 / 字典 / 生成器 / 服务监控 / 定时任务 / 文件中心 / 暗色主题 / 主题抽屉。
+
+`README.en.md` 主表和折叠区已全部换成英文图，并说明：
+界面文案是英文，**业务数据（任务名、备注等）仍是录入时的语言**，内容级翻译属于 L2。
+
+### 47.8 验收
+
+```
+deploy/package.ps1                退出码 0，zip 内容完整
+空库 Flyway                        V1~V17 全部 applied
+prod 接口                         8/8 符合预期（含 2 个按设计 404）
+drill-check.mjs                   4/4
+英文截图                          12 张，console error = 0
+```
+
+### 47.9 取舍与遗留
+
+| 问题 | 说明 |
+|---|---|
+| 为什么用 Node 模拟 Nginx | 本机没有 Nginx；演练目标是“前后端分离后的真实路径”，静态 + 代理足够覆盖 |
+| 发布包里的 `application-prod.yml` 是否可直接上线 | 是示例配置，敏感项全部走环境变量；上线前按 `deploy/README.md` 核对 |
+| 回滚怎么做 | 保留上一版目录与数据库备份；Flyway 只前进，回滚用备份库 + 旧包，不写逆向迁移 |
+| 真实 Nginx 验证 | 仍建议在一台有 Nginx 的 Linux 机器上用 `deploy/nginx/lingxiao.conf` 再走一遍 |

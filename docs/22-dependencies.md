@@ -315,7 +315,7 @@
 
 **后端 102 个 jar 里，真正“选型”的只有 12 个左右**（Boot、MP、Sa-Token、Flyway、Knife4j、
 Hutool、Jsoup、Velocity、Thumbnailator、Caffeine、MySQL 驱动、spring-security-crypto），
-其余都是它们的传递闭包。前端同理：10 个直接依赖 + Vite 两个开发依赖。
+其余都是它们的传递闭包。前端同理：11 个直接依赖 + Vite 两个开发依赖。
 测试依赖（JUnit / Mockito / AssertJ）只存在于 `test` scope，不在发布包内，
 单独见本文 2.12 与 [`docs/26-testing-ci.md`](26-testing-ci.md)。
 把这张表当“房产证”看：以后谁再问“项目用了什么”，直接翻这里。

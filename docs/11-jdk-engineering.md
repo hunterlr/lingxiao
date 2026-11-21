@@ -321,7 +321,7 @@ jobs:
 
 **当前门禁（已生效）：**
 
-- 后端测试矩阵 JDK 8 / 11 / 17 全绿（当前 92 项 / 18 个类，以 CI 结果为准）。
+- 后端测试矩阵 JDK 8 / 11 / 17 全绿（当前 99 项 / 20 个类，以 CI 结果为准）。
 - JDK 8 上 `package` 成功，产物为 `lx-boot/target/lingxiao.jar`。
 - 前端 `npm ci` + `npm run build` 成功（锁文件可复现）。
 
@@ -547,7 +547,7 @@ java -server \
 
 | 层 | 工具 | 覆盖 | v1.0 状态 |
 |---|---|---|---|
-| 单元测试 | JUnit5 + Mockito + AssertJ | 纯逻辑、安全清洗、参数校验 | **已落地**：92 项 / 18 个类，`mvn test` |
+| 单元测试 | JUnit5 + Mockito + AssertJ | 纯逻辑、安全清洗、参数校验 | **已落地**：99 项 / 20 个类，`mvn test` |
 | 集成测试 | Spring Boot Test + Testcontainers | Mapper、事务、Flyway、Redis | 未引入，等需要时再加 |
 | 接口测试 | PowerShell 脚本（`Invoke-RestMethod`） | 登录、权限、CRUD、越权 | **已落地**：`.local/verify-*.ps1` |
 | 页面回归 | Puppeteer | 登录、主题、上传、生成器 | **已落地**：`.local/uitest/*.mjs` |

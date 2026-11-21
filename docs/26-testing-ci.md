@@ -93,7 +93,7 @@ mvn -B -ntp -DskipTests package
 | `lx-module-generator` | `TextUtilsTest` | 8 | 注释折叠、Javadoc 截断、JS / HTML / Java / SQL 四类转义 |
 | `lx-boot` | `AppProfileTest` | 4 | 品牌名 trim、中英文名互相兜底、版本空值转空串 |
 
-合计：**Tests run: 99, Failures: 0, Errors: 0, Skipped: 0**（2026-11-20，JDK 8 跑通；66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
+合计：**Tests run: 99, Failures: 0, Errors: 0, Skipped: 0**（2026-11-21，JDK 8 跑通；66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
 
 ---
 

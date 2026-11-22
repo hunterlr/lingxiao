@@ -4579,7 +4579,7 @@ Community 只能用旧的 `ignoreMissingMigrations`。
 
 ### 48.5 验证
 
-**A. 单测**：`mvn test` → **112 项 / 23 个类**，新增：
+**A. 单测**：`mvn test` → **112 项 / 23 个类**（JDK 8 与 JDK 11 各跑一遍，均通过），新增：
 
 - `ModuleRegistryTest` 5 项：基座永远启用、关闭 / 未配置、空 `module_code`、列表排序、列表与 `isEnabled` 一致；
 - `ModuleMigrationLocationsTest` 3 项：固定目录、启用排序、目录不存在跳过；

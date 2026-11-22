@@ -96,7 +96,7 @@ mvn -B -ntp -DskipTests package
 | `lx-framework` | `ModuleMigrationLocationsTest` | 3 | system / file 固定参与、启用模块排序、目录不存在时跳过 |
 | `lx-module-system` | `StpInterfaceImplTest` | 5 | 非 platform 域为空、超管全权限、关闭模块权限过滤、无注册表全放行、空权限码 |
 
-合计：**Tests run: 112, Failures: 0, Errors: 0, Skipped: 0**（2026-11-22，JDK 8 跑通；99 项基线于 2026-11-21 在 JDK 8 跑通，66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
+合计：**Tests run: 112, Failures: 0, Errors: 0, Skipped: 0**（2026-11-22 在 JDK 8 / JDK 11 各跑一遍均通过；99 项基线于 2026-11-21 在 JDK 8 跑通，66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
 
 ---
 

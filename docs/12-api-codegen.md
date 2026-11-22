@@ -445,7 +445,7 @@ VALUES
 ### 7.1 内容列表
 
 ```http
-GET /api/portal/cms/contents?siteId=1&categoryId=10&pageNum=1&pageSize=10&orderBy=publishTime_desc
+GET /api/portal/cms/sites/main/articles?categoryKey=news&pageNum=1&pageSize=10
 ```
 
 ```json
@@ -475,6 +475,10 @@ GET /api/portal/cms/contents?siteId=1&categoryId=10&pageNum=1&pageSize=10&orderB
   "traceId": "9f3c2a7e8b1d4c6f"
 }
 ```
+
+> 本节是目标态示例（含试读 / VIP 字段与 `traceId`）。v1.1 实际响应为
+> `{ code, msg, data }`，分页字段是 `total / pageNum / pageSize / records`，
+> 见 [`29-portal-api.md`](29-portal-api.md)。
 
 ### 7.2 内容详情（权限截断）
 

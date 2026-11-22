@@ -44,7 +44,8 @@ public class CmsSiteService {
                 .eq(StringUtils.hasText(status), CmsSite::getStatus, status)
                 .orderByAsc(CmsSite::getSiteId);
         Page<CmsSite> result = siteMapper.selectPage(page, wrapper);
-        return PageResult.of(result.getTotal(), result.getCurrent(), result.getSize(), result.getRecords());    }
+        return PageResult.of(result.getTotal(), result.getCurrent(), result.getSize(), result.getRecords());
+    }
 
     /** 下拉用：只返回启用站点，不分页。 */
     public List<CmsSite> listEnabled() {

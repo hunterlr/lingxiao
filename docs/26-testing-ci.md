@@ -2,7 +2,7 @@
 
 > 本文回答两个问题：**哪些逻辑必须用单测锁住？没有数据库的机器上怎么自动验证？**
 >
-> 结论：v1.0 先做“纯逻辑 + 安全回归”的 126 个单测（26 个测试类），
+> 结论：v1.0 基线 + v1.1 CMS 共 134 个单测（28 个测试类），
 > 完全不依赖 MySQL / Redis，`mvn test` 一条命令跑完；
 > 再用 GitHub Actions 覆盖 JDK 8/11/17 与前端构建。
 
@@ -68,7 +68,7 @@ mvn -B -ntp -DskipTests package
 
 ---
 
-## 3. 当前测试清单（126 项 / 26 个类）
+## 3. 当前测试清单（134 项 / 28 个类）
 
 | 模块 | 测试类 | 项数 | 锁住什么 |
 |---|---|---|---|
@@ -99,8 +99,9 @@ mvn -B -ntp -DskipTests package
 | `lx-module-cms` | `CmsArticleServiceTest` | 5 | 读取侧清洗、删除先清标签关联、跨站点栏目拒绝、slug 重复拒绝、文章不存在 |
 | `lx-module-cms` | `CmsSiteServiceTest` | 3 | 有栏目 / 文章时拒绝删除、空站点物理删除 |
 | `lx-module-cms` | `CmsTagServiceTest` | 2 | 被文章引用时拒绝删除、未引用物理删除 |
+| `lx-module-cms` | `CmsPortalServiceTest` | 8 | 草稿 / 跨站点 / 停用栏目 / 停用祖先按不存在处理、正文清洗与阅读量、导航树剔除与提升、空 slug、站点字段白名单 |
 
-合计：**Tests run: 126, Failures: 0, Errors: 0, Skipped: 0**（2026-11-22 在 JDK 8 / JDK 11 各跑一遍均通过；112 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，99 项基线于 2026-11-21 在 JDK 8 跑通，66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
+合计：**Tests run: 134, Failures: 0, Errors: 0, Skipped: 0**（2026-11-22 在 JDK 8 / JDK 11 各 `clean test` 一遍均通过；126 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，112 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，99 项基线于 2026-11-21 在 JDK 8 跑通，66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
 
 ---
 

@@ -266,8 +266,8 @@ platform:cms:tag:list|add|edit|remove
 | 站点 / 栏目 / 文章 / 标签后台 CRUD | ✅ 已完成 | 见 §14 |
 | 草稿 → 发布 → 下线 | ✅ 已完成 | 发布 / 下线独立接口与权限码 |
 | 栏目闭包与成环校验 | ✅ 已完成 | 变更后按站点全量重建 |
-| 标签聚合查询 | ✅ 已完成（后台筛选） | 门户聚合页后置 |
-| 门户 API `/api/portal/cms/**` | ⏳ 未开始 | v1.3 门户一起做 |
+| 标签聚合查询 | ✅ 已完成（后台筛选 + 门户按标签筛选） | 门户聚合页 UI 后置 |
+| 门户 API `/api/portal/cms/**` | ✅ 已完成 | 只读、只出已发布内容（§15） |
 | 内容版本 / 回收站 / 定时发布 | ⏳ 未开始 | 表与页面均未建 |
 | `cms_content_ext` 自定义字段 | ⏳ 未开始 | 避免过早固定内容模型 |
 | 素材选择器 | ⏳ 未开始 | 当前封面 / Logo 为 `fileId 或 URL` 文本输入 |
@@ -324,11 +324,12 @@ platform:cms:tag:list|add|edit|remove
 - [x] 基座不 import 任何 CMS / 会员类。
 - [x] CMS 关闭：启动成功、接口 404、菜单 / 路由不出现；Flyway 不扫描 `cms` 目录
       （已建表与数据保留，不做物理删除）。空白库关闭态建表由迁移目录跳过保证。
-- [ ] CMS 打开：迁移、菜单、权限、发文、发布、**门户可见**全链路通过。
-      后台链路已通过（§14.5）；门户尚未实现。
+- [x] CMS 打开：迁移、菜单、权限、发文、发布、**门户可见**全链路通过。
+      后台链路见 §14.5，门户读取见 §15。
 - [x] CMS 关闭再打开：数据与引用关系完整。
 - [ ] 会员 Token 与后台 Token 互不认（会员模块未开工）。
-- [ ] 门户只调 `/api/portal`，不直连数据库（门户未开工）。
+- [x] 门户接口只出白名单字段、只出已发布内容；门户工程本身未开工，
+      落地时仍须只调 `/api/portal`（契约见 `docs/29-portal-api.md`）。
 - [x] 文件只走 `fileId`，CMS / 会员无自己的文件表（封面 / Logo 存 `fileId` 或 URL）。
 - [x] 无跨模块外键；删除走应用层校验。
 - [x] 菜单 SQL 幂等，重复执行不产生重复菜单（`INSERT IGNORE` + `menu_key` 唯一键）。
@@ -456,7 +457,6 @@ CMS 开工前先把“关掉模块还会漏菜单 / 漏迁移 / 漏权限”的�
 
 - Logo / 封面还是“`fileId` 或 `https://` 地址”文本输入，未接文件中心选择器；
   上传需要 `platform:file:upload`，与 CMS 编辑权限存在耦合，方案待定。
-- 门户 API 未实现，发布后的文章暂时没有对外读取入口。
 - 没有内容版本与回收站，删除是物理删除（有引用保护）。
 - CMS 菜单默认只授权给超管角色（`role_id=1`），其它角色需在角色管理里分配。
 
@@ -470,4 +470,72 @@ cd .local\uitest; node cms-ui.mjs
 # 关闭态
 java -jar lx-boot\target\lingxiao.jar --lx.captcha.enabled=false --lx.module.modules.cms.enabled=false
 cd .local\uitest; node cms-disabled.mjs
+```
+
+---
+
+## 15. v1.1 CMS 门户 API 落地（2026-11-22）
+
+本批给已发布内容补上对外读取入口：`/api/portal/cms/**`，只读、无需登录、
+只出白名单字段。接口契约与缓存建议单独写在 [`29-portal-api.md`](29-portal-api.md)，
+本节只记录实现落点、决策与验证。
+
+### 15.1 代码落点
+
+| 层 | 文件 |
+|---|---|
+| 门户 Controller | `CmsPortalController`（`/api/portal/cms/**`，`@ConditionalOnProperty(cms.enabled)`） |
+| 门户 Service | `CmsPortalService`（可见性、白名单映射、阅读量） |
+| 门户 VO | `dto/portal/PortalSiteVO`、`PortalCategoryVO`、`PortalTagVO`、`PortalArticleSummaryVO`、`PortalArticleDetailVO` |
+| 标签批量查询 | `CmsArticleTagMapper#selectRowsByArticleIds` + `dto/ArticleTagRow`（避免逐篇 N+1） |
+| 阅读量自增 | `CmsArticleMapper#increaseViewCount`（单条 UPDATE） |
+| 单测 | `CmsPortalServiceTest`（8 项） |
+
+### 15.2 关键决策
+
+1. **公开接口不依赖后台鉴权。** `/api/portal/**` 不在 `SaTokenConfigure` 的拦截路径里，
+   所以 Service 自己把住三层可见性：站点启用、文章已发布、栏目（含祖先）启用。
+2. **祖先栏目停用 = 整棵子树不可见。**
+   列表 SQL 用闭包表 `NOT EXISTS` 排除“任一祖先停用”的文章；详情与筛选条件走
+   `isCategoryVisible`（查闭包祖先再查状态）。只判文章直接栏目会在“停用父栏目”时漏内容。
+3. **列表不查正文。** `select` 排除 `content`，详情才返回；避免分页把 longtext 全拖出来。
+4. **字段白名单。** 统一转 `Portal*VO`，后台内部字段一律不下发；门户不需要也不应该
+   依赖实体的字段顺序。
+5. **分页与关键字有上限。** `pageSize` 最大 50，`keyword` 超过 50 字符截断，
+   防止公开接口被一页拉空或被超长 LIKE 拖慢。
+6. **隐藏栏目语义。** 停用栏目整棵子树剔除；隐藏栏目本身不出现在导航树，
+   可见子栏目上提为根或挂到最近可见父级，不需要额外字段。
+7. **阅读量用单条 UPDATE 自增。** 并发访问不会互相覆盖；返回值是累加后的值。
+   防刷与异步统计留到门户上线前。
+8. **跨站点隔离。** `siteKey` 解析站点 ID 后，栏目 / 标签 / 文章都再校验 `siteId`，
+   slug 只在站点内唯一。
+
+### 15.3 验证结果
+
+| 项 | 结果 |
+|---|---|
+| 编译 | `mvn -q -DskipTests package` 通过 |
+| 单测 | CMS 22 项（新增门户 8 项）；全仓 134 项 / 28 个测试类，JDK 8 与 JDK 11 各跑一遍全部通过 |
+| 接口验收 | `.local/portal-api-check.mjs` 38/38（站点、导航、标签、已发布过滤、子树、标签筛选、搜索、详情、阅读量、slug、停用 / 跨站点 404、分页上限、清理） |
+| 关闭模块 | `.local/portal-disabled.mjs` 5/5：模块列表 `cms.enabled=false`；门户与后台 CMS 接口均 404 |
+| 重新开启 | 门户接口恢复，关闭态不产生额外迁移 |
+| 前端 | 无需改动（门户工程未开工） |
+
+### 15.4 当前限制
+
+- 无缓存、无限流：每次请求直查数据库，详情阅读量可被脚本刷高。
+- 手工改库把栏目改成停用后，闭包表不会自动同步；需要走一次后台栏目编辑触发重建，
+  否则列表的“祖先停用”判断可能失效。
+- 内容版本、回收站、定时发布、素材选择器、内容级多语言仍未实现，门户读不到。
+- 门户工程（Nuxt3）、sitemap / RSS / Open Graph、ES 搜索、CDN 属 v1.3。
+
+### 15.5 复验命令
+
+```powershell
+# 后端 8080（CMS 开启、验证码关闭）
+node .local\portal-api-check.mjs
+
+# 关闭态
+java -jar lx-boot\target\lingxiao.jar --lx.captcha.enabled=false --lx.module.modules.cms.enabled=false
+node .local\portal-disabled.mjs
 ```

@@ -300,6 +300,11 @@ PC 门户（Nuxt3 SSR）
   → /api/portal/cms/search?q=
 ```
 
+> **v1.1 实际契约**：已实现子集改用 `siteKey` 与 `articles` 命名——
+> `/api/portal/cms/sites/{siteKey}/articles`、`.../articles/{id}`、
+> `.../articles/by-slug/{slug}`、`.../search`。专题 / 区块 / 评论 / 翻译 / 静态化未实现。
+> 以 [`29-portal-api.md`](29-portal-api.md) 为准，本节保留为长期目标态。
+
 优点：多端复用、SEO 可控、前后端分离、易缓存。
 缺点：需要 Node SSR 服务；首屏依赖 API。
 
@@ -428,7 +433,12 @@ PC 门户（Nuxt3 SSR）
 
 ### 10.2 门户 `/api/portal/cms`
 
-> 所有 GET 接口支持 `?lang=` 与 `Accept-Language` / `X-Lang`；响应带 `Content-Language`，回退时带 `X-Lang-Fallback: true`。
+> 本节是目标态。v1.1 已实现子集：站点（`sites/{siteKey}`）、栏目树、标签、
+> 文章列表 / 详情（ID / slug）/ 搜索，命名用 `articles` 而不是 `contents`；
+> 专题 / 评论 / 翻译 / 点赞未实现。实际参数与字段见 [`29-portal-api.md`](29-portal-api.md)。
+>
+> 目标态下所有 GET 接口支持 `?lang=` 与 `Accept-Language` / `X-Lang`，响应带 `Content-Language`，
+> 回退时带 `X-Lang-Fallback: true`；v1.1 只做错误文案语言，不返回这些响应头。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|

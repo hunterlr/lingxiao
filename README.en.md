@@ -58,6 +58,7 @@ Version **v1.0** ships the admin foundation. v1.1 is embedding CMS as an indepen
 - Draft / publish / take-offline state machine; publishing and unpublishing have their own permission codes
 - Rich-text content is sanitized against a whitelist on both write and read, so preview matches the portal
 - Referential guards for sites, categories and tags; tags never cross sites
+- Public read-only portal API `/api/portal/cms/**`: sites, navigation tree, tags, article list / detail / search; published content only
 
 **Operations & tooling**
 
@@ -190,6 +191,7 @@ lingxiao/
 /api/admin/monitor/online|server|cache  online users / server metrics / cache stats
 /api/admin/monitor/job/**               scheduled jobs and execution logs
 /api/admin/cms/site|category|article|tag content management (v1.1 module)
+/api/portal/cms/**                     public read-only portal API (sites / categories / articles / tags / search)
 /api/admin/tool/gen/**                  code generation
 /api/admin/file/**                      upload / dedup / list / rename / download
 /api/file/{fileId}                      public access (?size=thumb|medium)
@@ -213,13 +215,14 @@ Responses are uniform `{ code, msg, data }`: `0` success, `1xxx` general and val
 | [26-testing-ci.md](docs/26-testing-ci.md) | Test coverage and CI matrix |
 | [27-github-onboarding.md](docs/27-github-onboarding.md) | Moving to a new machine: database, startup, troubleshooting |
 | [28-third-party-login.md](docs/28-third-party-login.md) | Third-party login groundwork: bindings, avatars, boundaries |
+| [29-portal-api.md](docs/29-portal-api.md) | CMS portal API contract: endpoints, params, visibility, fields, caching |
 
 ## Roadmap
 
 | Version | Scope | Status |
 |---|---|---|
 | v1.0 | Admin foundation: permissions, files, jobs, monitoring, generator, deployment | ✅ Done |
-| v1.1 | i18n L1 (bilingual UI), CMS module (admin flows done) | 🚧 In progress |
+| v1.1 | i18n L1 (bilingual UI), CMS module (admin flows + read-only portal API done) | 🚧 In progress |
 | v1.2 | Membership, Nuxt 3 portal | Planned |
 | v1.3 | Workflow (Flowable), SaaS multi-tenancy | Planned |
 

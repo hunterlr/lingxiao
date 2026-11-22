@@ -4730,3 +4730,123 @@ Community 只能用旧的 `ignoreMissingMigrations`。
 | 内容版本 / 回收站 | 未做，删除是物理删除（有引用保护） |
 | 默认授权 | CMS 菜单只授权给超管角色，其它角色需手工分配 |
 | 前端构建裁剪 | `VITE_MODULES` 仍后置，运行期按后端模块开关控制 |
+
+---
+
+## 50. 第三十轮：CMS 门户 API（2026-11-22）
+
+### 50.1 本轮目标
+
+给 v1.1 CMS 补上“发布之后有人读”的一侧：`/api/portal/cms/**` 公开只读接口。
+不做门户工程、不做缓存、不做模板；先把接口契约、可见性与字段边界定死。
+
+范围：站点、栏目导航树、标签、已发布文章分页 / 详情 / slug / 搜索。
+
+### 50.2 改动清单
+
+| 文件 | 改动 |
+|---|---|
+| `lx-module-cms/.../controller/CmsPortalController.java` | 新增 8 个门户只读接口，`@ConditionalOnProperty(cms.enabled)` |
+| `lx-module-cms/.../service/CmsPortalService.java` | 可见性判断、字段白名单、阅读量、子树 / 标签筛选 |
+| `lx-module-cms/.../dto/portal/*.java` | 5 个门户 VO，不复用后台实体 |
+| `lx-module-cms/.../dto/ArticleTagRow.java` | 标签关联查询行，供列表批量回填 |
+| `CmsArticleMapper` | 新增 `increaseViewCount` |
+| `CmsArticleTagMapper` | 新增 `selectRowsByArticleIds`，避免一页文章逐篇查标签 |
+| `CmsPortalServiceTest` | 新增 8 项单测 |
+| `docs/29-portal-api.md` | 新增门户接口契约（路径、参数、可见性、字段、缓存建议） |
+| `docs/20` §7 / §11 / §14.4 / §15 | 状态、验收清单、门户落地记录 |
+| `lx-modules/lx-module-cms/README.md` | 补门户接口与开关说明 |
+
+没有新增依赖、没有新增表、没有新增迁移；门户接口完全复用 `cms_*` 现有结构。
+
+### 50.3 关键实现
+
+**A. 三重可见性自己兜**
+`/api/portal/**` 不在 Sa-Token 拦截路径里，公开访问。Service 必须自己保证：
+
+- 站点启用（`status=0`）；
+- 文章已发布（`status=1`）；
+- 文章所属栏目启用，且**所有祖先栏目都启用**。
+
+第三条最初只判了直接栏目，接口验收立刻抓出“停用父栏目下的文章仍可读”；
+补成闭包判断后列表与详情行为一致。
+
+**B. 列表 / 详情分工**
+列表 `select` 排除 `content`，只回摘要、栏目名与标签；详情才回正文，
+并在返回前再过一次 `HtmlSanitizer`。这样既不拖大字段，也不信任库里历史数据。
+
+**C. 字段白名单**
+5 个 `Portal*VO` 手写映射，不下发 `status / delFlag / createBy / remark / version`。
+后续后台实体加字段不会意外从公开接口漏出去。
+
+**D. 筛选条件的站点校验**
+`categoryKey / tagKey` 都先按 `siteKey` 解析站点，再校验栏目 / 标签属于该站点且启用；
+A 站的 key 不能拿来筛 B 站。slug 同样只在站点内唯一。
+
+**E. 隐藏与停用的区别**
+停用栏目：整棵子树从导航与文章列表里消失。
+隐藏栏目：本身不进导航，可见子栏目上提；它的文章仍可通过列表 / 详情访问。
+
+**F. 分页与关键字上限**
+`pageSize` 上限 50；`keyword` 超 50 字符截断；避免公开接口被一页拉空或超长 LIKE。
+
+**G. 阅读量**
+`UPDATE cms_article SET view_count = view_count + 1`，单条语句自增，
+不先查后写。详情返回 `当前值 + 1`，与数据库保持一致的近似值。
+
+### 50.4 验证
+
+**A. 编译与单测**
+
+- `mvn -q -DskipTests package` 通过；
+- 新增 `CmsPortalServiceTest` 8 项：草稿 / 跨站点 / 停用栏目 / 停用祖先 / 正文清洗 + 阅读量 /
+  导航树剔除与提升 / 空 slug / 站点字段白名单；
+- 全仓 **134 项 / 28 个测试类**，JDK 8 与 JDK 11 各跑一遍全部通过（clean test）。
+
+**B. 真实接口 38/38**
+
+`.local/portal-api-check.mjs` 覆盖：
+
+- 站点信息与启用站点列表；
+- 导航树：可见栏目、隐藏子栏目上提、隐藏栏目本身不出现、停用栏目整棵子树剔除；
+- 标签：只出启用；
+- 文章列表：已发布可见、草稿 / 下线 / 跨站点 / 停用栏目（含父栏目停用）不可见；
+- 列表不返回 `content`，带栏目名与标签；
+- 栏目子树筛选、`categoryKey`、`tagKey`、标题搜索；
+- 详情按 ID / slug，正文清洗，阅读量递增；
+- 停用站点 / 未知站点 / 草稿 / 下线 / 跨站点 / 停用栏目详情统一 1004；
+- `pageSize=1000` 被压到 50；
+- 验收后逐级清理，`cms_*` 无残留。
+
+**C. 关闭态 5/5**
+
+`--lx.module.modules.cms.enabled=false` 启动后：
+
+- `/admin/modules` 里 `cms.enabled=false`（模块仍列出，只是未启用）；
+- `/api/portal/cms/sites` 与 `/api/portal/cms/sites/{key}/articles` 均 404；
+- `/api/admin/cms/site/page` 404；
+- 重新开启后门户接口恢复，关闭态没有产生额外迁移。
+
+**D. 前端**
+
+门户接口无前端改动；后台四个 CMS 页面与 i18n 未变，不需要重跑构建。
+
+### 50.5 踩坑
+
+| 问题 | 处理 |
+|---|---|
+| 只判文章直接栏目 | 停用父栏目下的文章仍出现在列表 / 详情；列表补闭包 `NOT EXISTS`，详情与筛选补 `isCategoryVisible` |
+| 单测状态位写反 | “停用栏目”用例把 `status/visible` 传反，断言拿到 null；修正为 `status=1` |
+| 关闭态模块列表 | 关闭后 `/admin/modules` 仍返回 `cms`，只是 `enabled=false`；验收要判字段，不要判“列表里没有” |
+| 后台进程被 shell 回收 | `Start-Process` 启动的 java 偶尔随父 shell 结束；改用工具的后台任务方式，稳定拿到 PID 与日志 |
+| 旧 surefire 报告 | 上移 `HtmlSanitizerTest` 后旧模块 `target` 仍有报告，统计会多 9 项；用 `mvn clean test` 复核 |
+
+### 50.6 遗留
+
+| 项 | 说明 |
+|---|---|
+| 缓存 / 限流 | 未做；详情阅读量可被脚本刷高，上线前补限流或异步统计 |
+| 闭包一致性 | 手工改库改栏目状态不会自动重建闭包；需要走一次后台栏目编辑 |
+| 素材选择器 | Logo / 封面仍兼容 `fileId` 与 URL，门户两种都要处理 |
+| 内容生命周期 | 定时发布、版本、回收站仍未做 |
+| 门户工程 | Nuxt3、SEO、sitemap、ES、CDN 属 v1.3 |

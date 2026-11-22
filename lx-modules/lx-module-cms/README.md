@@ -2,21 +2,22 @@
 
 ## 这个目录是做什么的
 
-后台内容管理：站点 → 栏目树 → 文章 → 标签。v1.1 第一批只做**后台维护链路**，
+后台内容管理：站点 → 栏目树 → 文章 → 标签。v1.1 已做**后台维护链路 + 门户只读接口**，
 不包含门户渲染、内容版本、回收站和内容级多语言。
 
-**已实装（v1.1 第一刀，2026-11-22）**：
+**已实装（v1.1 第一刀 + 门户 API，2026-11-22）**：
 
 - 站点 CRUD（站点标识、名称、域名、Logo、SEO、状态）；
 - 栏目树 CRUD（`parent_id` + 闭包表，成环校验、跨站点父级拒绝）；
 - 文章 CRUD + 草稿 / 发布 / 下线状态流转，正文写入与读取双侧 HTML 清洗；
 - 标签 CRUD，文章多标签，标签不能跨站点复用；
 - 删除保护：站点 / 栏目 / 标签被引用时拒绝删除；
-- 后台页面四个：站点、栏目、文章、标签；菜单与按钮权限随模块开关下线。
+- 后台页面四个：站点、栏目、文章、标签；菜单与按钮权限随模块开关下线；
+- 门户只读接口 `/api/portal/cms/**`：站点、导航树、标签、文章列表 / 详情 / 搜索。
 
 **明确未做（后置）**：
 
-- 门户 API `/api/portal/cms/**`、Nuxt3 门户（v1.3 前）；
+- Nuxt3 门户工程、SEO / sitemap / 静态化（v1.3 前）；
 - 内容版本、回收站、定时发布；
 - `cms_content_ext` 自定义字段；
 - 素材选择器（当前 Logo / 封面是 `fileId 或 https://` 文本输入）；
@@ -45,12 +46,15 @@ com.lingxiao.modules.cms
 │  ├─ CmsSiteController      站点列表 / 选项 / 详情 / 增删改
 │  ├─ CmsCategoryController  栏目树 / 平铺列表 / 详情 / 增删改
 │  ├─ CmsTagController       标签分页 / 选项 / 增删改
-│  └─ CmsArticleController   文章分页 / 详情 / 增删改 / 发布 / 下线
+│  ├─ CmsArticleController   文章分页 / 详情 / 增删改 / 发布 / 下线
+│  └─ CmsPortalController    门户只读接口（/api/portal/cms/**，无需登录）
 ├─ service/
 │  ├─ CmsSiteService         站点 CRUD、删除保护
 │  ├─ CmsCategoryService     栏目树、闭包全量重建、成环与跨站点校验
 │  ├─ CmsTagService          标签 CRUD、被引用检查
-│  └─ CmsArticleService      正文清洗、状态流转、slug 唯一、标签同站校验
+│  ├─ CmsArticleService      正文清洗、状态流转、slug 唯一、标签同站校验
+│  └─ CmsPortalService       门户可见性、字段白名单、阅读量、子树 / 标签筛选
+├─ dto/portal/               门户 VO（站点 / 栏目 / 标签 / 摘要 / 详情）
 ├─ entity/                   CmsSite / CmsCategory / CmsArticle / CmsTag
 ├─ mapper/                   MyBatis-Plus Mapper（含 hardDelete、标签 EXISTS 过滤）
 └─ resources/db/migration/cms/
@@ -128,6 +132,26 @@ com.lingxiao.modules.cms
 权限码沿用 v1.0 的 `list / add / edit / remove` 风格；
 文章额外拆 `publish` / `offline`，方便“编辑能改稿、发布只给主编”。
 
+## 门户接口（公开只读）
+
+| 接口 | 说明 |
+|---|---|
+| `GET /api/portal/cms/sites` | 启用站点列表 |
+| `GET /api/portal/cms/sites/{siteKey}` | 站点信息 |
+| `GET /api/portal/cms/sites/{siteKey}/categories` | 栏目导航树（显示且启用） |
+| `GET /api/portal/cms/sites/{siteKey}/tags` | 启用标签 |
+| `GET /api/portal/cms/sites/{siteKey}/articles` | 已发布文章分页（栏目子树 / 标签 / 关键字） |
+| `GET /api/portal/cms/sites/{siteKey}/articles/{articleId}` | 文章详情 |
+| `GET /api/portal/cms/sites/{siteKey}/articles/by-slug/{slug}` | 按 slug 取详情 |
+| `GET /api/portal/cms/sites/{siteKey}/search` | 标题 / 摘要搜索 |
+
+- 不需要登录、不走后台权限；可见性由 `CmsPortalService` 自己兜：
+  站点启用、文章已发布、栏目**及所有祖先**启用。
+- 停用栏目整棵子树不可见；隐藏栏目本身不进导航，可见子栏目上提。
+- 只返回 `Portal*VO` 白名单字段；列表不带 `content`，详情返回清洗后的 HTML。
+- `pageSize` 上限 50；`keyword` 最长 50 字符；阅读量单条 UPDATE 自增。
+- 完整契约、参数、缓存建议见 [`docs/29-portal-api.md`](../../docs/29-portal-api.md)。
+
 ## 前端页面
 
 ```text
@@ -159,11 +183,16 @@ mvn -B -ntp -pl lx-modules/lx-module-cms -am test
 # 真实接口：34 项
 node .local\cms-api-check.mjs
 
+# 门户接口：38 项
+node .local\portal-api-check.mjs
+
 # 浏览器：13 项
 cd .local\uitest; node cms-ui.mjs
 
 # 模块关闭：接口 404、菜单 / 路由消失、数据保留
 cd .local\uitest; node cms-disabled.mjs
+node .local\portal-disabled.mjs
 ```
 
-2026-11-22 结果：14 项单测；接口 34/34；浏览器 12/12；关闭 / 重新开启后数据保留。
+2026-11-22 结果：22 项单测（后台 14 + 门户 8）；后台接口 34/34；门户接口 38/38；
+浏览器 13/13；关闭态门户 / 后台接口均 404（5/5），重新开启后数据保留。

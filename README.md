@@ -56,6 +56,7 @@
 - 文章草稿 / 发布 / 下线状态流转，发布与下线独立权限码
 - 富文本正文写入与读取双侧白名单清洗，预览与门户看到的内容一致
 - 站点 / 栏目 / 标签引用保护；标签不跨站点复用
+- 门户只读接口 `/api/portal/cms/**`：站点、导航树、标签、文章列表 / 详情 / 搜索，只出已发布内容
 
 **运维与工具**
 
@@ -188,6 +189,7 @@ lingxiao/
 /api/admin/monitor/online|server|cache  在线用户 / 服务监控 / 缓存监控
 /api/admin/monitor/job/**               定时任务与执行日志
 /api/admin/cms/site|category|article|tag 内容管理（v1.1 模块）
+/api/portal/cms/**                      门户只读接口（站点 / 栏目 / 文章 / 标签 / 搜索）
 /api/admin/tool/gen/**                  代码生成
 /api/admin/file/**                      上传 / 秒传 / 列表 / 改名 / 下载
 /api/file/{fileId}                      公开访问（?size=thumb|medium）
@@ -211,13 +213,14 @@ lingxiao/
 | [26-testing-ci.md](docs/26-testing-ci.md) | 单测覆盖清单与 CI 矩阵 |
 | [27-github-onboarding.md](docs/27-github-onboarding.md) | 换机器继续开发：建库、启动、排错 |
 | [28-third-party-login.md](docs/28-third-party-login.md) | 第三方登录预留：绑定表、头像处理、边界 |
+| [29-portal-api.md](docs/29-portal-api.md) | CMS 门户接口契约：路径、参数、可见性、字段与缓存建议 |
 
 ## 路线图
 
 | 版本 | 内容 | 状态 |
 |---|---|---|
 | v1.0 | 后台基座：权限、文件、任务、监控、生成器、部署 | ✅ 已完成 |
-| v1.1 | 多语言 L1（界面双语）、CMS 模块嵌入（后台链路已落地） | 🚧 进行中 |
+| v1.1 | 多语言 L1（界面双语）、CMS 模块嵌入（后台链路 + 门户只读接口已落地） | 🚧 进行中 |
 | v1.2 | 会员体系、门户 Nuxt3 | 规划中 |
 | v1.3 | 工作流（Flowable）、SaaS 多租户 | 规划中 |
 

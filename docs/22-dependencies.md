@@ -27,9 +27,9 @@
 
 ---
 
-## 2. 后端 102 个运行时 jar
+## 2. 后端 103 个运行时 jar
 
-### 2.1 项目自研模块（13）
+### 2.1 项目自研模块（14）
 
 | artifactId | 版本 | 作用 |
 |---|---|---|
@@ -43,6 +43,7 @@
 | `lx-framework` | 1.0.0-SNAPSHOT | 公共能力聚合（模块开关、基础配置） |
 | `lx-module-demo` | 1.0.0-SNAPSHOT | 可选模块关闭演示（默认关闭） |
 | `lx-module-file` | 1.0.0-SNAPSHOT | 文件中心、上传、图片衍生图 |
+| `lx-module-cms` | 1.0.0-SNAPSHOT | 内容管理（站点 / 栏目 / 文章 / 标签，v1.1） |
 | `lx-module-generator` | 1.0.0-SNAPSHOT | 代码生成器（导入表 / 预览 / ZIP） |
 | `lx-module-job` | 1.0.0-SNAPSHOT | 定时任务（Spring Task + 数据库锁） |
 | `lx-module-system` | 1.0.0-SNAPSHOT | 登录、用户、角色、菜单、部门、岗位、字典、参数、公告、日志、监控 |
@@ -163,7 +164,7 @@
 | `hutool-core` | 5.8.22 | 通用工具（日期、字符串等） |
 | `hutool-captcha` | 5.8.22 | 图形验证码 |
 | `commons-lang3` | 3.12.0 | 字符串/对象工具（传递依赖） |
-| `jsoup` | 1.17.2 | 公告富文本 XSS 清洗 |
+| `jsoup` | 1.17.2 | 公告 / CMS 富文本 XSS 清洗（`lx-common-web` 统一提供） |
 | `aspectjweaver` | 1.9.7 | `@Log` 切面织入 |
 | `velocity-engine-core` | 2.3 | 代码生成模板引擎 |
 | `thumbnailator` | 0.4.8 | 图片缩略图/压缩 |

@@ -30,4 +30,19 @@ public class PageResult<T> implements Serializable {
         result.records = Collections.emptyList();
         return result;
     }
+
+    /**
+     * 由查询结果构造分页响应。
+     *
+     * <p>让业务模块不再各写一遍 setter；{@code records} 为空时回退空列表，
+     * 前端表格不需要判 null。</p>
+     */
+    public static <T> PageResult<T> of(long total, long pageNum, long pageSize, List<T> records) {
+        PageResult<T> result = new PageResult<>();
+        result.total = total;
+        result.pageNum = pageNum;
+        result.pageSize = pageSize;
+        result.records = records == null ? Collections.emptyList() : records;
+        return result;
+    }
 }

@@ -134,13 +134,16 @@ public class CmsAutoConfiguration {
 ### 4.1 后台路由模块
 
 ```text
-lx-ui-admin/src/modules/cms/
-├─ routes.ts       路由 + 菜单元信息
-├─ api.ts          接口封装
-├─ views/          页面
-├─ components/     业务组件
-└─ index.ts        模块导出
+lx-ui-admin/src/
+├─ views/cms/      页面（site / category / article / tag）
+└─ api/cms.js      接口封装
 ```
+
+> **实施偏差（v1.1 第一批）**：原计划放 `src/modules/cms/` 并带独立 `routes.ts`。
+> 实际 v1.0 的路由是“后端菜单驱动 + `views` 路径映射”，
+> 页面放 `src/views/cms`、接口放 `src/api/cms.js` 与其它模块保持一致；
+> 模块开关仍由后端 `module_code='cms'` 控制，不额外引入前端模块注册表。
+> 构建期裁剪（`VITE_MODULES`）继续后置。
 
 ```ts
 // src/modules/registry.ts
@@ -243,14 +246,32 @@ export const modules = {
 - 评论（放 v1.2 会员互动）。
 - 复杂内容模型 / 自定义表单。
 
-**权限码示例：**
+**权限码（v1.1 实际落地）：**
 
 ```text
-platform:cms:site:list|create|update|delete
-platform:cms:category:list|create|update|delete
-platform:cms:content:list|create|update|delete|publish|offline
-platform:cms:tag:list|create|update|delete
+platform:cms:site:list|add|edit|remove
+platform:cms:category:list|add|edit|remove
+platform:cms:article:list|add|edit|remove|publish|offline
+platform:cms:tag:list|add|edit|remove
 ```
+
+> 与草案的差异：动词统一为 v1.0 的 `add / edit / remove`（不是 `create / update / delete`），
+> 内容实体命名为 `article`（不是 `content`）。按钮权限已在 `V21__cms_menu.sql` 落库，
+> 复用现有角色授权界面即可分配。
+
+**实施状态（2026-11-22）**：
+
+| 范围 | 状态 | 说明 |
+|---|---|---|
+| 站点 / 栏目 / 文章 / 标签后台 CRUD | ✅ 已完成 | 见 §14 |
+| 草稿 → 发布 → 下线 | ✅ 已完成 | 发布 / 下线独立接口与权限码 |
+| 栏目闭包与成环校验 | ✅ 已完成 | 变更后按站点全量重建 |
+| 标签聚合查询 | ✅ 已完成（后台筛选） | 门户聚合页后置 |
+| 门户 API `/api/portal/cms/**` | ⏳ 未开始 | v1.3 门户一起做 |
+| 内容版本 / 回收站 / 定时发布 | ⏳ 未开始 | 表与页面均未建 |
+| `cms_content_ext` 自定义字段 | ⏳ 未开始 | 避免过早固定内容模型 |
+| 素材选择器 | ⏳ 未开始 | 当前封面 / Logo 为 `fileId 或 URL` 文本输入 |
+| 内容级多语言 | ⏳ 未开始 | 走后续 `i18n_*` 内容翻译阶段 |
 
 ---
 
@@ -300,16 +321,18 @@ platform:cms:tag:list|create|update|delete
 
 ## 11. 验收清单
 
-- [ ] 基座不 import 任何 CMS / 会员类。
-- [ ] CMS 关闭：启动成功、无 `cms_*` 表、接口 404、菜单 / 路由不出现。
-- [ ] CMS 打开：迁移、菜单、权限、发文、发布、门户可见全链路通过。
-- [ ] CMS 关闭再打开：数据与引用关系完整。
-- [ ] 会员 Token 与后台 Token 互不认。
-- [ ] 门户只调 `/api/portal`，不直连数据库。
-- [ ] 文件只走 `fileId`，CMS / 会员无自己的文件表。
-- [ ] 无跨模块外键；删除走应用层校验。
-- [ ] 菜单 SQL 幂等，重复执行不产生重复菜单。
-- [ ] 关闭态与打开态都进 CI。
+- [x] 基座不 import 任何 CMS / 会员类。
+- [x] CMS 关闭：启动成功、接口 404、菜单 / 路由不出现；Flyway 不扫描 `cms` 目录
+      （已建表与数据保留，不做物理删除）。空白库关闭态建表由迁移目录跳过保证。
+- [ ] CMS 打开：迁移、菜单、权限、发文、发布、**门户可见**全链路通过。
+      后台链路已通过（§14.5）；门户尚未实现。
+- [x] CMS 关闭再打开：数据与引用关系完整。
+- [ ] 会员 Token 与后台 Token 互不认（会员模块未开工）。
+- [ ] 门户只调 `/api/portal`，不直连数据库（门户未开工）。
+- [x] 文件只走 `fileId`，CMS / 会员无自己的文件表（封面 / Logo 存 `fileId` 或 URL）。
+- [x] 无跨模块外键；删除走应用层校验。
+- [x] 菜单 SQL 幂等，重复执行不产生重复菜单（`INSERT IGNORE` + `menu_key` 唯一键）。
+- [ ] 关闭态与打开态都进 CI（当前靠 `mvn test` 的模块单测 + 本地真实接口 / 浏览器验收）。
 
 ---
 
@@ -376,3 +399,75 @@ CMS 开工前先把“关掉模块还会漏菜单 / 漏迁移 / 漏权限”的�
   侧边栏与权限接口才做过滤；
 - **模块依赖解析**：`module.yaml` 的 `requires` / `optional` 仍未读取，
   v1.1 先靠人工保证“CMS 依赖 system + file”。
+
+---
+
+## 14. v1.1 CMS 第一批落地（2026-11-22）
+
+本批交付“后台内容维护链路”，门户 API、版本、回收站、素材选择器、内容多语言均后置。
+数据库目标仍是 MySQL 起步、SQL 避免方言：建表、分页、标签 `EXISTS`、闭包重建都用标准 SQL。
+
+### 14.1 代码落点
+
+| 层 | 文件 |
+|---|---|
+| 后端模块 | `lx-modules/lx-module-cms`（包 `com.lingxiao.modules.cms`） |
+| 模块注册 | `lx-modules/pom.xml`、`lx-dependencies/pom.xml`、`lx-boot/pom.xml` |
+| 模块开关 | `lx-boot/src/main/resources/application.yml` 的 `lx.module.modules.cms` |
+| 表结构 | `db/migration/cms/V20__cms_schema.sql`（6 张 `cms_*`） |
+| 菜单权限 | `db/migration/cms/V21__cms_menu.sql`（菜单 3000+，`module_code='cms'`） |
+| 后端接口 | `CmsSiteController` / `CmsCategoryController` / `CmsArticleController` / `CmsTagController` |
+| 前端接口 | `lx-ui-admin/src/api/cms.js` |
+| 前端页面 | `lx-ui-admin/src/views/cms/{site,category,article,tag}/index.vue` |
+| 富文本清洗 | `com.lingxiao.common.web.util.HtmlSanitizer`（从 system 模块上移，公告 + CMS 共用） |
+| 校验文案 | `messages.properties` / `messages_en_US.properties` 的 `valid.cms.*` |
+
+### 14.2 关键决策
+
+1. **栏目层级用 `parent_id` 表达，闭包表只做查询加速。**
+   每次栏目变更按站点全量重建 `cms_category_closure`；成环在写入前拒绝。
+   文章按父栏目筛选时用闭包子查询拿到整棵子树，而不是递归 SQL。
+2. **文章状态只能通过发布 / 下线接口改变。**
+   新建强制草稿；编辑保存不改状态；发布写 `publish_time`。
+3. **正文双侧清洗。**
+   写入与读取都过同一份 Jsoup 白名单，历史脏数据与直接改库的数据也能兜住。
+4. **标签不跨站点复用。**
+   同一句“Java”在中文站和英文站是两条数据，各自有 key 与 URL；
+   删除前检查 `cms_article_tag` 引用。
+5. **删除保护全部在服务层。**
+   站点 / 栏目 / 标签没有跨模块外键，服务层拒绝“删了会让数据变孤儿”的操作。
+6. **权限码复用 v1.0 风格。**
+   `list / add / edit / remove`，文章额外拆 `publish / offline`。
+
+### 14.3 验证结果
+
+| 项 | 结果 |
+|---|---|
+| 编译 | `mvn -q -DskipTests package` 通过 |
+| Flyway | 自动执行 `V19 - system user social`、`V20 - cms schema`、`V21 - cms menu` |
+| 单测 | CMS 14 项；全仓 126 项 / 26 个测试类，JDK 8 与 JDK 11 各跑一遍均通过 |
+| 接口验收 | `.local/cms-api-check.mjs` 34/34（CRUD、闭包、成环、跨站点、清洗、状态、删除保护） |
+| 浏览器验收 | `.local/uitest/cms-ui.mjs` 13/13（菜单、四个页面、新增、预览、发布、删除、清理） |
+| 关闭模块 | `/api/admin/cms/**` 404；菜单 / 前端路由消失；直接访问 `/cms/site` 落 404 |
+| 重新开启 | 关闭前创建的站点仍在，菜单与接口恢复 |
+| 前端校验 | `check-i18n-keys.mjs` 无 missing / dotted-leaf；`npm run build` 通过 |
+
+### 14.4 当前限制
+
+- Logo / 封面还是“`fileId` 或 `https://` 地址”文本输入，未接文件中心选择器；
+  上传需要 `platform:file:upload`，与 CMS 编辑权限存在耦合，方案待定。
+- 门户 API 未实现，发布后的文章暂时没有对外读取入口。
+- 没有内容版本与回收站，删除是物理删除（有引用保护）。
+- CMS 菜单默认只授权给超管角色（`role_id=1`），其它角色需在角色管理里分配。
+
+### 14.5 复验命令
+
+```powershell
+# 后端 8080（关闭验证码）+ 前端 5173
+node .local\cms-api-check.mjs
+cd .local\uitest; node cms-ui.mjs
+
+# 关闭态
+java -jar lx-boot\target\lingxiao.jar --lx.captcha.enabled=false --lx.module.modules.cms.enabled=false
+cd .local\uitest; node cms-disabled.mjs
+```

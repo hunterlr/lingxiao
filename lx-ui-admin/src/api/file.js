@@ -24,6 +24,16 @@ export function uploadFile(file, { bizType = 'common', remark = '', onProgress }
   })
 }
 
+/**
+ * 上传个人头像（个人中心自助，不要求文件中心权限）。
+ * 成功返回 FileVO，写回 avatar 的是 fileId，不是 URL。
+ */
+export function uploadAvatar(file) {
+  const form = new FormData()
+  form.append('file', file)
+  return http.post('/admin/file/avatar', form, { timeout: 60000 })
+}
+
 export function listFiles(params) {
   return http.get('/admin/file/list', { params })
 }

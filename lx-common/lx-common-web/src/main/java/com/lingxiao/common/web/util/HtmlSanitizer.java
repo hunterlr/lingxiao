@@ -1,4 +1,4 @@
-package com.lingxiao.modules.system.support;
+package com.lingxiao.common.web.util;
 
 import org.jsoup.Jsoup;
 import org.jsoup.safety.Safelist;
@@ -6,7 +6,7 @@ import org.jsoup.safety.Safelist;
 /**
  * 富文本 HTML 白名单清洗器。
  *
- * <p>为什么必须做：公告 / 后续 CMS 文章的正文是前端富文本编辑器提交的 HTML。
+ * <p>为什么必须做：公告 / CMS 文章的正文是前端富文本编辑器提交的 HTML。
  * 只要服务端原样入库、原样返回，任何一个拿到编辑权限的账号都能塞进
  * {@code <script>}、{@code onerror=}、{@code javascript:} 之类的载荷，
  * 最终在别的管理员的浏览器里执行。</p>
@@ -30,6 +30,9 @@ import org.jsoup.safety.Safelist;
  * <p>注意：{@code style} / {@code class} 不在白名单内，富文本里的字体颜色、
  * 居中等内联样式会被剥离。这是 v1.0 的取舍：CSS 里同样可以藏
  * {@code expression()} / {@code url()}，在没做 CSS 白名单前一律不放行。</p>
+ *
+ * <p>放在 {@code lx-common-web} 而不是某个业务模块：公告（system）与文章（cms）
+ * 都要用，不能让 CMS 为了一个工具类反向依赖 system 模块。</p>
  */
 public final class HtmlSanitizer {
 

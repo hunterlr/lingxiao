@@ -4612,3 +4612,121 @@ Community 只能用旧的 `ignoreMissingMigrations`。
 | `module.yaml` 依赖解析 | 未做；`requires` / `optional` 仍靠人工保证，v1.1 先约定 CMS 依赖 system + file |
 | 前端构建裁剪 | `VITE_MODULES` 后置；v1.1 先保证运行期路由正确 |
 | 在线用户 `KEYS` | 与本轮无关，仍是切 Redis 前的小优化（见 `docs/13` §12.6 的缓存计划） |
+
+---
+
+## 49. 第二十九轮：v1.1 CMS 第一刀（2026-11-22）
+
+### 49.1 本轮目标
+
+按 `docs/20` §7 把 CMS 从“文档”变成“能用的后台模块”，同时收掉上一轮的
+头像自助编辑与第三方登录 schema 预留。
+
+范围只到**后台维护链路**：站点、栏目（树）、文章（草稿 / 发布 / 下线）、标签。
+门户 API、内容版本、回收站、素材选择器、内容级多语言明确后置。
+
+### 49.2 改动清单
+
+| 文件 / 目录 | 改动 |
+|---|---|
+| `lx-modules/lx-module-cms/` | 新模块：4 Controller / 4 Service / 4 实体 / 6 Mapper |
+| `lx-modules/pom.xml` | 加入 `<module>lx-module-cms</module>` |
+| `lx-dependencies/pom.xml` | `dependencyManagement` 增加 CMS 模块 |
+| `lx-boot/pom.xml` | 增加 CMS 模块依赖 |
+| `lx-boot/.../application.yml` | 新增 `lx.module.modules.cms`（`enabled=true`） |
+| `V20__cms_schema.sql` | `cms_site` / `cms_category` / `cms_category_closure` / `cms_article` / `cms_tag` / `cms_article_tag` |
+| `V21__cms_menu.sql` | 菜单 `3000/3010/3020/3030/3040` + 15 个按钮权限，`module_code='cms'` |
+| `lx-common-core/.../PageResult.java` | 补 `of(...)`，避免 CMS 自己拼分页结构 |
+| `lx-common-web/.../HtmlSanitizer.java` | 从 `lx-module-system` 上移，公告与 CMS 共用 |
+| `lx-module-system/pom.xml` | 移除 `jsoup`（改由 `lx-common-web` 携带） |
+| `lx-ui-admin/src/api/cms.js` | CMS 接口封装 |
+| `lx-ui-admin/src/views/cms/` | 站点 / 栏目 / 文章 / 标签四个页面 |
+| `lx-ui-admin/src/i18n/{zh-CN,en-US}.js` | `menu.cms:*` + `page.cms.*` 中英 |
+| `docs/28-third-party-login.md` | 第三方登录设计边界（本轮只预留 schema） |
+| `V19__system_user_social.sql` | `sys_user_social`（provider / open_id / union_id / 昵称 / 头像 / 原始数据） |
+| `lx-api/.../ProfileUpdateRequest.java`、`AuthService` | 个人中心支持改头像，`normalizeAvatar` 拒绝非 `http(s)` 协议 |
+| `FileController` / `api/file.js` / `profile/index.vue` | 头像上传 / 预览 / 移除 |
+
+### 49.3 关键实现
+
+**A. 栏目闭包**
+`parent_id` 是唯一事实来源；`cms_category_closure` 每次按站点全量重建。
+文章按父栏目筛选时用闭包子查询拿整棵子树，避免递归 SQL。
+写入前校验父栏目属于同一站点、且不能把自己挂到自己的子孙下。
+
+**B. 文章状态**
+新建一律草稿（请求里的 `status` 不采纳）；编辑不改状态；
+发布 / 下线是独立接口与独立权限码。发布写 `publish_time`，下线保留历史值。
+
+**C. 清洗与读取**
+正文写入与读取两侧都过 `HtmlSanitizer`。列表 SQL 不查 `content`，只有详情返回，
+避免列表页把大字段全部拖出来；预览抽屉展示的是详情接口清洗后的内容。
+
+**D. 标签**
+`(site_id, tag_key)` 唯一；文章只允许挂同站点标签；
+删除标签前查 `cms_article_tag`，有引用就拒绝。
+
+**E. 删除保护**
+站点（仍有栏目 / 文章）、栏目（仍有子栏目 / 文章）、标签（仍被引用）全部在服务层拦截，
+不依赖跨模块外键。文章删除先删关联再删正文。
+
+**F. 权限与模块开关**
+四个 Controller 都带 `@ConditionalOnProperty(lx.module.modules.cms.enabled)`；
+权限码走 `platform:cms:*`，菜单 `module_code='cms'`，关闭后菜单 / 权限 / 接口一起下线。
+
+### 49.4 验证
+
+**A. 编译与单测**
+
+- `mvn -q -DskipTests package` 通过；
+- 新增 CMS 单测 14 项（闭包深度、成环、跨站点、删除保护、读取侧清洗、删除顺序）；
+- 全仓 **126 项 / 26 个测试类**，JDK 8 与 JDK 11 各跑一遍，全部通过。
+
+**B. 启动与迁移**
+
+- 启动日志出现 `Migrating schema lingxiao to version "19 - system user social"`、
+  `"20 - cms schema"`、`"21 - cms menu"`；
+- 超管 `/auth/menus` 出现“内容管理”及四个子菜单；`/auth/info` 返回 `*:*:*`。
+
+**C. 真实接口 34/34**
+
+覆盖：站点 CRUD 与标识重复、栏目树、深层栏目、成环拒绝、跨站点父级拒绝、
+标签 CRUD、文章强制草稿、`<script>` 与 `javascript:` 清洗、标签回填、
+父栏目筛子栏目、标签筛选、发布写时间、下线、被引用不可删、逐级清空后删站点。
+
+**D. 浏览器 13/13**
+
+登录 → 侧边栏出现“内容管理” → 站点列表 / 新增 → 栏目树 / 新增弹窗 →
+标签列表 / 新增 → 文章列表 → 预览（服务端清洗后的正文）→ 发布 → 删除 → 清理。
+截图留在 `.local/uitest/cms-shots/`（不提交）。
+
+**E. 关闭 / 开启**
+
+- 关闭：`/api/admin/cms/site/list` 404；菜单不含 `cms:*`；直接访问 `/cms/site` 落 404；
+- 重新开启：关闭前创建的站点仍在，菜单与接口恢复。
+
+**F. 前端**
+
+`node scripts/check-i18n-keys.mjs`：中英各 1013 键，无 missing / dotted-leaf；
+`npm run build` 通过。
+
+### 49.5 踩坑
+
+| 问题 | 处理 |
+|---|---|
+| 权限验收误判 | 超管返回的是 `*:*:*`，不是展开后的权限码；测试要按通配符判断 |
+| 分页 `total` 是字符串 | `PageResult` 里 `total` 为 `long`，JSON 序列化后仍可能是字符串，断言先 `Number()` |
+| 单端登录踢掉脚本 Token | 浏览器登录会按单会话策略踢掉接口脚本的 Token，清理数据前需重新登录 |
+| 弹窗内输入框定位 | 页面可能有隐藏的同 placeholder 输入框，测试脚本把查找范围收敛到 `.el-dialog` |
+| 栏目页 i18n 键写错 | 页面误用 `page.cms.category.selectSiteFirst`，检查脚本报 missing，统一改为 `page.cms.common.selectSiteFirst` |
+| 删除顺序 | 文章 → 标签 → 孙栏目 → 子栏目 → 根栏目 → 站点，任一上层还有引用都会拒绝 |
+
+### 49.6 遗留
+
+| 项 | 说明 |
+|---|---|
+| 素材选择器 | Logo / 封面仍是 `fileId 或 URL` 文本输入；上传权限与 CMS 编辑权限耦合，方案待定 |
+| 门户 API | `/api/portal/cms/**` 未实现，发布后的文章暂无对外读取入口 |
+| 内容版本 / 回收站 | 未做，删除是物理删除（有引用保护） |
+| 默认授权 | CMS 菜单只授权给超管角色，其它角色需手工分配 |
+| 前端构建裁剪 | `VITE_MODULES` 仍后置，运行期按后端模块开关控制 |

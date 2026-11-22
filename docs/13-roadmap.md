@@ -580,3 +580,30 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 
 **下一步**：按 `docs/20` §7 开工 `lx-module-cms`（站点 / 栏目 / 内容 / 标签 /
 发布下线 + portal API），前端放 `lx-ui-admin/src/modules/cms`。
+
+### 12.8 P1：v1.1 CMS 第一批 —— 后台内容链路（✅ 已完成，2026-11-22）
+
+**完成内容**：
+
+- 新模块 `lx-modules/lx-module-cms`，启动期开关 `lx.module.modules.cms.enabled`；
+- `V20__cms_schema.sql`：站点 / 栏目 / 栏目闭包 / 文章 / 标签 / 文章标签 6 张表；
+- `V21__cms_menu.sql`：菜单 3000+ 与 `platform:cms:*` 按钮权限，`module_code='cms'`；
+- 后台页面：站点、栏目树（新增根 / 子栏目）、文章（富文本 / 发布 / 下线 / 预览）、标签；
+- 文章正文写入与读取双侧 HTML 清洗；栏目闭包全量重建与成环校验；
+- 站点 / 栏目 / 标签删除保护；标签不跨站点复用；
+- 富文本清洗工具上移 `lx-common-web`，公告与 CMS 共用。
+
+**同步收口**：
+
+- 后台用户头像自助编辑（上传 / 预览 / 移除，只接受 `fileId` 或 `http(s)`）；
+- 第三方登录 schema 预留 `V19__system_user_social.sql` + `docs/28`，默认“先绑定后登录”。
+
+**验收**：CMS 单测 14 项；全仓 126 项 / 26 类，JDK 8 / 11 均通过；
+真实接口 34/34；浏览器 13/13；关闭后接口 404 / 菜单与路由消失，重开数据保留；
+`vite build`、i18n 键检查通过。
+
+详见 `docs/20-cms-embed-plan.md` §14、`docs/21-build-log.md` §49、
+`lx-modules/lx-module-cms/README.md`。
+
+**下一步**：门户 API `/api/portal/cms/**`、素材选择器、内容版本 / 回收站；
+随后进入 v1.2 会员体系。

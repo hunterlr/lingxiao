@@ -33,6 +33,7 @@
         <module>lx-module-job</module>
         <module>lx-module-generator</module>
         <module>lx-module-demo</module>
+        <module>lx-module-cms</module>
     </modules>
 
     <dependencies>

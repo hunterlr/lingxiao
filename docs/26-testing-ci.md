@@ -2,7 +2,7 @@
 
 > 本文回答两个问题：**哪些逻辑必须用单测锁住？没有数据库的机器上怎么自动验证？**
 >
-> 结论：v1.0 先做“纯逻辑 + 安全回归”的 112 个单测（23 个测试类），
+> 结论：v1.0 先做“纯逻辑 + 安全回归”的 126 个单测（26 个测试类），
 > 完全不依赖 MySQL / Redis，`mvn test` 一条命令跑完；
 > 再用 GitHub Actions 覆盖 JDK 8/11/17 与前端构建。
 
@@ -68,7 +68,7 @@ mvn -B -ntp -DskipTests package
 
 ---
 
-## 3. 当前测试清单（112 项 / 23 个类）
+## 3. 当前测试清单（126 项 / 26 个类）
 
 | 模块 | 测试类 | 项数 | 锁住什么 |
 |---|---|---|---|
@@ -79,7 +79,7 @@ mvn -B -ntp -DskipTests package
 | `lx-common-core` | `ConfigProviderTest` | 3 | 参数脏值（空串 / 非数字 / 大小写）回退默认值 |
 | `lx-module-system` | `PasswordPolicyTest` | 5 | off / basic / strong 三档、非法值回退 basic、错误码 1001 |
 | `lx-module-system` | `SessionPolicyTest` | 3 | 参数缺失 / 空白 / 非法值都按单会话处理，只有 `true` 才放开多端 |
-| `lx-module-system` | `HtmlSanitizerTest` | 9 | script、事件属性、伪协议、iframe、内联样式、安全标签保留 |
+| `lx-common-web` | `HtmlSanitizerTest` | 9 | script、事件属性、伪协议、iframe、内联样式、安全标签保留 |
 | `lx-module-system` | `SysMenuServiceTest` | 4 | 两层树、父节点缺失作为根、空列表、详情 1004 |
 | `lx-common-core` | `MessageUtilsTest` | 6 | 语言包未接入 / 解析异常时回退默认文案，不污染主流程 |
 | `lx-common-web` | `I18nMessageSourceTest` | 5 | 中英文资源齐全、参数占位、缺 key 回退、编码正常 |
@@ -95,8 +95,12 @@ mvn -B -ntp -DskipTests package
 | `lx-framework` | `ModuleRegistryTest` | 5 | 基座模块永远启用、显式关闭 / 未配置按关闭、空 `module_code` 兼容、列表排序、列表与 `isEnabled` 一致 |
 | `lx-framework` | `ModuleMigrationLocationsTest` | 3 | system / file 固定参与、启用模块排序、目录不存在时跳过 |
 | `lx-module-system` | `StpInterfaceImplTest` | 5 | 非 platform 域为空、超管全权限、关闭模块权限过滤、无注册表全放行、空权限码 |
+| `lx-module-cms` | `CmsCategoryServiceTest` | 4 | 闭包深度（自身 0 / 父 1 / 祖父 2）、跨站点父级拒绝、有子栏目 / 文章时拒绝删除 |
+| `lx-module-cms` | `CmsArticleServiceTest` | 5 | 读取侧清洗、删除先清标签关联、跨站点栏目拒绝、slug 重复拒绝、文章不存在 |
+| `lx-module-cms` | `CmsSiteServiceTest` | 3 | 有栏目 / 文章时拒绝删除、空站点物理删除 |
+| `lx-module-cms` | `CmsTagServiceTest` | 2 | 被文章引用时拒绝删除、未引用物理删除 |
 
-合计：**Tests run: 112, Failures: 0, Errors: 0, Skipped: 0**（2026-11-22 在 JDK 8 / JDK 11 各跑一遍均通过；99 项基线于 2026-11-21 在 JDK 8 跑通，66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
+合计：**Tests run: 126, Failures: 0, Errors: 0, Skipped: 0**（2026-11-22 在 JDK 8 / JDK 11 各跑一遍均通过；112 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，99 项基线于 2026-11-21 在 JDK 8 跑通，66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
 
 ---
 

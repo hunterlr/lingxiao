@@ -156,6 +156,12 @@ lx:
         enabled: true
         name: 代码生成器
         description: 导入表 / 配置字段 / 预览 / 下载 ZIP；关闭后 /api/admin/tool/gen 接口不加载
+      # 内容管理（v1.1）：true = 装配 CMS Bean 并执行 cms_* 迁移；false = 接口 404、菜单不下发
+      # 生产首次上线若还没准备好内容，可以先保持 false，数据与迁移记录不受影响
+      cms:
+        enabled: true
+        name: 内容管理
+        description: 站点 / 栏目 / 文章 / 标签 / 门户 API；关闭后 /api/admin/cms 与 /api/portal/cms 不加载
   # 定时任务运行参数（与业务参数分开：这些是基础设施，不放 sys_config）
   job:
     # 调度线程池大小：同一时刻最多并行跑几个任务

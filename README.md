@@ -18,7 +18,7 @@
 
 凌霄是一套面向中后台系统的**模块化单体**基座。它不是又一个「生成完就扔」的脚手架，而是把后台项目里最费时间的那几件事——登录与权限、文件与图片、定时任务、日志审计、代码生成、部署交付——做成可直接使用的完整闭环，业务代码只管写自己的领域逻辑。
 
-当前版本 **v1.0** 已完成后台基座；CMS、会员、工作流、SaaS 多租户以独立模块按需嵌入，不需要改动基座。
+当前版本 **v1.0** 已完成后台基座；v1.1 正在把 CMS 作为独立模块嵌入（后台站点 / 栏目 / 文章 / 标签已可用），会员、工作流、SaaS 多租户后续按同样方式接入，不需要改动基座。
 
 <p align="center">
   <img src="docs/images/02-dashboard.png" width="900" alt="凌霄后台首页" />
@@ -49,6 +49,14 @@
 - 图片管线：剥离 EXIF、按拍摄方向转正，自动生成 thumb（≤160px）与 medium（≤800px）
 - 公开访问 `/api/file/{fileId}?size=thumb|medium`，`StorageService` 抽象，本地磁盘起步
 
+**内容管理（v1.1 模块）**
+
+- 独立模块 `lx-module-cms`，`lx.module.modules.cms.enabled=false` 后接口、迁移、菜单、前端路由一起下线
+- 站点 → 栏目树 → 文章 → 标签；栏目闭包表支持多级与子树筛选
+- 文章草稿 / 发布 / 下线状态流转，发布与下线独立权限码
+- 富文本正文写入与读取双侧白名单清洗，预览与门户看到的内容一致
+- 站点 / 栏目 / 标签引用保护；标签不跨站点复用
+
 **运维与工具**
 
 - 定时任务：Spring Task + 数据库锁，建任务 / 启停 / 执行一次 / 执行日志，集群不重复执行
@@ -66,7 +74,7 @@
 **工程**
 
 - Maven 多模块 + 自动装配 + 三层模块开关，**关闭 = 不加载**（Bean、接口、迁移、前端路由一起下线）
-- 112 项单元测试（不依赖 MySQL / Redis），GitHub Actions 覆盖 JDK 8 / 11 / 17 与前端构建
+- 126 项单元测试（不依赖 MySQL / Redis），GitHub Actions 覆盖 JDK 8 / 11 / 17 与前端构建
 - 一个 jar 同时跑在 JDK 8 / 11 / 17 上
 - 生产配置与发布包组装脚本齐备：`java -jar` + Nginx，prod 关闭生成器 / 接口文档 / SQL 日志
 
@@ -161,6 +169,7 @@ lingxiao/
 │  ├─ lx-module-system       #   认证 / 用户 / 角色 / 菜单 / 字典 / 参数 / 日志
 │  ├─ lx-module-file         #   文件与图片管线
 │  ├─ lx-module-job          #   定时任务（Spring Task + 数据库锁）
+│  ├─ lx-module-cms          #   内容管理（v1.1：站点 / 栏目 / 文章 / 标签）
 │  └─ lx-module-generator    #   代码生成（开发期，生产可关）
 ├─ lx-api/lx-admin-api/      # /api/admin 的 DTO 与契约
 ├─ lx-boot/                  # 启动类、配置、打包
@@ -178,6 +187,7 @@ lingxiao/
 /api/admin/system/oper-log|login-log    操作日志 / 登录日志
 /api/admin/monitor/online|server|cache  在线用户 / 服务监控 / 缓存监控
 /api/admin/monitor/job/**               定时任务与执行日志
+/api/admin/cms/site|category|article|tag 内容管理（v1.1 模块）
 /api/admin/tool/gen/**                  代码生成
 /api/admin/file/**                      上传 / 秒传 / 列表 / 改名 / 下载
 /api/file/{fileId}                      公开访问（?size=thumb|medium）
@@ -195,17 +205,19 @@ lingxiao/
 | [04-permission.md](docs/04-permission.md) | 双权限体系与数据范围 |
 | [06-modularity.md](docs/06-modularity.md) | 三层模块开关与 SPI |
 | [14-multi-database.md](docs/14-multi-database.md) | 多数据库兼容与信创路线 |
+| [20-cms-embed-plan.md](docs/20-cms-embed-plan.md) | CMS 模块嵌入：边界、契约、实施记录 |
 | [21-build-log.md](docs/21-build-log.md) | 施工记录：每一轮的决策、验证与踩坑 |
 | [22-dependencies.md](docs/22-dependencies.md) | 依赖台账：版本、用途、升级规则 |
 | [26-testing-ci.md](docs/26-testing-ci.md) | 单测覆盖清单与 CI 矩阵 |
 | [27-github-onboarding.md](docs/27-github-onboarding.md) | 换机器继续开发：建库、启动、排错 |
+| [28-third-party-login.md](docs/28-third-party-login.md) | 第三方登录预留：绑定表、头像处理、边界 |
 
 ## 路线图
 
 | 版本 | 内容 | 状态 |
 |---|---|---|
 | v1.0 | 后台基座：权限、文件、任务、监控、生成器、部署 | ✅ 已完成 |
-| v1.1 | 多语言 L1（界面双语）、CMS 模块嵌入 | 🚧 进行中 |
+| v1.1 | 多语言 L1（界面双语）、CMS 模块嵌入（后台链路已落地） | 🚧 进行中 |
 | v1.2 | 会员体系、门户 Nuxt3 | 规划中 |
 | v1.3 | 工作流（Flowable）、SaaS 多租户 | 规划中 |
 

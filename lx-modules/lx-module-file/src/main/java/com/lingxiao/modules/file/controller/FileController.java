@@ -2,6 +2,8 @@ package com.lingxiao.modules.file.controller;
 
 import com.lingxiao.common.core.domain.PageResult;
 import com.lingxiao.common.core.domain.R;
+import com.lingxiao.common.core.enums.ErrorCode;
+import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.common.log.annotation.Log;
 import com.lingxiao.common.log.enums.BusinessType;
 import com.lingxiao.common.security.annotation.RequiresPermission;
@@ -47,6 +49,28 @@ public class FileController {
                             @RequestParam(defaultValue = "common") String bizType,
                             @RequestParam(required = false) String remark) {
         return R.ok(fileService.upload(file, bizType, remark));
+    }
+
+    /**
+     * 上传个人头像。
+     *
+     * <p>不校验 {@code platform:file:upload}：改头像属于个人自助能力，
+     * 普通角色不该为了换头像被要求进文件中心。仍受全局文件类型 / 大小限制，
+     * 并额外限定图片扩展名，避免把这里当成通用上传通道。</p>
+     *
+     * <p>返回 {@code fileId}，由前端写回 {@code sys_user.avatar}；
+     * 第三方登录回写的 {@code http(s)} 外链不走这个接口。</p>
+     */
+    @Log(title = "头像上传", businessType = BusinessType.INSERT)
+    @PostMapping("/avatar")
+    public R<FileVO> uploadAvatar(@RequestParam("file") MultipartFile file) {
+        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
+        boolean image = name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png")
+                || name.endsWith(".gif") || name.endsWith(".webp") || name.endsWith(".bmp");
+        if (!image) {
+            throw new ServiceException(ErrorCode.FILE_TYPE_NOT_ALLOWED, "头像只支持图片文件");
+        }
+        return R.ok(fileService.upload(file, "avatar", null));
     }
 
     @RequiresPermission("platform:file:list")

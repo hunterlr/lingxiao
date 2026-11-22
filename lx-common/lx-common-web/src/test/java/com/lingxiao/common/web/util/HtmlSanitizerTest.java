@@ -1,4 +1,4 @@
-package com.lingxiao.modules.system.support;
+package com.lingxiao.common.web.util;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

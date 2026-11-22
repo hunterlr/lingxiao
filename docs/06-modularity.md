@@ -55,6 +55,9 @@ flowchart TB
 **首发默认：单租户。**
 
 > **v1.0 实际打包：** 只装 `lx-system` / `lx-file` / `lx-demo`（契约验证，生产可去）。`lx-cms` / `lx-member` / `lx-workflow` / `lx-saas` / `lx-open` 均不打进 v1.0，后续按 `20-cms-embed-plan.md` 以模块嵌入。
+>
+> **v1.1 更新（2026-11-22）：** `lx-module-cms` 已加入 `lx-boot` 依赖与 `lx.module.modules.cms`，
+> 关闭时接口 / 迁移 / 菜单 / 前端路由一起下线；会员 / 工作流 / SaaS 仍不进包。
 
 - `lx-saas` 不打进首发包，`lx.module.saas.enabled=false`，不建 `sys_tenant` / 套餐表，不加载租户管理接口与菜单。
 - 但 `tenant_id` 字段与 `TenantContext` **从第一天就存在**：所有业务表带 `tenant_id default 0`，请求链路写入 `TenantContext(0)`，缓存 Key 带 `0`，异步与 MQ 传播 `0`。

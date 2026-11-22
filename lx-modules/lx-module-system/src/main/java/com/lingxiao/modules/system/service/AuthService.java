@@ -230,6 +230,7 @@ public class AuthService {
         userMapper.update(null, new LambdaUpdateWrapper<SysUser>()
                 .eq(SysUser::getUserId, userId)
                 .set(SysUser::getNickname, nickname)
+                .set(SysUser::getAvatar, normalizeAvatar(request.getAvatar()))
                 .set(SysUser::getEmail, trimToNull(request.getEmail()))
                 .set(SysUser::getPhone, trimToNull(request.getPhone()))
                 .set(SysUser::getUpdateBy, userId));
@@ -429,5 +430,24 @@ public class AuthService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    /**
+     * 头像只允许两种形态：文件中心 fileId、http(s) 外链。
+     *
+     * <p>不接受其它协议（{@code javascript:} / {@code data:} 等），避免把
+     * 用户输入直接塞进 {@code <img src>} 时留下注入面；第三方登录回写的
+     * 头像虽然来自可信平台，也统一走这里。</p>
+     */
+    private String normalizeAvatar(String avatar) {
+        String value = trimToNull(avatar);
+        if (value == null) {
+            return null;
+        }
+        if (value.startsWith("http://") || value.startsWith("https://")) {
+            return value;
+        }
+        // 文件中心 fileId 是纯数字；其它内容一律拒绝并回空，不让脏值入库
+        return value.matches("\\d{1,20}") ? value : null;
     }
 }

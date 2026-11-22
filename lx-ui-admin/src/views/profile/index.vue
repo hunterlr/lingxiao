@@ -10,6 +10,14 @@
       </div>
 
       <el-descriptions :column="2" border>
+        <el-descriptions-item :label="t('page.profile.avatar')">
+          <div class="avatar-line">
+            <el-avatar :size="48" :src="displayAvatar" class="profile-avatar">
+              {{ (auth.nickname || auth.username || '?').slice(0, 1) }}
+            </el-avatar>
+            <span v-if="!auth.avatar" class="text-secondary">{{ t('page.profile.avatarEmpty') }}</span>
+          </div>
+        </el-descriptions-item>
         <el-descriptions-item :label="t('page.profile.userId')">
           <span class="text-mono">{{ auth.userId || '-' }}</span>
         </el-descriptions-item>
@@ -60,6 +68,26 @@
       @closed="resetProfileForm"
     >
       <el-form ref="profileFormRef" :model="profileForm" :rules="profileRules" label-width="80px">
+        <el-form-item :label="t('page.profile.avatar')">
+          <div class="avatar-editor">
+            <el-avatar :size="64" :src="formAvatarUrl" class="profile-avatar">
+              {{ (profileForm.nickname || auth.username || '?').slice(0, 1) }}
+            </el-avatar>
+            <div class="avatar-actions">
+              <el-upload
+                :show-file-list="false"
+                :http-request="handleAvatarUpload"
+                accept="image/jpeg,image/png,image/gif,image/webp,image/bmp"
+              >
+                <el-button size="small" :loading="avatarUploading">{{ t('page.profile.avatarUpload') }}</el-button>
+              </el-upload>
+              <el-button v-if="profileForm.avatar" size="small" link type="danger" @click="clearAvatar">
+                {{ t('page.profile.avatarRemove') }}
+              </el-button>
+            </div>
+            <div class="form-tip">{{ t('page.profile.avatarTip') }}</div>
+          </div>
+        </el-form-item>
         <el-form-item :label="t('page.profile.loginAccount')">
           <el-input :model-value="auth.username" disabled />
         </el-form-item>
@@ -116,12 +144,13 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Edit, Lock } from '@element-plus/icons-vue'
 import { changePassword } from '@/api/auth'
+import { uploadAvatar } from '@/api/file'
 import { useAuthStore } from '@/store/auth'
 
 /**
@@ -139,8 +168,36 @@ const router = useRouter()
 
 const profileVisible = ref(false)
 const profileSaving = ref(false)
+const avatarUploading = ref(false)
 const profileFormRef = ref()
-const profileForm = reactive({ nickname: '', email: '', phone: '' })
+const profileForm = reactive({ nickname: '', avatar: '', email: '', phone: '' })
+
+/** 头像兼容 fileId 与 http(s) 外链，和后端 normalizeAvatar 的规则保持一致。 */
+function avatarSrc(value) {
+  if (!value) return ''
+  if (value.startsWith('http') || value.startsWith('/')) return value
+  return `/api/file/${value}`
+}
+
+const displayAvatar = computed(() => avatarSrc(auth.avatar))
+const formAvatarUrl = computed(() => avatarSrc(profileForm.avatar))
+
+async function handleAvatarUpload({ file }) {
+  avatarUploading.value = true
+  try {
+    const result = await uploadAvatar(file)
+    profileForm.avatar = String(result.fileId || '')
+    ElMessage.success(t('page.profile.avatarUploaded'))
+  } catch (e) {
+    // 统一错误提示由 axios 拦截器弹出，这里只结束 loading
+  } finally {
+    avatarUploading.value = false
+  }
+}
+
+function clearAvatar() {
+  profileForm.avatar = ''
+}
 
 const profileRules = {
   nickname: [
@@ -180,6 +237,7 @@ const passwordRules = {
 
 function openProfileDialog() {
   profileForm.nickname = auth.nickname || ''
+  profileForm.avatar = auth.avatar || ''
   profileForm.email = auth.email || ''
   profileForm.phone = auth.phone || ''
   profileVisible.value = true
@@ -196,6 +254,7 @@ async function submitProfile() {
   try {
     await auth.updateProfile({
       nickname: profileForm.nickname,
+      avatar: profileForm.avatar,
       email: profileForm.email,
       phone: profileForm.phone
     })
@@ -257,6 +316,32 @@ async function submitPassword() {
 .role-tag,
 .perm-tag {
   margin: 2px 6px 2px 0;
+}
+
+.avatar-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.avatar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-avatar {
+  flex: none;
+  background: var(--lx-primary);
+  color: #fff;
+  font-size: 18px;
 }
 
 .permission-list {

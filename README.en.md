@@ -18,7 +18,7 @@
 
 LingXiao is a **modular monolith** foundation for back-office systems. It is not another scaffold that you throw away after generating a few CRUD pages. It closes the loops that actually eat weeks in every admin project — authentication and permissions, files and image pipelines, scheduled jobs, audit logs, code generation, deployment — so that application code can focus on its own domain.
 
-Version **v1.0** ships the admin foundation. CMS, membership, workflow and SaaS multi-tenancy plug in later as independent modules without touching the core.
+Version **v1.0** ships the admin foundation. v1.1 is embedding CMS as an independent module (site / category / article / tag management is usable today); membership, workflow and SaaS multi-tenancy will plug in the same way without touching the core.
 
 <p align="center">
   <img src="docs/images/14-dashboard-en.png" width="900" alt="LingXiao dashboard" />
@@ -51,6 +51,14 @@ Version **v1.0** ships the admin foundation. CMS, membership, workflow and SaaS 
 - Image pipeline: strip EXIF, auto-rotate by orientation, generate `thumb` (≤160px) and `medium` (≤800px) variants
 - Public access via `/api/file/{fileId}?size=thumb|medium`; `StorageService` abstraction, local disk first
 
+**Content management (v1.1 module)**
+
+- Standalone `lx-module-cms`; setting `lx.module.modules.cms.enabled=false` removes endpoints, migrations, menus and frontend routes together
+- Site → category tree → article → tag; a closure table powers multi-level trees and subtree filtering
+- Draft / publish / take-offline state machine; publishing and unpublishing have their own permission codes
+- Rich-text content is sanitized against a whitelist on both write and read, so preview matches the portal
+- Referential guards for sites, categories and tags; tags never cross sites
+
 **Operations & tooling**
 
 - Scheduled jobs: Spring Task + database lock; create, enable/disable, run once, execution logs; no duplicate runs in a cluster
@@ -68,7 +76,7 @@ Version **v1.0** ships the admin foundation. CMS, membership, workflow and SaaS 
 **Engineering**
 
 - Maven multi-module with auto-configuration and three-layer module switches; **disabled means not loaded** (beans, endpoints, migrations and frontend routes all go away)
-- 112 unit tests that need neither MySQL nor Redis; GitHub Actions covers JDK 8 / 11 / 17 plus the frontend build
+- 126 unit tests that need neither MySQL nor Redis; GitHub Actions covers JDK 8 / 11 / 17 plus the frontend build
 - One jar runs on JDK 8, 11 and 17
 - Production profile and packaging scripts included: `java -jar` + Nginx; prod disables the generator, API docs and SQL logging
 
@@ -163,6 +171,7 @@ lingxiao/
 │  ├─ lx-module-system       #   Auth / users / roles / menus / dicts / settings / logs
 │  ├─ lx-module-file         #   Files and image pipeline
 │  ├─ lx-module-job          #   Scheduled jobs (Spring Task + database lock)
+│  ├─ lx-module-cms          #   Content management (v1.1: sites / categories / articles / tags)
 │  └─ lx-module-generator    #   Code generator (dev only, can be disabled in prod)
 ├─ lx-api/lx-admin-api/      # DTOs and contracts for /api/admin
 ├─ lx-boot/                  # Application entry, config, packaging
@@ -180,6 +189,7 @@ lingxiao/
 /api/admin/system/oper-log|login-log    operation and login logs
 /api/admin/monitor/online|server|cache  online users / server metrics / cache stats
 /api/admin/monitor/job/**               scheduled jobs and execution logs
+/api/admin/cms/site|category|article|tag content management (v1.1 module)
 /api/admin/tool/gen/**                  code generation
 /api/admin/file/**                      upload / dedup / list / rename / download
 /api/file/{fileId}                      public access (?size=thumb|medium)
@@ -197,17 +207,19 @@ Responses are uniform `{ code, msg, data }`: `0` success, `1xxx` general and val
 | [04-permission.md](docs/04-permission.md) | Dual permission realms and data scopes |
 | [06-modularity.md](docs/06-modularity.md) | Three-layer module switches and SPI |
 | [14-multi-database.md](docs/14-multi-database.md) | Multi-database compatibility roadmap |
+| [20-cms-embed-plan.md](docs/20-cms-embed-plan.md) | CMS embedding: boundaries, contracts, implementation |
 | [21-build-log.md](docs/21-build-log.md) | Build log: decisions, verification and pitfalls per round |
 | [22-dependencies.md](docs/22-dependencies.md) | Dependency ledger: versions, purpose, upgrade rules |
 | [26-testing-ci.md](docs/26-testing-ci.md) | Test coverage and CI matrix |
 | [27-github-onboarding.md](docs/27-github-onboarding.md) | Moving to a new machine: database, startup, troubleshooting |
+| [28-third-party-login.md](docs/28-third-party-login.md) | Third-party login groundwork: bindings, avatars, boundaries |
 
 ## Roadmap
 
 | Version | Scope | Status |
 |---|---|---|
 | v1.0 | Admin foundation: permissions, files, jobs, monitoring, generator, deployment | ✅ Done |
-| v1.1 | i18n L1 (bilingual UI), CMS module | 🚧 In progress |
+| v1.1 | i18n L1 (bilingual UI), CMS module (admin flows done) | 🚧 In progress |
 | v1.2 | Membership, Nuxt 3 portal | Planned |
 | v1.3 | Workflow (Flowable), SaaS multi-tenancy | Planned |
 

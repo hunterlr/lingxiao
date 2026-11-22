@@ -132,6 +132,12 @@ remark       varchar(500) default null        comment '备注'
 | `cms_static_task` | 静态化任务 |
 | `cms_content_relation` | 相关内容 |
 
+> **实际落地命名**：`cms_article`（内容主表）、`cms_article_tag`（内容标签）、
+> `cms_article_version`（内容版本）；站点 / 栏目 / 标签与上表一致。
+> `cms_model` / `cms_model_field` / `cms_content_ext` / `cms_page` / `cms_nav` /
+> `cms_block` / `cms_banner` 规划在 v1.3 CMS 第三刀，
+> `cms_static_task` 规划在 P6；排期见 `docs/20-cms-embed-plan.md` §21。
+
 ### 2.5 会员 `mem_`
 
 | 表 | 说明 |

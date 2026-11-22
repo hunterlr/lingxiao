@@ -918,3 +918,37 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 
 **下一步**：消息通知；会员资料完善（头像上传、手机号 / 邮箱换绑、会话管理）；
 第三方平台真实凭据联调；标签页、sitemap / RSS 与缓存策略；随后进入工作流 / SaaS 规划。
+
+### 12.22 P1：v1.2 会员第五刀 — 头像本地化、唯一性与合并（✅ 已完成，2026-11-23）
+
+**完成内容**：
+
+- `V33__member_account_uniqueness.sql`：`mem_user.password_set`、用户名 / 手机号 /
+  邮箱生成列 + 唯一键（仅约束未删除行）、`mem_user_social` 联系方式快照、
+  `mem_merge_log` 与合并权限 4017；
+- 第三方头像下载后转存文件中心（`MemberAvatarLocalizer` + `FileService.uploadBytes`），
+  不再直接引用外部地址；
+- 同邮箱 / 手机号不静默合并：OAuth 登录按“已绑定 → 已验证联系方式匹配 → 建号”
+  分流，匹配时生成一次性 bindTicket，由会员确认后绑定；
+- 后台会员列表提供合并预览与执行，旧账号停用、互动 / 绑定迁移、会话失效并写审计。
+
+**验收**：全仓单测 244 项 0 失败；`.local/member-merge-check.mjs` 24/24；
+`.local/member-password-set-check.mjs` 10/10；后台与门户构建通过。
+
+### 12.23 P1：v1.2 会员第六刀 — 换绑与密码重置补强（✅ 已完成，2026-11-23）
+
+**完成内容**：
+
+- `V34__member_contact_change.sql`：`mem_contact_change`（只存 BCrypt 哈希）与
+  `mem.account.contactCodeExpireMinutes` / `contactRateLimitCount` /
+  `contactRateLimitMinutes`（configId 31~33，后台会员设置可调）；
+- `POST /api/app/profile/contact/code`、`PUT /api/app/profile/contact`：
+  登录态 + 新值验证码换绑手机号 / 邮箱；已设置密码的账号需当前密码；
+  唯一性、格式、发码 / 确认双限流、通道失败明确报错与验证码作废；
+- 找回密码补图形验证码（scene=`reset`），重置成功后作废旧码、踢掉旧会话，
+  `password_set=0` 的第三方建号也能直接设置密码；
+- 门户账号页新增“账号安全”手机号 / 邮箱换绑区与“忘记原密码”入口。
+
+**验收**：全仓 `mvn -o test` 257 项 0 失败；`.local/member-contact-check.mjs` 45/45；
+`.local/member-contact-ui-check.mjs` 15/15；图形验证码开启时门户实测通过；
+后端、门户、后台构建通过。

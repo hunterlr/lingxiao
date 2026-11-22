@@ -148,6 +148,29 @@ node .output/server/index.mjs
 - 评论读取失败只影响评论区，正文、收藏与点赞照常渲染；评论内容用文本插值，
   不使用 `v-html`。
 
+### 4.7 第三方登录
+
+| 动作 | 接口 | 说明 |
+|---|---|---|
+| 读可用平台 | `GET /api/app/auth/oauth/providers` | 匿名可读；返回总开关、自动建号与已启用平台 |
+| 取授权地址 | `GET /api/app/auth/oauth/authorize-url?provider=&mode=&redirect=` | 服务端生成 state；`mode=bind` 需登录 |
+| 平台回调 | `GET /api/app/auth/oauth/callback/{provider}` | 浏览器跳转，完成后 302 回门户 |
+| 换会员 Token | `POST /api/app/auth/oauth/exchange` | 一次性 ticket 换 Token，写入 Cookie |
+| 小程序登录 | `POST /api/app/auth/oauth/mini-login` | 客户端提交 `wx.login()` 的 code |
+| 绑定列表 / 解绑 | `GET` / `DELETE /api/app/auth/oauth/bindings` | 必须登录，只能操作当前会员 |
+
+- 登录页按钮由 `GET /api/app/auth/oauth/providers` 驱动：总开关关闭、平台停用或
+  未配置 ClientId / Secret 时不渲染按钮；小程序平台（`browser=false`）不展示按钮。
+- 点击按钮先取授权地址再整页跳转；平台回调由后端 302 到
+  `/oauth/callback?ticket=...`，页面立即 `POST /exchange` 换 Token 并写入
+  `lx-portal-member-token` Cookie，Token 不出现在 URL。
+- 回调失败使用短错误码：`state_invalid`、`not_bound`、`provider_disabled`、
+  `ticket_invalid` 等，页面按码翻译成中文提示，不展示平台原始错误。
+- 账号页「第三方账号」列表展示已绑定平台；发起绑定带 `mode=bind`，
+  会员 ID 只从服务端 state 读取；解绑后仍可用密码登录。
+- 401 / `1002` 统一回登录页并带 `redirect`；`1003` 表示第三方登录总开关关闭，
+  页面提示「第三方登录暂未开放」。
+
 ---
 
 ## 5. 数据与可见性

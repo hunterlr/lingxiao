@@ -104,3 +104,30 @@ export interface MemberCommentItem {
   avatar?: string | null
   createTime?: string | null
 }
+
+/** 门户可用的第三方登录入口；只含展示字段，不含任何平台密钥。 */
+export interface MemberOAuthProvider {
+  provider: string
+  displayName: string
+  group?: 'cn' | 'global' | string | null
+}
+
+export interface MemberOAuthProviders {
+  enabled: boolean
+  autoRegister: boolean
+  providers: MemberOAuthProvider[]
+}
+
+export interface MemberOAuthAuthorize {
+  provider: string
+  authorizeUrl: string
+}
+
+/** 当前会员已绑定的第三方账号；不含 openId 等平台标识。 */
+export interface MemberOAuthBinding {
+  provider: string
+  displayName: string
+  nickname?: string | null
+  avatar?: string | null
+  lastLoginTime?: string | null
+}

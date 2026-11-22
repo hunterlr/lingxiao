@@ -22,6 +22,7 @@
       <p v-if="memberDisabled" class="form-alert error" role="alert">
         {{ disabledMessage }}
       </p>
+      <p v-else-if="oauthError" class="form-alert error" role="alert">{{ oauthError }}</p>
       <p v-else-if="errorMessage" class="form-alert error" role="alert">{{ errorMessage }}</p>
 
       <form @submit.prevent="onSubmit">
@@ -90,13 +91,15 @@
           </div>
         </div>
       </form>
+
+      <MemberOAuthButtons :redirect="redirectTarget()" @error="onOAuthError" />
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { MemberCaptcha } from '~/types/member'
-import { MemberApiError, memberErrorMessage } from '~/composables/useMemberAuth'
+import { MemberApiError, memberErrorMessage, oauthErrorMessage } from '~/composables/useMemberAuth'
 
 const route = useRoute()
 const { login, token, profile, ensureProfile, fetchCaptcha } = useMemberAuth()
@@ -113,6 +116,14 @@ const notice = computed(() => {
   if (route.query.changed === '1') return '密码已修改，请使用新密码登录。'
   return ''
 })
+const oauthError = computed(() => {
+  const code = route.query.oauthError
+  return typeof code === 'string' && code ? oauthErrorMessage(code) : ''
+})
+
+function onOAuthError(message: string) {
+  errorMessage.value = message
+}
 
 function redirectTarget(): string {
   const value = route.query.redirect

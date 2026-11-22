@@ -188,6 +188,44 @@
       </section>
 
       <section class="account-panel">
+        <h2 class="panel-title">第三方账号</h2>
+        <p class="panel-description">
+          绑定后可直接用第三方账号登录。解绑前请确认仍记得账号密码，否则可能无法再次登录。
+        </p>
+
+        <p v-if="oauthNotice" class="form-alert info" role="status">{{ oauthNotice }}</p>
+        <p v-if="bindingsError" class="form-alert error" role="alert">{{ bindingsError }}</p>
+        <p v-else-if="bindingsLoading" class="form-hint">正在加载绑定信息…</p>
+        <p v-else-if="!bindings.length" class="form-hint">还没有绑定第三方账号。</p>
+
+        <ul v-else class="oauth-bindings">
+          <li v-for="item in bindings" :key="item.provider" class="oauth-binding">
+            <div class="oauth-binding-main">
+              <strong>{{ item.displayName }}</strong>
+              <span class="oauth-binding-meta">
+                {{ item.nickname || '已绑定' }}
+                <template v-if="item.lastLoginTime"> · 最近登录 {{ formatDate(item.lastLoginTime) }}</template>
+              </span>
+            </div>
+            <button
+              type="button"
+              class="oauth-unbind"
+              :disabled="unbindingProvider === item.provider"
+              @click="onUnbind(item)"
+            >
+              {{ unbindingProvider === item.provider ? '解绑中…' : '解绑' }}
+            </button>
+          </li>
+        </ul>
+
+        <MemberOAuthButtons
+          mode="bind"
+          :bound-providers="boundProviders"
+          @error="bindingsError = $event"
+        />
+      </section>
+
+      <section class="account-panel">
         <h2 class="panel-title">修改密码</h2>
         <p class="panel-description">修改成功后该账号的全部旧会话会立即失效，需要使用新密码重新登录。</p>
 
@@ -246,10 +284,11 @@
 </template>
 
 <script setup lang="ts">
-import type { MemberFavoriteItem, MemberProfile } from '~/types/member'
+import type { MemberFavoriteItem, MemberOAuthBinding, MemberProfile } from '~/types/member'
 import type { PortalArticleSummary } from '~/types/portal'
-import { MemberApiError, memberErrorMessage } from '~/composables/useMemberAuth'
+import { MemberApiError, memberErrorMessage, oauthErrorMessage } from '~/composables/useMemberAuth'
 
+const route = useRoute()
 const {
   profile,
   sessionError,
@@ -258,7 +297,9 @@ const {
   changePassword,
   logout,
   fetchFavorites,
-  setFavorite
+  setFavorite,
+  fetchOAuthBindings,
+  unbindOAuth
 } = useMemberAuth()
 const portalApi = usePortalApi()
 
@@ -285,6 +326,21 @@ const favoritesPage = ref(1)
 const favoritesLoading = ref(false)
 const favoritesRemovingId = ref('')
 const favoritesError = ref('')
+
+const bindings = ref<MemberOAuthBinding[]>([])
+const bindingsLoading = ref(false)
+const bindingsError = ref('')
+const unbindingProvider = ref('')
+const boundProviders = computed(() => bindings.value.map((item) => item.provider))
+const oauthNotice = computed(() => {
+  const bound = route.query.oauthBound
+  if (typeof bound === 'string' && bound) {
+    const matched = bindings.value.find((item) => item.provider === bound)
+    return matched ? `已绑定 ${matched.displayName}` : '第三方账号绑定成功'
+  }
+  const code = route.query.oauthError
+  return typeof code === 'string' && code ? oauthErrorMessage(code) : ''
+})
 
 const displayName = computed(() => profile.value?.nickname || profile.value?.username || '会员')
 const avatarUrl = computed(() => mediaUrl(profile.value?.avatar, 'thumb'))
@@ -361,11 +417,48 @@ async function removeFavorite(articleId: string | number) {
   }
 }
 
+/** 第三方绑定列表；失败只影响这一块，不影响收藏与资料。 */
+async function loadBindings() {
+  if (!profile.value) return
+  bindingsLoading.value = true
+  bindingsError.value = ''
+  try {
+    bindings.value = (await fetchOAuthBindings()) || []
+  } catch (error) {
+    bindings.value = []
+    bindingsError.value = memberErrorMessage(error, '绑定信息加载失败，请稍后再试')
+  } finally {
+    bindingsLoading.value = false
+  }
+}
+
+async function onUnbind(item: MemberOAuthBinding) {
+  if (unbindingProvider.value) return
+  if (!window.confirm(`确认解绑 ${item.displayName} 吗？解绑后将不能用它登录。`)) return
+  unbindingProvider.value = item.provider
+  bindingsError.value = ''
+  try {
+    await unbindOAuth(item.provider)
+    await loadBindings()
+  } catch (error) {
+    bindingsError.value = memberErrorMessage(error, '解绑失败，请稍后再试')
+  } finally {
+    unbindingProvider.value = ''
+  }
+}
+
 onMounted(() => {
-  if (profile.value) loadFavorites(1)
+  if (profile.value) {
+    loadFavorites(1)
+    loadBindings()
+  }
 })
 watch(profile, (value) => {
-  if (!value) resetFavorites()
+  if (!value) {
+    resetFavorites()
+    bindings.value = []
+    bindingsError.value = ''
+  }
 })
 
 /** 资料返回后回填表单；保存成功返回同一份资料时也会刷新。 */

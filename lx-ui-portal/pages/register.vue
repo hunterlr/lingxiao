@@ -19,6 +19,7 @@
       <p class="auth-sub">已有账号？<NuxtLink to="/login">直接登录</NuxtLink></p>
 
       <p v-if="memberDisabled" class="form-alert error" role="alert">{{ disabledMessage }}</p>
+      <p v-else-if="oauthError" class="form-alert error" role="alert">{{ oauthError }}</p>
       <p v-else-if="errorMessage" class="form-alert error" role="alert">{{ errorMessage }}</p>
 
       <form @submit.prevent="onSubmit">
@@ -149,14 +150,17 @@
           </div>
         </div>
       </form>
+
+      <MemberOAuthButtons redirect="/account" @error="onOAuthError" />
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { MemberCaptcha } from '~/types/member'
-import { MemberApiError, memberErrorMessage } from '~/composables/useMemberAuth'
+import { MemberApiError, memberErrorMessage, oauthErrorMessage } from '~/composables/useMemberAuth'
 
+const route = useRoute()
 const { register, token, profile, ensureProfile, fetchCaptcha } = useMemberAuth()
 
 const form = reactive({
@@ -175,6 +179,14 @@ const submitting = ref(false)
 const errorMessage = ref('')
 const memberDisabled = ref(false)
 const disabledMessage = ref('会员功能已关闭，请稍后再试。')
+const oauthError = computed(() => {
+  const code = route.query.oauthError
+  return typeof code === 'string' && code ? oauthErrorMessage(code) : ''
+})
+
+function onOAuthError(message: string) {
+  errorMessage.value = message
+}
 
 async function refreshCaptcha() {
   captchaLoading.value = true

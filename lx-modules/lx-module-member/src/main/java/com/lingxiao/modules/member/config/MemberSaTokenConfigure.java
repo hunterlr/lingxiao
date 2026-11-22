@@ -88,6 +88,14 @@ public class MemberSaTokenConfigure implements WebMvcConfigurer {
                         "/api/app/auth/login",
                         "/api/app/auth/forgot-password",
                         "/api/app/auth/reset-password",
+                        // 第三方登录：入口列表、授权地址、平台回调与 ticket 换 Token
+                        // 都必须匿名可访问；绑定列表 / 解绑仍在下方受登录保护。
+                        // authorize-url 的 mode=bind 由 Service 自己校验会员登录态。
+                        "/api/app/auth/oauth/providers",
+                        "/api/app/auth/oauth/authorize-url",
+                        "/api/app/auth/oauth/callback/**",
+                        "/api/app/auth/oauth/exchange",
+                        "/api/app/auth/oauth/mini-login",
                         // 公开只读统计：匿名可看收藏 / 点赞数，带 Token 时附带个人状态。
                         // 写操作仍在 /api/app/interactions/** 下，不在白名单里。
                         "/api/app/public/**"

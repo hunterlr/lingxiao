@@ -885,3 +885,36 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 
 **下一步**：消息通知；会员资料完善（头像上传、手机号 / 邮箱换绑、会话管理）；
 标签页、sitemap / RSS 与缓存策略；随后进入工作流 / SaaS 规划。
+
+### 12.21 P1：v1.2 会员第三方登录（✅ 已完成，2026-11-22）
+
+**完成内容**：
+
+- 新增迁移 `V31__member_oauth.sql`：`mem_oauth_provider`（27 个平台种子，
+  默认全部停用）、`mem_user_social`、`mem.oauth.enabled / autoRegister /
+  portalBaseUrl`（configId 28~30）与菜单 4050/4051；`V32` 补微信小程序种子；
+- `MemberOAuthProviderRegistry`：微信开放平台 / 公众号 / 小程序、QQ、微博、
+  支付宝、抖音、钉钉、Gitee，以及 GitHub / GitLab / Google / Microsoft /
+  Apple / Facebook / X / LinkedIn / Discord / LINE / Kakao / Naver / Amazon /
+  Yahoo / Reddit / Slack / Twitch / Spotify；标准平台用一份描述走统一适配器，
+  微信 / QQ / 支付宝 / Apple 用独立实现，X 走 PKCE；
+- `MemberOAuthService`：授权地址、state 校验、回调换用户信息、一次性 ticket、
+  `exchange` 换会员 Token、小程序 `mini-login`、绑定 / 解绑与站内回跳校验；
+- 后台「会员管理 → 第三方登录」按国内 / 国外分组管理平台开关与凭据，
+  密钥只写不读；「会员设置」新增总开关、自动建号与门户地址；
+- 门户登录 / 注册页按可用平台渲染按钮，账号页支持绑定与解绑，
+  `/oauth/callback` 用 ticket 换 Token 并写入 Cookie，Token 不出现在 URL；
+- 第三方账号只写 `mem_user` / `mem_user_social`，不触碰后台账号与权限，
+  会员 Token 与后台 Token 继续物理隔离。
+
+**验收**：全仓 `mvn -o test` **232 项 / 38 类**，0 失败；Flyway V31、V32 成功；
+`MemberOAuthStateStoreTest` 4 项 + `MemberOAuthServiceTest` 10 项通过；
+`.local/member-oauth-check.mjs` **37/37**；后台与门户 `npm run build` 通过；
+浏览器完成后台分组 / 小程序标记 / 配置弹窗、门户按钮、回调错误页、
+账号绑定区与总开关关闭后隐藏，控制台无错误。
+
+详见 `docs/30-member-embed-plan.md` §14、`docs/31-portal-frontend.md` §4.7、
+`docs/21-build-log.md` §62。
+
+**下一步**：消息通知；会员资料完善（头像上传、手机号 / 邮箱换绑、会话管理）；
+第三方平台真实凭据联调；标签页、sitemap / RSS 与缓存策略；随后进入工作流 / SaaS 规划。

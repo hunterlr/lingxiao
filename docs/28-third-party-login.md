@@ -1,7 +1,9 @@
-# 28 · 第三方登录对接设计（预留）
+# 28 · 第三方登录对接设计（后台域预留，会员域已落地）
 
-> 状态：schema 已预留（`V19__system_user_social.sql`），Provider 实现未开工。
-> 本文只定边界与数据流，避免接入时把字段硬塞进 `sys_user`，或把会员登录
+> 状态：后台域 schema 已预留（`V19__system_user_social.sql`），Provider 实现仍未开工；
+> 会员域已于 v1.2 落地（`V31__member_oauth.sql`、`V32__member_oauth_wechat_mini.sql`），
+> 详见 `docs/30-member-embed-plan.md` §14。
+> 本文只定后台域边界与数据流，避免接入时把字段硬塞进 `sys_user`，或把会员登录
 > 与后台登录混成一套 Token。
 
 ---

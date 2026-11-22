@@ -4,6 +4,9 @@ import type {
   MemberFavoriteItem,
   MemberInteraction,
   MemberLoginForm,
+  MemberOAuthAuthorize,
+  MemberOAuthBinding,
+  MemberOAuthProviders,
   MemberPasswordForm,
   MemberProfile,
   MemberProfileForm,
@@ -40,6 +43,31 @@ export class MemberApiError extends Error {
 export function memberErrorMessage(error: unknown, fallback = '操作失败，请稍后再试'): string {
   if (error instanceof MemberApiError && error.message) return error.message
   return fallback
+}
+
+/**
+ * 第三方登录错误码文案。
+ *
+ * <p>回调失败时后端只回一个稳定短码（不放上游错误原文），门户按码翻译；
+ * 未知码统一落到“请稍后重试”，避免把平台内部信息展示给用户。</p>
+ */
+const OAUTH_ERRORS: Record<string, string> = {
+  disabled: '第三方登录已关闭，请使用账号密码登录。',
+  provider_disabled: '该第三方登录平台已停用，请更换其它方式。',
+  not_configured: '该第三方登录平台尚未配置完成，请联系管理员。',
+  not_bound: '该第三方账号尚未绑定会员，请先用账号密码登录后在个人中心绑定。',
+  already_bound: '当前账号已绑定该平台，请先在个人中心解绑。',
+  bind_conflict: '该第三方账号已绑定其他会员，请更换账号。',
+  account_disabled: '会员账号已停用，请联系管理员。',
+  member_missing: '会员不存在或已被删除。',
+  provider_error: '第三方授权失败，请稍后重试。',
+  state_invalid: '授权已过期，请重新发起第三方登录。',
+  failed: '第三方登录失败，请稍后重试。'
+}
+
+export function oauthErrorMessage(code: unknown, fallback = '第三方登录失败，请稍后重试'): string {
+  const key = typeof code === 'string' ? code : ''
+  return OAUTH_ERRORS[key] || fallback
 }
 
 const TOKEN_COOKIE = 'lx-portal-member-token'
@@ -241,6 +269,44 @@ export function useMemberAuth() {
     clearSession()
   }
 
+  // ==================== 第三方登录 ====================
+
+  /** 登录 / 注册页的第三方入口；总开关关闭时返回 enabled=false。 */
+  function fetchOAuthProviders(): Promise<MemberOAuthProviders> {
+    return request<MemberOAuthProviders>('/auth/oauth/providers')
+  }
+
+  /** 取平台授权地址；mode=bind 时会自动带上会员 Token。 */
+  function fetchOAuthAuthorizeUrl(
+    provider: string,
+    mode: 'login' | 'bind' = 'login',
+    redirect?: string
+  ): Promise<MemberOAuthAuthorize> {
+    return request<MemberOAuthAuthorize>('/auth/oauth/authorize-url', {
+      query: { provider, mode, redirect }
+    })
+  }
+
+  /** 用一次性 ticket 换 Token；换完立即写入门户 Cookie。 */
+  async function exchangeOAuthTicket(ticket: string): Promise<MemberSession> {
+    const session = await request<MemberSession>('/auth/oauth/exchange', {
+      method: 'POST',
+      body: { ticket }
+    })
+    applySession(session)
+    return session
+  }
+
+  function fetchOAuthBindings(): Promise<MemberOAuthBinding[]> {
+    return request<MemberOAuthBinding[]>('/auth/oauth/bindings')
+  }
+
+  function unbindOAuth(provider: string): Promise<void> {
+    return request<void>(`/auth/oauth/bindings/${encodeURIComponent(provider)}`, {
+      method: 'DELETE'
+    })
+  }
+
   // ==================== 收藏 / 点赞 ====================
 
   function articleSegment(articleId: string | number): string {
@@ -304,6 +370,11 @@ export function useMemberAuth() {
     fetchCaptcha,
     forgotPassword,
     resetPassword,
+    fetchOAuthProviders,
+    fetchOAuthAuthorizeUrl,
+    exchangeOAuthTicket,
+    fetchOAuthBindings,
+    unbindOAuth,
     fetchInteraction,
     fetchFavorites,
     setFavorite,

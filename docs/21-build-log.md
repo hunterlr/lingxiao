@@ -6057,3 +6057,98 @@ SSR：匿名与会员评论区、已通过评论渲染              6/6
 | 敏感词与自动审核 | 仅人工审核，未接敏感词库 |
 | 评论防刷 | 未做频率限制，可复用会员限流服务 |
 | 评论数缓存 | 文章页每次分页查询，热门文章可加计数冗余 |
+
+---
+
+## 62. 会员第三方登录（2026-11-22）
+
+### 62.1 背景
+
+会员已经能注册、登录、收藏、点赞和评论，但入口仍然只有账号密码。第三方登录
+覆盖的平台多、差异大，因此先把 27 个平台的适配器一次性写完，运营再按需在后台
+填凭据、逐平台启用；同时提供独立总开关，避免「代码里有」就等于「门户上能用」。
+
+### 62.2 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `V31__member_oauth.sql` | `mem_oauth_provider`、`mem_user_social`、`mem.oauth.*`（configId 28~30）、菜单 4050/4051 |
+| 补充迁移 | `V32__member_oauth_wechat_mini.sql` | 微信小程序种子，默认停用 |
+| 实体 | `MemOAuthProvider` / `MemUserSocial` | 平台配置；会员绑定关系 |
+| 服务 | `MemberOAuthConfigService` | 总开关、平台开关、凭据读写、门户可用列表、回调地址 |
+| 服务 | `MemberOAuthAccountService` | 登录 / 自动建号、绑定 / 解绑、绑定列表 |
+| 编排 | `MemberOAuthService` | 授权地址、state 校验、回调、ticket、exchange、小程序登录 |
+| 适配器 | `oauth/` 包 | `StandardOAuthProvider` + 微信 / 小程序 / QQ / 支付宝 / Apple 独立实现 |
+| 注册表 | `MemberOAuthProviderRegistry` | 27 个平台的端点、字段路径、scope、分组与是否浏览器入口 |
+| 临时凭证 | `MemberOAuthStateStore` | Sa-Token DAO 存 state（10 分钟）与 ticket（2 分钟、一次有效） |
+| 会员接口 | `MemberOAuthController` | `/api/app/auth/oauth/**` |
+| 后台接口 | `MemberOAuthAdminController` | `/api/admin/member/oauth/**`，权限码 `platform:member:oauth:list|edit` |
+| 后台页面 | `views/member/oauth/index.vue` | 国内 / 国外分组、开关、凭据、高级端点 |
+| 设置页 | `views/member/setting/index.vue` | 第三方登录分组：总开关 / 自动建号 / 门户地址 |
+| 门户 | `MemberOAuthButtons.vue` / `pages/oauth/callback.vue` / `pages/account.vue` | 登录按钮、ticket 换票、绑定管理 |
+| 单测 | `MemberOAuthStateStoreTest` / `MemberOAuthServiceTest` | 4 + 10 项 |
+
+### 62.3 关键决策
+
+1. **双层开关。** `mem.oauth.enabled` 是总开关，平台 `status` 是单平台开关；
+   总开关关闭时门户不展示任何入口，接口返回 `1003`。平台即使启用，
+   没填 ClientId / ClientSecret 也不会出现在门户。
+2. **Token 不进 URL。** 平台回调完成后只 302 一个 2 分钟有效、一次性的 ticket；
+   门户 `POST /exchange` 换 Token 后写 Cookie。ticket 被转发也换不到第二次。
+3. **state / ticket 存服务端。** 用 Sa-Token `SaTokenDao`，单机内存，
+   接 Redis 后自动共享；伪造 state、过期 ticket 都有稳定错误码。
+4. **小程序单独入口。** 小程序没有网页授权：客户端 `wx.login()` 后提交
+   `POST /api/app/auth/oauth/mini-login`。普通 OAuth 平台禁止走该入口，
+   避免绕过 state；门户也不展示小程序按钮。
+5. **绑定模式不信任前端。** `mode=bind` 的会员 ID 只从服务端 state 读取；
+   未登录直接返回 `1002`，且先校验登录态再做外部请求。
+6. **自动建号最小复制。** 只复制昵称与 http(s) 头像，不占用第三方邮箱 / 手机号；
+   用户名用 `平台前缀_openId尾6位`，冲突加随机后缀；密码写随机 BCrypt 占位值。
+7. **会员域与平台域物理隔离。** 只写 `mem_user` / `mem_user_social`，
+   不建跨模块外键、不触碰 `sys_user` / `sys_user_role`；门户第三方登录
+   不会获得任何后台权限。
+8. **密钥只写不读。** 后台列表只返回 `hasSecret / configured`；
+   保存时 Secret 留空表示沿用原值，只有显式 `clearSecret=true` 才清空。
+
+### 62.4 验证
+
+```text
+mvn -o test                                    232 项 / 38 类，0 失败
+Flyway                                         V31、V32 成功，27 个平台落库
+MemberOAuthStateStoreTest                      4/4
+MemberOAuthServiceTest                         10/10
+member-oauth-check.mjs                         37/37
+npm run build（后台 / 门户）                    通过
+浏览器：后台分组 / 小程序标记 / 配置弹窗         通过
+浏览器：门户按钮 / 回调错误页 / 绑定区 / 开关隐藏 通过
+控制台                                         无脚本错误
+```
+
+接口验收覆盖：总开关关闭时门户入口为空、授权 / exchange 返回 1003、
+匿名绑定列表 401、平台列表 27 个且分组正确、小程序标记 `browser=false`、
+默认全部停用、会员 Token 调后台接口 401、未知平台 1004、非法状态 1001、
+凭据保存不回显、PKCE 地址、未启用平台 1003、小程序接口拒绝普通平台、
+伪造 state 回调 302、伪造 ticket 1001、绑定 / 解绑登录保护、自动建号开关同步、
+恢复后入口清空。
+
+### 62.5 踩坑
+
+| 问题 | 处理 |
+|---|---|
+| 业务异常 HTTP 200，脚本按 4xx 断言 | 统一按外层 `code` 断言，只有未登录是 401 + 1002 |
+| 批量保存参数缺少 `configId` | 先按 `configKeyPrefix` 查列表取 `configId`，再 batch 更新 |
+| 清空密钥后仍显示已配置 | MyBatis-Plus `updateById` 忽略 null，`clearSecret` 走显式 `set(null)` |
+| 小程序出现在门户按钮里 | 注册表增加 `browser` 标记，公开列表过滤，后台标注「小程序」 |
+| 小程序绑定未登录先请求第三方 | 先 `requireMemberId()` 再 `exchange`，避免浪费平台调用 |
+| i18n 文案里的 JSON 花括号触发 vue-i18n 编译错误 | 占位文案去掉花括号，控制台恢复干净 |
+| 验收脚本残留上次的密钥 | 脚本开头先 `clearSecret`，保证“默认未配置”断言稳定 |
+
+### 62.6 遗留
+
+| 项 | 说明 |
+|---|---|
+| 真实平台联调 | 适配器与端点已就绪，需在各平台后台登记回调地址并填真实凭据 |
+| 小程序端页面 | 后端 `mini-login` 已就绪，小程序页面由小程序工程实现 |
+| 第三方头像转存 | 当前保留外链；后续可下载到文件中心换 `fileId` |
+| 账号合并 | 同一邮箱的密码账号与第三方账号暂不自动合并，避免误绑 |
+| 解绑前校验 | 当前允许直接解绑；若会员没有密码，后续需强制先设置密码 |

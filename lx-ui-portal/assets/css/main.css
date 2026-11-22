@@ -1854,6 +1854,141 @@ a.pager-link:hover {
   }
 }
 
+/* ---------- 第三方登录 ---------- */
+.oauth-block {
+  margin-top: 22px;
+}
+
+.oauth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.oauth-divider::before,
+.oauth-divider::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--line);
+}
+
+.oauth-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.oauth-button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.oauth-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.oauth-button:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.oauth-badge {
+  display: grid;
+  place-items: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.oauth-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oauth-loading {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.oauth-bindings {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oauth-binding {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.oauth-binding-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.oauth-binding-main strong {
+  font-size: 14px;
+}
+
+.oauth-binding-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.oauth-unbind {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border: 1px solid #e4b7b3;
+  border-radius: 8px;
+  background: transparent;
+  color: #a52a23;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.oauth-unbind:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+@media (max-width: 560px) {
+  .oauth-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;

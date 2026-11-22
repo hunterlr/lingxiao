@@ -155,6 +155,12 @@ const GROUP_DEFS = [
     titleKey: 'page.memberSetting.groupComment',
     descriptionKey: 'page.memberSetting.groupCommentHint',
     keys: ['mem.comment.enabled']
+  },
+  {
+    key: 'oauth',
+    titleKey: 'page.memberSetting.groupOauth',
+    descriptionKey: 'page.memberSetting.groupOauthHint',
+    keys: ['mem.oauth.enabled', 'mem.oauth.autoRegister', 'mem.oauth.portalBaseUrl']
   }
 ]
 

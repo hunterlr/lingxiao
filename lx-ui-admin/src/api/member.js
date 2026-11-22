@@ -69,3 +69,13 @@ export function auditMemberComment(commentId, data) {
 export function deleteMemberComment(commentId) {
   return http.delete(`/admin/member/comment/${commentId}`)
 }
+
+/* ==================== 会员第三方登录 ==================== */
+
+export function listMemberOAuthProviders() {
+  return http.get('/admin/member/oauth')
+}
+
+export function updateMemberOAuthProvider(provider, data) {
+  return http.put(`/admin/member/oauth/${provider}`, data)
+}

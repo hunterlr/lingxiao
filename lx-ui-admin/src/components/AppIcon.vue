@@ -49,7 +49,8 @@ const ICON_MAP = {
   home: 'HomeFilled',
   dashboard: 'Odometer',
   lock: 'Lock',
-  userfilled: 'UserFilled'
+  userfilled: 'UserFilled',
+  link: 'Link'
 }
 
 const resolved = computed(() => {

@@ -585,3 +585,147 @@ mvn -q -pl lx-modules/lx-module-member -am test -Dtest=MemberCommentServiceTest 
 | 敏感词 / 自动审核 | 仅人工审核，未接敏感词库 |
 | 评论防刷 | 未做频率限制，可复用会员限流服务 |
 | 我的评论 | 表已带会员索引，接口与页面留给后续切片 |
+
+---
+
+## 14. v1.2 第四刀：第三方登录（2026-11-22）
+
+第三方登录覆盖 27 个平台，但默认全部停用。代码里先把适配器写完，
+运营在后台按需填凭据、打开单平台开关，再打开会员设置里的总开关，
+门户才会出现对应按钮。会员第三方账号与后台 `sys_user` / `sys_user_social`
+完全隔离，不会因为登录门户获得任何后台权限。
+
+### 14.1 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `V31__member_oauth.sql` | `mem_oauth_provider`、`mem_user_social`、`mem.oauth.*`（configId 28~30）、菜单 4050/4051 |
+| 补充迁移 | `V32__member_oauth_wechat_mini.sql` | 微信小程序服务商种子，默认停用 |
+| 实体 | `MemOAuthProvider` / `MemUserSocial` | 平台配置；会员绑定关系 |
+| 服务 | `MemberOAuthConfigService` | 总开关 / 平台开关 / 凭据读写 / 门户可用列表 / 回调地址 |
+| 服务 | `MemberOAuthAccountService` | 第三方登录、自动建号、绑定 / 解绑、绑定列表 |
+| 编排 | `MemberOAuthService` | 授权地址、回调、一次性 ticket、token 交换、小程序登录 |
+| 适配器 | `oauth/` 包 | `StandardOAuthProvider` + 微信 / 小程序 / QQ / 支付宝 / Apple 专用适配器 |
+| 注册表 | `MemberOAuthProviderRegistry` | 27 个平台的端点、字段路径、scope 与分组 |
+| 临时凭证 | `MemberOAuthStateStore` | Sa-Token DAO 存 state（10 分钟）与 ticket（2 分钟，一次有效） |
+| 会员接口 | `MemberOAuthController` | `/api/app/auth/oauth/**` |
+| 后台接口 | `MemberOAuthAdminController` | `/api/admin/member/oauth/**`，权限码 `platform:member:oauth:list|edit` |
+| 后台页面 | `views/member/oauth/index.vue` | 国内 / 国外分组、开关、凭据与高级端点 |
+| 设置页 | `views/member/setting/index.vue` | 第三方登录分组：总开关 / 自动建号 / 门户地址 |
+| 门户 | `MemberOAuthButtons.vue`、`pages/oauth/callback.vue`、`pages/account.vue` | 登录按钮、回调换票、绑定管理 |
+| 单测 | `MemberOAuthStateStoreTest` / `MemberOAuthServiceTest` | 4 + 10 项 |
+
+### 14.2 平台清单
+
+| 分组 | 平台 |
+|---|---|
+| 国内 | 微信开放平台、微信公众号、微信小程序、QQ、新浪微博、支付宝、抖音、钉钉、Gitee |
+| 国外 | GitHub、GitLab、Google、Microsoft、Apple、Facebook、X (Twitter)、LinkedIn、Discord、LINE、Kakao、Naver、Amazon、Yahoo、Reddit、Slack、Twitch、Spotify |
+
+- 微信开放平台 / 公众号 / QQ / 支付宝 / Apple 流程不标准，使用独立适配器；
+- 其余平台用 `MemberOAuthProviderSpec` 描述端点与字段路径，统一走
+  `StandardOAuthProvider`，新增平台只需要加一条描述；
+- X 使用 PKCE（`code_verifier` 存在服务端 state 里）；Reddit / Yahoo /
+  Spotify 等使用 Token Basic Auth；
+- 微信小程序没有网页授权入口：门户不展示按钮，客户端调用 `wx.login()` 后
+  把 code 提交到 `POST /api/app/auth/oauth/mini-login`，普通 OAuth 平台
+  不允许走这个入口，避免绕过 state。
+
+### 14.3 登录流程
+
+```text
+门户 → GET /api/app/auth/oauth/authorize-url?provider=github&redirect=/account
+     ← 授权地址（服务端生成 state，10 分钟）
+浏览器 → 平台授权页
+平台 → GET /api/app/auth/oauth/callback/github?code&state
+服务端 → 消费 state → 换用户信息
+       ├─ 已绑定：登录会员
+       ├─ 未绑定 + autoRegister=true：自动建号并绑定
+       └─ 未绑定 + autoRegister=false：not_bound
+     → 302 /oauth/callback?ticket=一次性凭证
+门户 → POST /api/app/auth/oauth/exchange { ticket }
+     ← 会员 Token（写入门户 Cookie）
+```
+
+- 会员 Token 从不出现在 URL、回调参数或第三方平台；
+- ticket 只存会员 ID 与来源平台，2 分钟过期且只能换一次；
+- 绑定模式：已登录会员从个人中心发起，`mode=bind`，会员 ID 只从服务端
+  state 读取，不接受 URL / 请求体传入；
+- 解绑只删 `mem_user_social`，不影响会员密码登录。
+
+### 14.4 数据模型
+
+`mem_oauth_provider`（主键 `tenant_id + provider`）：
+
+| 字段 | 说明 |
+|---|---|
+| `provider` | 稳定编码，例如 `wechat_open` / `github` |
+| `status` | `0` 启用 / `1` 停用，默认全部停用 |
+| `client_id` / `client_secret` | 平台凭据；Secret 只写不读 |
+| `redirect_uri` | 留空按 `mem.oauth.portalBaseUrl` 自动生成 |
+| `scope` | 留空使用内置默认值 |
+| `authorize_url` / `token_url` / `user_info_url` | 可覆写内置端点 |
+| `extra_json` | 预留平台差异参数（Apple 团队 ID / Key ID 等） |
+| `sort` / `remark` | 排序与备注 |
+
+`mem_user_social`：
+
+| 字段 | 说明 |
+|---|---|
+| `member_id` | 只关联 `mem_user.member_id`，不建跨模块外键 |
+| `provider` / `open_id` / `union_id` | 平台身份；`(provider, open_id)` 唯一 |
+| `nickname` / `avatar` | 授权快照，仅用于展示兜底 |
+| `raw_data` | 原始 JSON，排障用，接口不下发 |
+| `last_login_time` | 最近一次第三方登录时间 |
+
+### 14.5 安全与边界
+
+1. **会员域与平台域物理隔离。** 只写 `mem_user` / `mem_user_social`，
+   不触碰 `sys_user` / `sys_user_role`；会员 Token 与后台 Token 互不识别。
+2. **未绑定且关闭自动建号时明确报错。** 返回 `1001 not_bound`，提示先登录再绑定，
+   不会静默创建一个空账号。
+3. **自动建号不复制邮箱 / 手机号。** 第三方邮箱未必已验证，直接占用会挡住会员
+   后续自行注册；只复制昵称与 http(s) 头像。
+4. **头像只接受 http/https 或数字 fileId。** 第三方返回 `javascript:` / `data:`
+   等一律丢弃；登录时不覆盖会员自己改过的头像。
+5. **state / ticket 一次性。** 回调重放、伪造 state、过期 ticket 都有对应错误码；
+   门户按短码翻译，不展示上游错误原文。
+6. **总开关 + 单平台开关双层控制。** 总开关关闭时门户不展示任何入口，接口返回
+   `1003`；平台未配置 ClientId / Secret 时即使启用也不出现在门户。
+7. **绑定 / 解绑需要会员登录。** 绑定列表与解绑由会员拦截器保护；
+   发起绑定虽然走公开的 `authorize-url`，但 `mode=bind` 在 Service 内校验登录态。
+
+### 14.6 验证结果
+
+| 项 | 结果 |
+|---|---|
+| 编译 / 打包 | `mvn -o -DskipTests package` 通过 |
+| Flyway | V31、V32 成功，27 个平台、参数与菜单已落库 |
+| 全仓单测 | **232 项 / 38 类**，失败 0 错误 0 |
+| OAuth 单测 | `MemberOAuthStateStoreTest` 4 项 + `MemberOAuthServiceTest` 10 项 |
+| 接口验收 | `.local/member-oauth-check.mjs` **37/37** |
+| 后台构建 | `npm run build` 通过 |
+| 门户构建 | `npm run build` 通过 |
+| 浏览器 | 后台平台列表 / 分组 / 小程序标记 / 配置弹窗；门户登录按钮、回调错误页、账户绑定区、总开关关闭后隐藏 |
+
+### 14.7 复验命令
+
+```powershell
+# 后端 8080（关闭验证码），门户 3000
+java -jar lx-boot\target\lingxiao.jar --lx.captcha.enabled=false
+node .local\member-oauth-check.mjs
+
+# 单测
+mvn -o -pl lx-modules/lx-module-member -am test `
+  "-Dtest=MemberOAuthStateStoreTest,MemberOAuthServiceTest" -DfailIfNoTests=false
+```
+
+### 14.8 遗留
+
+| 项 | 说明 |
+|---|---|
+| 真实平台联调 | 适配器与端点已就绪，需在各平台后台登记回调地址并填真实凭据 |
+| 小程序端页面 | 后端 `mini-login` 已就绪，小程序页面由小程序工程实现 |
+| 第三方头像转存 | 当前保留外链；后续可下载到文件中心换 `fileId` |
+| 账号合并 | 同一邮箱的密码账号与第三方账号暂不自动合并，避免误绑 |
+| 解绑前校验 | 当前允许直接解绑；若会员没有密码，后续需强制先设置密码 |

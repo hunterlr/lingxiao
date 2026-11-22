@@ -236,6 +236,84 @@ button {
   background: var(--accent);
 }
 
+/* ==================== 会员入口 ==================== */
+
+.member-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.member-login {
+  padding: 9px 12px;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.member-login:hover,
+.member-login.is-active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.member-register {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s ease;
+}
+
+.member-register:hover {
+  background: var(--accent);
+}
+
+.member-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 190px;
+  padding: 4px 12px 4px 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 13px;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.member-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.member-avatar {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.member-avatar-text {
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.member-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ==================== 主体 ==================== */
 
 .page-main {
@@ -944,6 +1022,408 @@ a.pager-link:hover {
   color: var(--muted);
 }
 
+/* ==================== 会员登录 / 注册 / 找回密码 ==================== */
+
+.auth-page {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 48px;
+  align-items: start;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.auth-intro {
+  padding: 26px 0;
+}
+
+.auth-intro h1 {
+  margin: 0 0 18px;
+  font-family: var(--font-serif);
+  font-size: clamp(30px, 4vw, 44px);
+  line-height: 1.2;
+}
+
+.auth-intro > p:not(.eyebrow) {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.auth-points {
+  display: grid;
+  gap: 10px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.auth-points li::before {
+  content: "—";
+  margin-right: 10px;
+  color: var(--warm);
+}
+
+.auth-card {
+  padding: 30px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.auth-card h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 26px;
+}
+
+.auth-sub {
+  margin: 8px 0 22px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.auth-sub a {
+  color: var(--accent);
+}
+
+/* ==================== 会员表单 ==================== */
+
+.form-field {
+  margin-bottom: 16px;
+}
+
+.form-field > label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.form-field input:not([type="checkbox"]),
+.form-field select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: none;
+  background: var(--paper);
+  color: var(--ink);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-field input:not([type="checkbox"]):focus,
+.form-field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.form-field input[readonly] {
+  color: var(--muted);
+  background: #f2f1ec;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.form-hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.form-alert {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.form-alert.error {
+  border: 1px solid #f3c9c5;
+  background: #fff4f3;
+  color: #a52a23;
+}
+
+.form-alert.info {
+  border: 1px solid #c9dcff;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.captcha-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.captcha-row input {
+  flex: 1 1 auto;
+}
+
+.captcha-image {
+  flex: 0 0 120px;
+  display: grid;
+  place-items: center;
+  min-height: 42px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.captcha-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.checkbox-field {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.checkbox-field input {
+  width: auto;
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+
+.form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.form-actions .button {
+  width: 100%;
+}
+
+.form-actions .button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.form-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.form-links a,
+.form-links .link-button {
+  color: var(--accent);
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+/* ==================== 会员个人中心 ==================== */
+
+.account-page {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 26px;
+  align-items: start;
+}
+
+.profile-card,
+.account-panel {
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.profile-card {
+  position: sticky;
+  top: 100px;
+}
+
+.profile-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.profile-avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-avatar-text {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--accent), #77a4ff);
+  color: #fff;
+  font-family: var(--font-serif);
+  font-size: 32px;
+}
+
+.profile-name {
+  font-family: var(--font-serif);
+  font-size: 22px;
+}
+
+.profile-username {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 22px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+  text-align: center;
+}
+
+.profile-stats strong {
+  display: block;
+  font-size: 16px;
+}
+
+.profile-stats span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.profile-meta {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.profile-meta > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-meta dt {
+  color: var(--muted);
+}
+
+.profile-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.profile-actions {
+  margin-top: 22px;
+}
+
+.profile-actions .button {
+  width: 100%;
+}
+
+.account-panels {
+  display: grid;
+  gap: 22px;
+}
+
+.panel-title {
+  margin: 0 0 8px;
+  font-family: var(--font-serif);
+  font-size: 24px;
+}
+
+.panel-description {
+  margin: 0 0 20px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.account-guard {
+  max-width: 560px;
+}
+
+.account-guard .form-actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.account-guard .button {
+  width: auto;
+}
+
+.avatar-field {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.avatar-preview {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.avatar-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 /* ==================== 响应式 ==================== */
 
 @media (max-width: 1024px) {
@@ -972,11 +1452,45 @@ a.pager-link:hover {
   .article-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .auth-page,
+  .account-page {
+    grid-template-columns: 1fr;
+    gap: 26px;
+    max-width: 640px;
+  }
+
+  .auth-intro {
+    padding: 0;
+  }
+
+  .profile-card {
+    position: static;
+  }
 }
 
 @media (max-width: 720px) {
   .container {
     width: calc(100% - 32px);
+  }
+
+  .member-actions {
+    order: 2;
+    margin-left: auto;
+  }
+
+  .header-search {
+    order: 3;
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .site-nav {
+    order: 4;
+  }
+
+  .member-name {
+    display: none;
   }
 
   .page-main {
@@ -1006,6 +1520,16 @@ a.pager-link:hover {
 
   .footer-inner {
     grid-template-columns: 1fr;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-card,
+  .profile-card,
+  .account-panel {
+    padding: 20px;
   }
 }
 

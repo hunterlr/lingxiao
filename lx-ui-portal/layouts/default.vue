@@ -1,14 +1,21 @@
 <script setup lang="ts">
 const route = useRoute()
 const { fetchSite, fetchCategories } = usePortalApi()
+const { profile, isLoggedIn, ensureProfile } = useMemberAuth()
 
 const { data: site } = await useAsyncData('portal-site', fetchSite)
 const { data: categories } = await useAsyncData('portal-categories', fetchCategories)
+// 有 Token 才请求会员资料；失败不会阻断内容页
+await ensureProfile()
 
 const siteName = computed(() => site.value?.siteName || '凌霄门户')
 const logo = computed(() => mediaUrl(site.value?.logo))
 const navItems = computed(() => rootCategories(categories.value || []).slice(0, 6))
 const year = new Date().getFullYear()
+
+const memberName = computed(() => profile.value?.nickname || profile.value?.username || '个人中心')
+const memberAvatar = computed(() => mediaUrl(profile.value?.avatar, 'thumb'))
+const memberInitial = computed(() => (memberName.value || '会').slice(0, 1))
 
 const keyword = ref(route.path === '/search' ? String(route.query.keyword || '') : '')
 watch(
@@ -75,6 +82,23 @@ useSeoMeta({
           />
           <button type="submit" aria-label="提交搜索">搜索</button>
         </form>
+
+        <div class="member-actions">
+          <NuxtLink v-if="isLoggedIn" to="/account" class="member-chip" :aria-label="`个人中心：${memberName}`">
+            <img
+              v-if="memberAvatar"
+              :src="memberAvatar"
+              :alt="memberName"
+              class="member-avatar"
+            />
+            <span v-else class="member-avatar member-avatar-text" aria-hidden="true">{{ memberInitial }}</span>
+            <span class="member-name">{{ memberName }}</span>
+          </NuxtLink>
+          <template v-else>
+            <NuxtLink to="/login" class="member-login" :class="{ 'is-active': route.path === '/login' }">登录</NuxtLink>
+            <NuxtLink to="/register" class="member-register">注册</NuxtLink>
+          </template>
+        </div>
       </div>
     </header>
 

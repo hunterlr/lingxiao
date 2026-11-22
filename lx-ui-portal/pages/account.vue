@@ -132,7 +132,7 @@
 
       <section class="account-panel">
         <h2 class="panel-title">基本资料</h2>
-        <p class="panel-description">昵称、头像与性别可自助修改；手机号 / 邮箱更换需要验证，暂未开放。</p>
+        <p class="panel-description">昵称、头像与性别可自助修改；手机号和邮箱在下方“账号安全”中通过验证码换绑。</p>
 
         <p v-if="profileError" class="form-alert error" role="alert">{{ profileError }}</p>
         <p v-if="profileSuccess" class="form-alert info" role="status">{{ profileSuccess }}</p>
@@ -186,6 +186,144 @@
             </button>
           </div>
         </form>
+      </section>
+
+      <section class="account-panel">
+        <h2 class="panel-title">账号安全</h2>
+        <p class="panel-description">
+          更换手机号或邮箱需要向新联系方式发送验证码；已设置密码的账号还要再次输入当前密码。
+          换绑成功后旧手机号 / 邮箱立即失效。
+        </p>
+
+        <div class="contact-block">
+          <h3 class="contact-title">手机号</h3>
+          <p class="form-hint">当前：{{ profile.mobile || '未绑定' }}</p>
+          <p v-if="contactError.mobile" class="form-alert error" role="alert">{{ contactError.mobile }}</p>
+          <p v-if="contactSuccess.mobile" class="form-alert info" role="status">{{ contactSuccess.mobile }}</p>
+
+          <form @submit.prevent="onChangeContact('mobile')">
+            <div class="form-field">
+              <label for="contact-mobile">新手机号</label>
+              <input
+                id="contact-mobile"
+                v-model="contactForms.mobile.value"
+                name="mobile"
+                type="tel"
+                autocomplete="tel"
+                maxlength="32"
+                placeholder="请输入新的手机号"
+                required
+              />
+            </div>
+            <div v-if="passwordSet" class="form-field">
+              <label for="contact-mobile-password">当前密码</label>
+              <input
+                id="contact-mobile-password"
+                v-model="contactForms.mobile.password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                maxlength="64"
+                placeholder="发送验证码前校验当前密码"
+                required
+              />
+            </div>
+            <div class="contact-code-row">
+              <div class="form-field">
+                <label for="contact-mobile-code">验证码</label>
+                <input
+                  id="contact-mobile-code"
+                  v-model="contactForms.mobile.code"
+                  name="code"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  maxlength="16"
+                  placeholder="发送到新手机号的验证码"
+                  required
+                />
+              </div>
+              <button
+                type="button"
+                class="button ghost small"
+                :disabled="!!contactLoading.mobile"
+                @click="onSendContactCode('mobile')"
+              >
+                {{ contactLoading.mobile === 'code' ? '发送中…' : '发送验证码' }}
+              </button>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="button" :disabled="!!contactLoading.mobile">
+                {{ contactLoading.mobile === 'change' ? '换绑中…' : '确认换绑手机号' }}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="contact-block">
+          <h3 class="contact-title">邮箱</h3>
+          <p class="form-hint">当前：{{ profile.email || '未绑定' }}</p>
+          <p v-if="contactError.email" class="form-alert error" role="alert">{{ contactError.email }}</p>
+          <p v-if="contactSuccess.email" class="form-alert info" role="status">{{ contactSuccess.email }}</p>
+
+          <form @submit.prevent="onChangeContact('email')">
+            <div class="form-field">
+              <label for="contact-email">新邮箱</label>
+              <input
+                id="contact-email"
+                v-model="contactForms.email.value"
+                name="email"
+                type="email"
+                autocomplete="email"
+                maxlength="128"
+                placeholder="请输入新的邮箱"
+                required
+              />
+            </div>
+            <div v-if="passwordSet" class="form-field">
+              <label for="contact-email-password">当前密码</label>
+              <input
+                id="contact-email-password"
+                v-model="contactForms.email.password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                maxlength="64"
+                placeholder="发送验证码前校验当前密码"
+                required
+              />
+            </div>
+            <div class="contact-code-row">
+              <div class="form-field">
+                <label for="contact-email-code">验证码</label>
+                <input
+                  id="contact-email-code"
+                  v-model="contactForms.email.code"
+                  name="code"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  maxlength="16"
+                  placeholder="发送到新邮箱的验证码"
+                  required
+                />
+              </div>
+              <button
+                type="button"
+                class="button ghost small"
+                :disabled="!!contactLoading.email"
+                @click="onSendContactCode('email')"
+              >
+                {{ contactLoading.email === 'code' ? '发送中…' : '发送验证码' }}
+              </button>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="button" :disabled="!!contactLoading.email">
+                {{ contactLoading.email === 'change' ? '换绑中…' : '确认换绑邮箱' }}
+              </button>
+            </div>
+          </form>
+        </div>
       </section>
 
       <section class="account-panel">
@@ -280,6 +418,9 @@
               <button type="submit" class="button" :disabled="savingPassword">
                 {{ savingPassword ? '提交中…' : '修改密码' }}
               </button>
+              <div class="form-links">
+                <NuxtLink to="/forgot-password">忘记原密码</NuxtLink>
+              </div>
             </div>
           </form>
         </template>
@@ -348,6 +489,8 @@ const {
   updateProfile,
   changePassword,
   setPassword,
+  sendContactCode,
+  changeContact,
   logout,
   fetchFavorites,
   setFavorite,
@@ -369,6 +512,15 @@ const passwordError = ref('')
 const passwordSuccess = ref('')
 /** 只有第三方建号（password_set=0）才显示“设置密码”；老账号默认视为已设置。 */
 const passwordSet = computed(() => profile.value?.passwordSet !== '0')
+
+/** 手机号 / 邮箱换绑表单；密码只在发送验证码时校验，确认换绑不需要再带。 */
+const contactForms = reactive({
+  mobile: { value: '', code: '', password: '' },
+  email: { value: '', code: '', password: '' }
+})
+const contactLoading = reactive({ mobile: '', email: '' })
+const contactError = reactive({ mobile: '', email: '' })
+const contactSuccess = reactive({ mobile: '', email: '' })
 
 interface FavoriteRow {
   item: MemberFavoriteItem
@@ -622,6 +774,64 @@ async function onSetPassword() {
     }
   } finally {
     savingPassword.value = false
+  }
+}
+
+async function onSendContactCode(type: 'mobile' | 'email') {
+  const form = contactForms[type]
+  contactError[type] = ''
+  contactSuccess[type] = ''
+  const value = form.value.trim()
+  if (!value) {
+    contactError[type] = type === 'mobile' ? '请输入新的手机号' : '请输入新的邮箱'
+    return
+  }
+  if (passwordSet.value && !form.password) {
+    contactError[type] = '请输入当前密码'
+    return
+  }
+
+  contactLoading[type] = 'code'
+  try {
+    await sendContactCode({
+      type,
+      value,
+      password: passwordSet.value ? form.password : undefined
+    })
+    form.value = value
+    contactSuccess[type] = `验证码已发送到 ${value}，请查收后填写。`
+  } catch (error) {
+    contactError[type] = memberErrorMessage(error, '验证码发送失败，请稍后重试')
+  } finally {
+    contactLoading[type] = ''
+  }
+}
+
+async function onChangeContact(type: 'mobile' | 'email') {
+  const form = contactForms[type]
+  contactError[type] = ''
+  contactSuccess[type] = ''
+  const value = form.value.trim()
+  if (!value) {
+    contactError[type] = type === 'mobile' ? '请输入新的手机号' : '请输入新的邮箱'
+    return
+  }
+  if (!form.code.trim()) {
+    contactError[type] = '请输入验证码'
+    return
+  }
+
+  contactLoading[type] = 'change'
+  try {
+    await changeContact({ type, value, code: form.code.trim() })
+    contactSuccess[type] = type === 'mobile' ? '手机号已换绑' : '邮箱已换绑'
+    form.value = ''
+    form.code = ''
+    form.password = ''
+  } catch (error) {
+    contactError[type] = memberErrorMessage(error, '换绑失败，请稍后重试')
+  } finally {
+    contactLoading[type] = ''
   }
 }
 

@@ -472,6 +472,8 @@ export default {
       groupRegisterHint: '注册必填项与注册限流。',
       groupReset: '找回密码',
       groupResetHint: '验证码有效期与找回密码限流。',
+      groupContact: '手机号 / 邮箱换绑',
+      groupContactHint: '换绑验证码有效期与发送 / 确认限流；IP 阈值自动放宽为会员阈值的 10 倍。',
       groupComment: '评论设置',
       groupCommentHint: '评论开关控制门户文章页的评论读取与提交；关闭后后台仍可审核历史评论。',
       groupOauth: '第三方登录',

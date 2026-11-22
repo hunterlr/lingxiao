@@ -151,6 +151,16 @@ const GROUP_DEFS = [
     ]
   },
   {
+    key: 'contact',
+    titleKey: 'page.memberSetting.groupContact',
+    descriptionKey: 'page.memberSetting.groupContactHint',
+    keys: [
+      'mem.account.contactCodeExpireMinutes',
+      'mem.account.contactRateLimitCount',
+      'mem.account.contactRateLimitMinutes'
+    ]
+  },
+  {
     key: 'comment',
     titleKey: 'page.memberSetting.groupComment',
     descriptionKey: 'page.memberSetting.groupCommentHint',

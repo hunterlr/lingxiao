@@ -1700,6 +1700,36 @@ a.pager-link:hover {
   line-height: 1.7;
 }
 
+/* ==================== 账号安全（手机号 / 邮箱换绑） ==================== */
+
+.contact-block + .contact-block {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.contact-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.contact-code-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.contact-code-row .form-field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.contact-code-row .button {
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
 .account-guard {
   max-width: 560px;
 }
@@ -1845,6 +1875,15 @@ a.pager-link:hover {
 
   .form-row {
     grid-template-columns: 1fr;
+  }
+
+  .contact-code-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .contact-code-row .button {
+    width: 100%;
   }
 
   .auth-card,

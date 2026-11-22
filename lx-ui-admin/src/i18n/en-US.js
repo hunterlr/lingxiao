@@ -470,6 +470,8 @@ export default {
       groupRegisterHint: 'Required fields and registration rate limits.',
       groupReset: 'Password reset',
       groupResetHint: 'Verification code lifetime and password reset rate limits.',
+      groupContact: 'Mobile / email change',
+      groupContactHint: 'Verification code lifetime plus send / confirm rate limits. The IP threshold is ten times the member threshold.',
       groupComment: 'Comments',
       groupCommentHint: 'The comment switch controls reading and submitting comments on the portal. When off, admins can still review historical comments.',
       groupOauth: 'Social login',

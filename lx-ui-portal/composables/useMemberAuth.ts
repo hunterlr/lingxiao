@@ -1,7 +1,10 @@
 import type {
   MemberCaptcha,
   MemberCommentItem,
+  MemberContactChangeForm,
+  MemberContactCodeForm,
   MemberFavoriteItem,
+  MemberForgotPasswordForm,
   MemberInteraction,
   MemberLoginForm,
   MemberOAuthAuthorize,
@@ -264,14 +267,36 @@ export function useMemberAuth() {
     if (profile.value) profile.value = { ...profile.value, passwordSet: '1' }
   }
 
+  // ==================== 手机号 / 邮箱换绑 ====================
+
+  /** 向新手机号 / 邮箱发送换绑验证码；已设置密码的账号必须带当前密码。 */
+  function sendContactCode(form: MemberContactCodeForm): Promise<void> {
+    return request<void>('/profile/contact/code', {
+      method: 'POST',
+      body: { ...form }
+    })
+  }
+
+  /** 校验换绑验证码；成功后后端返回最新资料，这里同步更新页面状态。 */
+  async function changeContact(form: MemberContactChangeForm): Promise<MemberProfile> {
+    const result = await request<MemberProfile>('/profile/contact', {
+      method: 'PUT',
+      body: { ...form }
+    })
+    profile.value = result
+    loaded.value = true
+    sessionError.value = ''
+    return result
+  }
+
   function fetchCaptcha(scene: 'login' | 'register' | 'reset'): Promise<MemberCaptcha> {
     return request<MemberCaptcha>('/auth/captcha', { query: { scene } })
   }
 
-  async function forgotPassword(account: string): Promise<void> {
+  async function forgotPassword(form: MemberForgotPasswordForm): Promise<void> {
     await request<void>('/auth/forgot-password', {
       method: 'POST',
-      body: { account }
+      body: { ...form }
     })
   }
 
@@ -396,6 +421,8 @@ export function useMemberAuth() {
     updateProfile,
     changePassword,
     setPassword,
+    sendContactCode,
+    changeContact,
     fetchCaptcha,
     forgotPassword,
     resetPassword,

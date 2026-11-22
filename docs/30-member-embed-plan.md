@@ -863,4 +863,88 @@ mvn -o test
 |---|---|
 | 真实第三方联调 | 需要真实 AppID / Secret 与平台回调白名单；本地只用假凭据验证按钮与授权地址 |
 | 合并撤销 | `mem_merge_log` 留了审计，但不提供一键回滚；需要时按日志人工恢复 |
-| 通知手机号 / 邮箱绑定 | 目前只允许已存在的联系方式匹配，未开放门户内换绑验证 |
+| 通知手机号 / 邮箱绑定 | 已在 §16 开放登录态换绑：验证新值归属；已设置密码的账号还需当前密码 |
+
+## 16. v1.2 第六刀：手机号 / 邮箱换绑与密码重置补强（2026-11-23）
+
+在第五刀基础上开放“登录态内换绑联系方式”，并把找回密码入口补到账号页。
+原则不变：验证的是**新联系方式归属**；旧联系方式不再收码，避免双通道互相阻塞。
+
+### 16.1 迁移与参数
+
+| 迁移 | 内容 |
+|---|---|
+| `V34__member_contact_change.sql` | `mem_contact_change`；`mem.account.contactCodeExpireMinutes` / `contactRateLimitCount` / `contactRateLimitMinutes`（config_id 31~33） |
+
+- `mem_contact_change` 只存 BCrypt 哈希、旧值（仅审计）、目标新值、有效期、请求 IP 与使用时间。
+- 同一会员同一类型的未使用码在申请新码时全部作废；换绑成功后再作废一次，确保一次性使用。
+- 后台「会员管理 → 会员设置」新增“手机号 / 邮箱换绑”分组，参数运行期生效，不需要重启。
+
+### 16.2 接口
+
+| 接口 | 说明 |
+|---|---|
+| `POST /api/app/profile/contact/code` | 登录态 + `type`（mobile / email）+ 新值 +（`password_set=1` 时的当前密码）→ 向新值发码 |
+| `PUT /api/app/profile/contact` | 登录态 + `type` + 新值 + 验证码 → 改 `mem_user.mobile / email`，返回最新 `MemberInfoVO` |
+
+- 已设置密码（`password_set=1`）必须提交当前密码，错误返回 `2005`；未设密码的第三方建号只要求登录态 + 新值验证码。
+- 新值格式：手机号 `^\+?\d{5,20}$`（最长 32）；邮箱统一小写、最长 128。
+- 唯一性：写入前按 `tenant_id + 新值` 查重，命中返回“手机号 / 邮箱已被使用”；并发撞唯一键时把 `DuplicateKeyException` 翻成同一提示。
+- 不允许清空联系方式，也不允许把值改成与当前相同。
+- 发码限流按会员 + IP 双维度，IP 阈值为会员阈值的 10 倍（上限 1000）。
+- 通道停用 / 发送失败 → 明确返回“验证码发送失败”，并立即把刚写入的码标记为已使用，避免留下用户永远收不到的有效码。
+- 换绑不注销当前会话；旧联系方式立即可失效（不能再登录），新值可立即用于登录与找回密码。
+
+### 16.3 密码重置补强
+
+- 找回密码接口补图形验证码（scene=`reset`），与现有验证码总闸一致；账号不存在仍静默成功，避免枚举会员。
+- 重置密码成功后：`password_set` 置 `1`、清登录失败计数与锁定时间、作废全部未使用找回码、`logoutAll` 踢掉旧会话。
+- `password_set=0` 的账号也能通过找回密码直接设置密码，不必先登录第三方。
+- 门户账号页“修改密码”下新增“忘记原密码”链接，直达 `/forgot-password`。
+- 门户找回密码页在图形验证码启用时显示账号 + 图片验证码，失败自动换一张。
+
+### 16.4 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `V34__member_contact_change.sql` | 换绑验证码表 + 3 个参数 |
+| 实体 / Mapper | `MemContactChange` / `MemContactChangeMapper` | 一次性验证码，只存哈希 |
+| 服务 | `MemberContactService` | 格式、唯一性、密码确认、限流、发码、换绑 |
+| DTO | `MemberContactCodeRequest` / `MemberContactChangeRequest` | 请求结构与 Bean Validation |
+| 接口 | `MemberProfileController` | `/profile/contact/code`、`/profile/contact` |
+| 门户 | `account.vue` / `useMemberAuth.ts` / `types/member.ts` / `forgot-password.vue` | 账号安全区、换绑方法、找回密码图形验证码 |
+| 后台 | `views/member/setting/index.vue` + 中英文案 | 换绑参数分组 |
+| 单测 | `MemberContactServiceTest` | 13 项（含通道抛异常时作废验证码） |
+| i18n | `messages*.properties` | 换绑错误与字段校验文案 |
+
+### 16.5 验证结果（2026-11-23）
+
+| 项 | 结果 |
+|---|---|
+| Flyway | V34 成功，数据库到 v34；`mem_contact_change` 与 31~33 参数已落库 |
+| 单测 | `MemberContactServiceTest` 13 + `MemberUserServiceTest` 22，共 35 项通过 |
+| 换绑 / 重置 | `.local/member-contact-check.mjs` **45/45**：密码确认、唯一性、格式、换绑、旧值失效、验证码一次性、限流、通道停用、`password_set=0` 重置 |
+| 全仓单测 | `mvn -o test` **257 项**，失败 0 错误 0 |
+| 门户 SSR | `.local/member-contact-ui-check.mjs` **15/15**：账号安全区、手机号 / 邮箱表单、当前值展示、忘记原密码链接 |
+| 构建 | 后端 `mvn -o -DskipTests package`、门户 / 后台 `npm run build` 均通过 |
+
+### 16.6 复验命令
+
+```powershell
+# 后端 8080（关闭验证码），门户 3000
+java -jar lx-boot\target\lingxiao.jar --lx.captcha.enabled=false
+node .local\member-contact-check.mjs
+node .local\member-contact-ui-check.mjs
+
+# 模块单测 / 全仓单测
+mvn -o -pl lx-modules/lx-module-member -am test "-Dtest=MemberContactServiceTest,MemberUserServiceTest"
+mvn -o test
+```
+
+### 16.7 遗留
+
+| 项 | 说明 |
+|---|---|
+| 换绑审计 | 仅存旧值快照，未单独写操作流水；需要时可结合 `@Log` 操作日志与 `mem_contact_change` 追溯 |
+| 生产通道 | 开发通道仍只写日志；上线前实现 `MemberSmsSender` / `MemberEmailSender` 并切到 `prod` |
+| 多节点限流 | 仍是单机内存窗口；多实例部署需换 Redis / 网关限流 |

@@ -82,6 +82,30 @@ export interface MemberResetPasswordForm {
   newPassword: string
 }
 
+/** 找回密码第一步：账号 + 图形验证码（场景 reset）。 */
+export interface MemberForgotPasswordForm {
+  account: string
+  captchaKey?: string
+  captchaCode?: string
+}
+
+/** 手机号 / 邮箱换绑类型。 */
+export type MemberContactType = 'mobile' | 'email'
+
+/** 换绑第一步：向新联系方式发送验证码；已设置密码的账号还要带当前密码。 */
+export interface MemberContactCodeForm {
+  type: MemberContactType
+  value: string
+  password?: string
+}
+
+/** 换绑第二步：提交验证码并落库。 */
+export interface MemberContactChangeForm {
+  type: MemberContactType
+  value: string
+  code: string
+}
+
 /** 第三方建号首次设置密码；已设置密码的账号走修改密码。 */
 export interface MemberSetPasswordForm {
   newPassword: string

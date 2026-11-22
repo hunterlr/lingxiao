@@ -8,6 +8,7 @@ import com.lingxiao.common.core.enums.ErrorCode;
 import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.modules.member.dto.MemberLoginRequest;
 import com.lingxiao.modules.member.dto.MemberLoginResponse;
+import com.lingxiao.modules.member.dto.MemberForgotPasswordRequest;
 import com.lingxiao.modules.member.dto.MemberRegisterRequest;
 import com.lingxiao.modules.member.dto.MemberResetPasswordRequest;
 import com.lingxiao.modules.member.entity.MemLevel;
@@ -144,6 +145,12 @@ class MemberUserServiceTest {
         return request;
     }
 
+    private static MemberForgotPasswordRequest forgotRequest(String account) {
+        MemberForgotPasswordRequest request = new MemberForgotPasswordRequest();
+        request.setAccount(account);
+        return request;
+    }
+
     @Test
     @DisplayName("注册成功：落 mem_user，默认等级与渠道，注册后直接发 Token")
     void registerSuccess() {
@@ -263,10 +270,11 @@ class MemberUserServiceTest {
     void forgotPasswordSilentForUnknownAccount() {
         when(userMapper.selectList(any())).thenReturn(Collections.emptyList());
 
-        service.forgotPassword("nobody");
+        service.forgotPassword(forgotRequest("nobody"));
 
         verify(passwordResetMapper, never()).insert(any(MemPasswordReset.class));
         verify(resetCodeSender, never()).send(any(MemUser.class), anyString(), anyString(), anyInt());
+        verify(captchaService).verify(eq("reset"), isNull(), isNull());
     }
 
     @Test
@@ -275,7 +283,7 @@ class MemberUserServiceTest {
         MemUser user = user();
         when(userMapper.selectList(any())).thenReturn(Collections.singletonList(user));
 
-        service.forgotPassword("alice");
+        service.forgotPassword(forgotRequest("alice"));
 
         verify(passwordResetMapper).update(isNull(), any());
         ArgumentCaptor<MemPasswordReset> captor = ArgumentCaptor.forClass(MemPasswordReset.class);
@@ -417,7 +425,7 @@ class MemberUserServiceTest {
     void forgotPasswordAppliesRateLimit() {
         when(userMapper.selectList(any())).thenReturn(Collections.emptyList());
 
-        service.forgotPassword("nobody");
+        service.forgotPassword(forgotRequest("nobody"));
 
         verify(rateLimitService).check("member:forgot:id:nobody", 5, 10);
         verify(rateLimitService).check("member:forgot:ip:unknown", 50, 10);

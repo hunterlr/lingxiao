@@ -3,14 +3,19 @@ package com.lingxiao.modules.member.controller;
 import com.lingxiao.common.core.domain.R;
 import com.lingxiao.common.log.annotation.Log;
 import com.lingxiao.common.log.enums.BusinessType;
+import com.lingxiao.modules.member.dto.MemberContactChangeRequest;
+import com.lingxiao.modules.member.dto.MemberContactCodeRequest;
 import com.lingxiao.modules.member.dto.MemberInfoVO;
 import com.lingxiao.modules.member.dto.MemberPasswordChangeRequest;
 import com.lingxiao.modules.member.dto.MemberPasswordSetRequest;
 import com.lingxiao.modules.member.dto.MemberProfileUpdateRequest;
+import com.lingxiao.modules.member.security.MemberLoginHelper;
+import com.lingxiao.modules.member.service.MemberContactService;
 import com.lingxiao.modules.member.service.MemberUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,6 +36,7 @@ import javax.validation.Valid;
 public class MemberProfileController {
 
     private final MemberUserService userService;
+    private final MemberContactService contactService;
 
     @GetMapping
     public R<MemberInfoVO> info() {
@@ -56,5 +62,21 @@ public class MemberProfileController {
     public R<Void> setPassword(@Valid @RequestBody MemberPasswordSetRequest request) {
         userService.setPassword(request);
         return R.ok();
+    }
+
+    /** 换绑手机号 / 邮箱：验证码发送到新联系方式，不记录密码与验证码。 */
+    @Log(title = "会员个人中心", businessType = BusinessType.UPDATE, saveRequestData = false)
+    @PostMapping("/contact/code")
+    public R<Void> sendContactCode(@Valid @RequestBody MemberContactCodeRequest request) {
+        contactService.sendCode(MemberLoginHelper.getMemberId(), request);
+        return R.ok();
+    }
+
+    /** 换绑手机号 / 邮箱：校验验证码并返回最新资料。 */
+    @Log(title = "会员个人中心", businessType = BusinessType.UPDATE, saveRequestData = false)
+    @PutMapping("/contact")
+    public R<MemberInfoVO> changeContact(@Valid @RequestBody MemberContactChangeRequest request) {
+        contactService.change(MemberLoginHelper.getMemberId(), request);
+        return R.ok(userService.getInfo());
     }
 }

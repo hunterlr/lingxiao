@@ -38,6 +38,32 @@
             required
           />
         </div>
+        <div v-if="captcha?.enabled" class="form-field">
+          <label for="forgot-captcha">图形验证码</label>
+          <div class="captcha-row">
+            <input
+              id="forgot-captcha"
+              v-model="form.captchaCode"
+              name="captchaCode"
+              type="text"
+              inputmode="text"
+              autocomplete="off"
+              maxlength="8"
+              placeholder="请输入图片中的字符"
+              required
+            />
+            <button
+              type="button"
+              class="captcha-image"
+              :aria-label="captchaLoading ? '正在刷新验证码' : '点击刷新验证码'"
+              @click="refreshCaptcha"
+            >
+              <img v-if="captcha.image" :src="captcha.image" alt="图形验证码" />
+              <span v-else>刷新</span>
+            </button>
+          </div>
+          <p class="form-hint">看不清可以点击图片刷新，图形验证码一次性使用。</p>
+        </div>
         <p class="form-hint">验证码有效期由站点会员设置决定，通常 10 分钟。</p>
         <div class="form-actions">
           <button type="submit" class="button" :disabled="submitting || memberDisabled">
@@ -108,12 +134,15 @@
 </template>
 
 <script setup lang="ts">
+import type { MemberCaptcha } from '~/types/member'
 import { MemberApiError, memberErrorMessage } from '~/composables/useMemberAuth'
 
-const { forgotPassword, resetPassword } = useMemberAuth()
+const { forgotPassword, resetPassword, fetchCaptcha } = useMemberAuth()
 
 const step = ref<'request' | 'reset'>('request')
-const form = reactive({ account: '', code: '', newPassword: '', confirmPassword: '' })
+const form = reactive({ account: '', code: '', newPassword: '', confirmPassword: '', captchaCode: '' })
+const captcha = ref<MemberCaptcha | null>(null)
+const captchaLoading = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
 const infoMessage = ref('')
@@ -128,6 +157,22 @@ function handleError(error: unknown, fallback: string) {
   errorMessage.value = memberErrorMessage(error, fallback)
 }
 
+async function refreshCaptcha() {
+  captchaLoading.value = true
+  try {
+    captcha.value = await fetchCaptcha('reset')
+  } catch (error) {
+    if (error instanceof MemberApiError && error.code === 1003) {
+      memberDisabled.value = true
+      disabledMessage.value = memberErrorMessage(error, disabledMessage.value)
+    } else {
+      errorMessage.value = memberErrorMessage(error, '图形验证码加载失败，请稍后重试')
+    }
+  } finally {
+    captchaLoading.value = false
+  }
+}
+
 async function onSendCode() {
   errorMessage.value = ''
   infoMessage.value = ''
@@ -136,15 +181,25 @@ async function onSendCode() {
     errorMessage.value = '请输入账号'
     return
   }
+  if (captcha.value?.enabled && (!captcha.value.key || !form.captchaCode.trim())) {
+    errorMessage.value = '请输入图形验证码'
+    return
+  }
 
   submitting.value = true
   try {
-    await forgotPassword(account)
+    await forgotPassword({
+      account,
+      captchaKey: captcha.value?.enabled ? captcha.value.key || undefined : undefined,
+      captchaCode: captcha.value?.enabled ? form.captchaCode.trim() : undefined
+    })
     form.account = account
     infoMessage.value = '如果该账号存在，验证码已发送，请查收短信或邮件。'
     step.value = 'reset'
   } catch (error) {
     handleError(error, '验证码发送失败，请稍后重试')
+    form.captchaCode = ''
+    if (captcha.value?.enabled) await refreshCaptcha()
   } finally {
     submitting.value = false
   }
@@ -192,4 +247,6 @@ function backToRequest() {
 
 // 已登录也可以找回密码；不强制跳转，避免用户误入后无法操作
 useSeoMeta({ title: '找回密码', robots: 'noindex' })
+
+onMounted(refreshCaptcha)
 </script>

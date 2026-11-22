@@ -62,7 +62,7 @@ public class MemberAuthController {
     /** 申请找回密码验证码；账号不存在也返回成功，避免枚举会员。 */
     @PostMapping("/forgot-password")
     public R<Void> forgotPassword(@Valid @RequestBody MemberForgotPasswordRequest request) {
-        userService.forgotPassword(request.getAccount());
+        userService.forgotPassword(request);
         return R.ok();
     }
 

@@ -11,6 +11,7 @@ import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.common.security.util.LoginHelper;
 import com.lingxiao.common.web.util.ServletUtils;
 import com.lingxiao.modules.member.dto.MemberCreateRequest;
+import com.lingxiao.modules.member.dto.MemberForgotPasswordRequest;
 import com.lingxiao.modules.member.dto.MemberInfoVO;
 import com.lingxiao.modules.member.dto.MemberLoginRequest;
 import com.lingxiao.modules.member.dto.MemberLoginResponse;
@@ -298,11 +299,14 @@ public class MemberUserService {
     /**
      * 找回密码第一步：申请验证码。
      *
-     * <p>无论账号是否存在都返回成功，避免被用来枚举会员账号。验证码只存
-     * BCrypt 哈希，有效期由 {@code mem.register.resetCodeExpireMinutes} 控制。</p>
+     * <p>顺序：限流 → 图形验证码 → 查账号 → 发码。无论账号是否存在都返回成功，
+     * 避免被用来枚举会员账号。验证码只存 BCrypt 哈希，有效期由
+     * {@code mem.register.resetCodeExpireMinutes} 控制。</p>
      */
-    public void forgotPassword(String account) {
+    public void forgotPassword(MemberForgotPasswordRequest request) {
+        String account = request.getAccount();
         limitReset("forgot", account);
+        captchaService.verify("reset", request.getCaptchaKey(), request.getCaptchaCode());
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
         String hash = passwordEncoder.encode(code);
         int expireMinutes = resetExpireMinutes();
@@ -365,7 +369,8 @@ public class MemberUserService {
                 .set(MemUser::getLoginFailCount, 0)
                 .set(MemUser::getLockTime, null));
         passwordResetMapper.update(null, new LambdaUpdateWrapper<MemPasswordReset>()
-                .eq(MemPasswordReset::getResetId, reset.getResetId())
+                .eq(MemPasswordReset::getMemberId, user.getMemberId())
+                .eq(MemPasswordReset::getUsed, "0")
                 .set(MemPasswordReset::getUsed, "1")
                 .set(MemPasswordReset::getUseTime, LocalDateTime.now()));
         tokenIssuer.logoutAll(user.getMemberId());

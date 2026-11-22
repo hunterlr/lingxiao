@@ -1029,15 +1029,30 @@ mvn -q test
 
 ### 21.8 下一窗口启动提示词
 
-```text
-在仓库 E:\java\lingxiao 继续 v1.3 CMS 第三刀：内容模型与字段最小集、单页、导航、
-区块 / 轮播、草稿预览。严格按 docs/20-cms-embed-plan.md §21 与 docs/13-roadmap.md
-§12.24 执行，模板只做“模板编码 + Nuxt 组件映射”的准备，不做静态化。
+#### 21.8.1 开工自检（必须写进提示词）
 
-开工前先读：docs/20 §21、docs/02 的 CMS-016~054、docs/06-modularity.md、
-docs/29-portal-api.md、docs/05-database.md、docs/31-portal-frontend.md §9。
-先输出拆解方案（迁移编号、表、接口、权限码、后台 / 门户页面、验收脚本），
-再开始写代码。
+1. **先确认基线**：执行 `git log -1` 与 `git status --porcelain`，确认当前在
+   `81a261f`（或之后的提交）且工作区干净；有未提交改动先说明，不要直接覆盖。
+2. **先方案后代码**：迁移编号（从 `V35` 起）、权限码、菜单 ID、门户接口逐项列出，
+   确认不与现有编号撞号并等确认后再动手；有疑问先问，不要自行跳步。
+
+#### 21.8.2 第三刀提示词（推荐先做这个）
+
+```text
+在仓库 E:\java\lingxiao 开发 v1.3 CMS 第三刀：内容模型与字段最小集（文章 / 图集 / 单页）、
+单页、导航、区块 / 轮播、草稿预览。严格按 docs/20-cms-embed-plan.md §21 与
+docs/13-roadmap.md §12.24 执行；本轮不做服务端模板引擎，不做静态页生成。
+
+开工自检：
+1) 先执行 git log -1 和 git status --porcelain，确认基线在 81a261f（含）之后、
+   工作区干净；若工作区有未提交改动，先说明情况再决定是否继续，不要直接覆盖。
+2) 先输出拆解方案并等确认再写代码：迁移编号（从 V35 起，放 db/migration/cms/）、
+   表结构、接口与权限码、菜单 ID、后台页面、门户接口与页面、验收脚本；
+   逐项说明不与现有 CMS 表、菜单、权限码撞号。有疑问先问，不要跳步。
+
+开工前先读：docs/20 §21、docs/13 §12.24、docs/02 的 CMS-016~054、
+docs/06-modularity.md、docs/29-portal-api.md、docs/05-database.md §2.4、
+docs/31-portal-frontend.md §9、docs/30-member-embed-plan.md（只读，了解边界）。
 
 硬约束：
 - 门户只调 /api/portal/cms/** 与 /api/app/**，禁止调 /api/admin/**；
@@ -1049,5 +1064,26 @@ docs/29-portal-api.md、docs/05-database.md、docs/31-portal-frontend.md §9。
 - 中文注释，错误 / 校验文案中英文双份，权限码与菜单 SQL 幂等。
 
 交付：代码 + 单测 + Flyway 实跑 + .local/cms-model-check.mjs + 后台 / 门户构建 +
-文档同步，最后 git commit & push。完成后列出验收结果与遗留。
+浏览器走查（无控制台错误）+ 文档同步（docs/20 新章节、docs/13 勾掉 12.24、
+docs/05 表、docs/29 接口），最后 git commit & push。完成后列出验收结果与遗留。
+```
+
+#### 21.8.3 第四刀提示词（想先做模板时替换第一段）
+
+```text
+在仓库 E:\java\lingxiao 开发 v1.4 CMS 第四刀：站点主题 + 栏目模板的“模板编码 + Nuxt
+组件映射”、模板预览、标签独立页、sitemap / robots / RSS、404。先读 docs/20 §21.5 与 §21.2。
+不做服务端模板引擎，不做静态页生成。
+
+开工自检：
+1) 先执行 git log -1 和 git status --porcelain，确认基线在 81a261f（含）之后、
+   工作区干净；有未提交改动先说明，不要直接覆盖。
+2) 先确认第三刀（内容模型 / 单页 / 导航 / 区块）是否已完成；未完成先停下来说明依赖，
+   不要跳步。
+3) 先输出方案并等确认：模板编码清单与默认回退规则、站点主题字段、栏目 template
+   白名单、权限码与菜单 ID、预览票据方案、门户组件映射，再写代码。
+
+其余硬约束、交付标准与 21.8.2 相同（门户只调 /api/portal/cms/** 与 /api/app/**、
+不跨模块外键、文件只存 fileId、CMS 关闭 404、迁移从 V35 起不改历史、文案中英双份）。
+完成后列出验收结果与遗留。
 ```

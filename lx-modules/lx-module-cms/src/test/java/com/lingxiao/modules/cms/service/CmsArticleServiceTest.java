@@ -14,12 +14,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -251,6 +253,109 @@ class CmsArticleServiceTest {
 
         assertThat(error).isNotNull();
         assertThat(error.getMessage()).contains("文章不存在");
+    }
+
+    /* ==================== 定时发布 ==================== */
+
+    @Test
+    @DisplayName("定时发布：时间早于当前时拒绝，不改状态")
+    void scheduleRejectsPastTime() {
+        CmsArticle article = new CmsArticle();
+        article.setArticleId(5L);
+        article.setStatus(CmsArticleService.STATUS_DRAFT);
+        when(articleMapper.selectById(5L)).thenReturn(article);
+
+        ServiceException error = catchThrowableOfType(
+                () -> service.schedule(5L, LocalDateTime.now().minusMinutes(1)), ServiceException.class);
+
+        assertThat(error).isNotNull();
+        assertThat(error.getMessage()).contains("晚于当前时间");
+        verify(articleMapper, never()).scheduleById(anyLong(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("定时发布：已发布文章必须先下线")
+    void scheduleRejectsPublishedArticle() {
+        CmsArticle article = new CmsArticle();
+        article.setArticleId(5L);
+        article.setStatus(CmsArticleService.STATUS_PUBLISHED);
+        when(articleMapper.selectById(5L)).thenReturn(article);
+
+        ServiceException error = catchThrowableOfType(
+                () -> service.schedule(5L, LocalDateTime.now().plusHours(1)), ServiceException.class);
+
+        assertThat(error).isNotNull();
+        assertThat(error.getMessage()).contains("先下线");
+        verify(articleMapper, never()).scheduleById(anyLong(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("定时发布：草稿排期后写状态 3 与计划时间")
+    void scheduleMarksArticleAsScheduled() {
+        CmsArticle article = new CmsArticle();
+        article.setArticleId(5L);
+        article.setStatus(CmsArticleService.STATUS_DRAFT);
+        when(articleMapper.selectById(5L)).thenReturn(article);
+        when(articleMapper.scheduleById(eq(5L), any(), isNull(), any())).thenReturn(1);
+
+        service.schedule(5L, LocalDateTime.now().plusHours(2));
+
+        verify(articleMapper).scheduleById(eq(5L), any(), isNull(), any());
+    }
+
+    @Test
+    @DisplayName("取消定时：非定时状态拒绝")
+    void cancelScheduleRejectsDraft() {
+        CmsArticle article = new CmsArticle();
+        article.setArticleId(5L);
+        article.setStatus(CmsArticleService.STATUS_DRAFT);
+        when(articleMapper.selectById(5L)).thenReturn(article);
+
+        ServiceException error = catchThrowableOfType(
+                () -> service.cancelSchedule(5L), ServiceException.class);
+
+        assertThat(error).isNotNull();
+        assertThat(error.getMessage()).contains("只有定时待发布");
+        verify(articleMapper, never()).cancelScheduleById(anyLong(), any(), any());
+    }
+
+    @Test
+    @DisplayName("取消定时：定时待发布回到草稿")
+    void cancelScheduleMovesBackToDraft() {
+        CmsArticle article = new CmsArticle();
+        article.setArticleId(5L);
+        article.setStatus(CmsArticleService.STATUS_SCHEDULED);
+        when(articleMapper.selectById(5L)).thenReturn(article);
+        when(articleMapper.cancelScheduleById(eq(5L), isNull(), any())).thenReturn(1);
+
+        service.cancelSchedule(5L);
+
+        verify(articleMapper).cancelScheduleById(eq(5L), isNull(), any());
+    }
+
+    @Test
+    @DisplayName("到点扫描：只统计真正抢占成功的文章")
+    void publishDueScheduledCountsClaimedRows() {
+        when(articleMapper.selectDueScheduledIds(any(), eq(200)))
+                .thenReturn(Arrays.asList(5L, 6L));
+        when(articleMapper.publishScheduledById(eq(5L), any())).thenReturn(1);
+        when(articleMapper.publishScheduledById(eq(6L), any())).thenReturn(0);
+
+        int published = service.publishDueScheduled(200);
+
+        assertThat(published).isEqualTo(1);
+        verify(articleMapper).publishScheduledById(eq(5L), any());
+        verify(articleMapper).publishScheduledById(eq(6L), any());
+    }
+
+    @Test
+    @DisplayName("到点扫描：没有候选时不发 UPDATE")
+    void publishDueScheduledWithoutCandidates() {
+        when(articleMapper.selectDueScheduledIds(any(), anyInt()))
+                .thenReturn(Collections.emptyList());
+
+        assertThat(service.publishDueScheduled(200)).isZero();
+        verify(articleMapper, never()).publishScheduledById(anyLong(), any());
     }
 
     private CmsCategory category(Long id, Long siteId) {

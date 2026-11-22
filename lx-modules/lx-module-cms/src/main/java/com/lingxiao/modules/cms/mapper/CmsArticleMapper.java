@@ -11,6 +11,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 文章 Mapper。列表条件（站点 / 栏目子树 / 标签 / 状态）在服务层拼
@@ -31,6 +32,62 @@ public interface CmsArticleMapper extends BaseMapper<CmsArticle> {
      */
     @Update("UPDATE cms_article SET view_count = view_count + 1 WHERE article_id = #{articleId}")
     int increaseViewCount(@Param("articleId") Long articleId);
+
+    // ==================== 定时发布 ====================
+
+    /**
+     * 到点发布：条件 UPDATE 抢占。
+     *
+     * <p>多个实例同时扫描时，只有第一个把 status 从 3 改成 1 的实例
+     * 影响行数为 1，其余实例自然跳过，不需要额外全局锁。</p>
+     *
+     * <p>{@code COALESCE(publish_time, schedule_time)}：没有首次发布时间就写计划时间，
+     * 已有历史发布时间则保留（与手动发布口径一致）。</p>
+     */
+    @Update("UPDATE cms_article SET status = '1', "
+            + "publish_time = COALESCE(publish_time, schedule_time), "
+            + "schedule_time = NULL, update_time = #{now}, version = version + 1 "
+            + "WHERE article_id = #{articleId} AND del_flag = '0' "
+            + "AND status = '3' AND schedule_time IS NOT NULL AND schedule_time <= #{now}")
+    int publishScheduledById(@Param("articleId") Long articleId,
+                             @Param("now") LocalDateTime now);
+
+    /**
+     * 设置 / 修改排期。
+     *
+     * <p>条件更新而不是读后写：草稿（0）/ 已下线（2）/ 已排期（3）才能排期，
+     * 已发布（1）必须显式先下线；并发改状态时以数据库为准，影响行数为 0 由 Service 报冲突。</p>
+     */
+    @Update("UPDATE cms_article SET status = '3', schedule_time = #{scheduleTime}, "
+            + "update_by = #{updateBy}, update_time = #{now}, version = version + 1 "
+            + "WHERE article_id = #{articleId} AND del_flag = '0' "
+            + "AND status IN ('0', '2', '3')")
+    int scheduleById(@Param("articleId") Long articleId,
+                     @Param("scheduleTime") LocalDateTime scheduleTime,
+                     @Param("updateBy") Long updateBy,
+                     @Param("now") LocalDateTime now);
+
+    /** 取消排期：只允许 status='3'，避免误清已发布文章的计划字段。 */
+    @Update("UPDATE cms_article SET status = '0', schedule_time = NULL, "
+            + "update_by = #{updateBy}, update_time = #{now}, version = version + 1 "
+            + "WHERE article_id = #{articleId} AND del_flag = '0' AND status = '3'")
+    int cancelScheduleById(@Param("articleId") Long articleId,
+                           @Param("updateBy") Long updateBy,
+                           @Param("now") LocalDateTime now);
+
+    /**
+     * 取到点待发布的文章 ID。
+     *
+     * <p>只查主键，不查正文；{@code LIMIT} 由参数控制，单轮扫描有上限。
+     * 排序按计划时间，积压时先发最早该发的。</p>
+     */
+    @Select("<script>SELECT article_id FROM cms_article "
+            + "WHERE del_flag = '0' AND status = '3' "
+            + "AND schedule_time IS NOT NULL AND schedule_time &lt;= #{now} "
+            + "ORDER BY schedule_time ASC LIMIT #{limit}"
+            + "</script>")
+    List<Long> selectDueScheduledIds(@Param("now") LocalDateTime now,
+                                     @Param("limit") int limit);
 
     // ==================== 回收站 ====================
 
@@ -54,8 +111,10 @@ public interface CmsArticleMapper extends BaseMapper<CmsArticle> {
      *
      * <p>publish_time 保留：它表示“首次发布时间”，重新发布时沿用，
      * 不会因为进过一次回收站就把历史发布时间清掉。</p>
+     *
+     * <p>定时信息一并清空：回收期间调度不应该继续生效，恢复后由人重新排期。</p>
      */
-    @Update("UPDATE cms_article SET del_flag = '0', status = '0', "
+    @Update("UPDATE cms_article SET del_flag = '0', status = '0', schedule_time = NULL, "
             + "delete_by = NULL, delete_by_name = NULL, delete_time = NULL, "
             + "update_by = #{updateBy}, update_time = #{updateTime}, version = version + 1 "
             + "WHERE article_id = #{articleId} AND del_flag = '1'")

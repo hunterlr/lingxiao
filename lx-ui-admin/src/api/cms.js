@@ -107,6 +107,14 @@ export function offlineArticle(articleId) {
   return http.put(`/admin/cms/article/${articleId}/offline`)
 }
 
+export function scheduleArticle(articleId, data) {
+  return http.put(`/admin/cms/article/${articleId}/schedule`, data)
+}
+
+export function cancelScheduleArticle(articleId) {
+  return http.put(`/admin/cms/article/${articleId}/schedule/cancel`)
+}
+
 export function deleteArticle(articleId) {
   return http.delete(`/admin/cms/article/${articleId}`)
 }

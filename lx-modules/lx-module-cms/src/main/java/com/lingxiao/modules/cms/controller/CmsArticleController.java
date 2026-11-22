@@ -6,6 +6,7 @@ import com.lingxiao.common.log.annotation.Log;
 import com.lingxiao.common.log.enums.BusinessType;
 import com.lingxiao.common.security.annotation.RequiresPermission;
 import com.lingxiao.modules.cms.dto.CmsArticleRecycleVO;
+import com.lingxiao.modules.cms.dto.CmsArticleScheduleDTO;
 import com.lingxiao.modules.cms.entity.CmsArticle;
 import com.lingxiao.modules.cms.service.CmsArticleService;
 import lombok.RequiredArgsConstructor;
@@ -93,6 +94,25 @@ public class CmsArticleController {
     @PutMapping("/{articleId}/offline")
     public R<Void> offline(@PathVariable Long articleId) {
         articleService.offline(articleId);
+        return R.ok();
+    }
+
+    /** 定时发布：设置 / 修改计划时间；已发布文章需先下线。 */
+    @RequiresPermission("platform:cms:article:schedule")
+    @Log(title = "CMS 文章定时发布", businessType = BusinessType.UPDATE)
+    @PutMapping("/{articleId}/schedule")
+    public R<Void> schedule(@PathVariable Long articleId,
+                            @Valid @RequestBody CmsArticleScheduleDTO dto) {
+        articleService.schedule(articleId, dto.getScheduleTime());
+        return R.ok();
+    }
+
+    /** 取消定时：定时待发布 → 草稿。 */
+    @RequiresPermission("platform:cms:article:schedule")
+    @Log(title = "CMS 文章取消定时", businessType = BusinessType.UPDATE)
+    @PutMapping("/{articleId}/schedule/cancel")
+    public R<Void> cancelSchedule(@PathVariable Long articleId) {
+        articleService.cancelSchedule(articleId);
         return R.ok();
     }
 

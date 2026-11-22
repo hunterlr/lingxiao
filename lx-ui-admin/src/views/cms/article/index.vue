@@ -41,6 +41,7 @@
             <el-option :label="t('page.cms.article.draft')" value="0" />
             <el-option :label="t('page.cms.article.published')" value="1" />
             <el-option :label="t('page.cms.article.offline')" value="2" />
+            <el-option :label="t('page.cms.article.scheduled')" value="3" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -91,9 +92,12 @@
         <el-table-column prop="publishTime" :label="t('page.cms.article.publishedAt')" width="160">
           <template #default="{ row }">{{ row.publishTime || '-' }}</template>
         </el-table-column>
+        <el-table-column prop="scheduleTime" :label="t('page.cms.article.scheduleTime')" width="160">
+          <template #default="{ row }">{{ row.scheduleTime || '-' }}</template>
+        </el-table-column>
         <el-table-column prop="viewCount" :label="t('page.cms.article.views')" width="90" align="center" />
         <el-table-column prop="createTime" :label="t('common.createTime')" width="160" />
-        <el-table-column :label="t('common.operation')" width="270" fixed="right">
+        <el-table-column :label="t('common.operation')" width="400" fixed="right">
           <template #default="{ row }">
             <div class="table-actions">
               <el-button link type="primary" @click="openPreview(row)">{{ t('page.cms.article.preview') }}</el-button>
@@ -117,6 +121,24 @@
                 @click="handleOffline(row)"
               >
                 {{ t('page.cms.article.offlineAction') }}
+              </el-button>
+              <el-button
+                v-if="row.status !== '1'"
+                v-hasPerm="'platform:cms:article:schedule'"
+                link
+                type="primary"
+                @click="openSchedule(row)"
+              >
+                {{ t('page.cms.article.schedule') }}
+              </el-button>
+              <el-button
+                v-if="row.status === '3'"
+                v-hasPerm="'platform:cms:article:schedule'"
+                link
+                type="warning"
+                @click="handleCancelSchedule(row)"
+              >
+                {{ t('page.cms.article.cancelSchedule') }}
               </el-button>
               <el-button v-hasPerm="'platform:cms:article:remove'" link type="danger" @click="handleDelete(row)">
                 {{ t('common.delete') }}
@@ -237,6 +259,42 @@
       </template>
     </el-dialog>
 
+    <el-dialog
+      v-model="scheduleVisible"
+      :title="t('page.cms.article.scheduleTitle')"
+      width="440px"
+      append-to-body
+      destroy-on-close
+    >
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        :title="t('page.cms.article.scheduleHint')"
+        style="margin-bottom: 16px"
+      />
+      <el-form label-width="110px">
+        <el-form-item :label="t('page.cms.article.scheduleTime')" required>
+          <el-date-picker
+            v-model="scheduleTime"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            :placeholder="t('page.cms.article.scheduleRequired')"
+            :disabled-date="disablePastDate"
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="scheduleVisible = false">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" :loading="scheduleSaving" @click="submitSchedule">
+            {{ t('page.cms.article.scheduleSubmit') }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <el-drawer v-model="previewVisible" :title="previewTitle" size="640px" append-to-body>
       <el-alert
         type="info"
@@ -261,6 +319,7 @@ import RichEditor from '@/components/RichEditor.vue'
 import MediaPicker from '@/components/MediaPicker.vue'
 import {
   addArticle,
+  cancelScheduleArticle,
   deleteArticle,
   getArticle,
   getCategoryTree,
@@ -269,6 +328,7 @@ import {
   listTagOptions,
   offlineArticle,
   publishArticle,
+  scheduleArticle,
   updateArticle
 } from '@/api/cms'
 
@@ -306,12 +366,14 @@ const categoryNameMap = computed(() => {
 function statusLabel(status) {
   if (status === '1') return t('page.cms.article.published')
   if (status === '2') return t('page.cms.article.offline')
+  if (status === '3') return t('page.cms.article.scheduled')
   return t('page.cms.article.draft')
 }
 
 function statusTagType(status) {
   if (status === '1') return 'success'
   if (status === '2') return 'warning'
+  if (status === '3') return 'primary'
   return 'info'
 }
 
@@ -579,6 +641,67 @@ async function handleOffline(row) {
   }
   await offlineArticle(row.articleId)
   ElMessage.success(t('common.success'))
+  await loadList()
+}
+
+/* ==================== 定时发布 ==================== */
+const scheduleVisible = ref(false)
+const scheduleSaving = ref(false)
+const scheduleTime = ref('')
+const scheduleRow = ref(null)
+
+function formatLocalDateTime(date) {
+  const pad = (value) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} `
+    + `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+function disablePastDate(date) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return date.getTime() < today.getTime()
+}
+
+function openSchedule(row) {
+  scheduleRow.value = row
+  // 已有排期时默认沿用，改时间比重新选更方便
+  scheduleTime.value = row.scheduleTime || formatLocalDateTime(new Date(Date.now() + 60 * 60 * 1000))
+  scheduleVisible.value = true
+}
+
+async function submitSchedule() {
+  if (!scheduleTime.value) {
+    ElMessage.warning(t('page.cms.article.scheduleRequired'))
+    return
+  }
+  const target = new Date(scheduleTime.value.replace(/-/g, '/')).getTime()
+  if (!Number.isFinite(target) || target <= Date.now()) {
+    ElMessage.warning(t('page.cms.article.scheduleFuture'))
+    return
+  }
+  scheduleSaving.value = true
+  try {
+    await scheduleArticle(scheduleRow.value.articleId, { scheduleTime: scheduleTime.value })
+    ElMessage.success(t('page.cms.article.scheduleSuccess'))
+    scheduleVisible.value = false
+    await loadList()
+  } finally {
+    scheduleSaving.value = false
+  }
+}
+
+async function handleCancelSchedule(row) {
+  try {
+    await ElMessageBox.confirm(
+      t('page.cms.article.cancelScheduleConfirm', { title: row.title }),
+      t('page.cms.article.cancelSchedule'),
+      { type: 'warning', confirmButtonText: t('page.cms.article.cancelSchedule'), cancelButtonText: t('common.cancel') }
+    )
+  } catch (e) {
+    return
+  }
+  await cancelScheduleArticle(row.articleId)
+  ElMessage.success(t('page.cms.article.cancelScheduleSuccess'))
   await loadList()
 }
 

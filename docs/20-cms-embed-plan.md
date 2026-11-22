@@ -269,7 +269,7 @@ platform:cms:tag:list|add|edit|remove
 | 标签聚合查询 | ✅ 已完成（后台筛选 + 门户按标签筛选） | 门户聚合页 UI 后置 |
 | 门户 API `/api/portal/cms/**` | ✅ 已完成 | 只读、只出已发布内容（§15） |
 | 文章回收站 | ✅ 已完成（2026-11-22） | 软删除 + 恢复回草稿 + 彻底删除（§16） |
-| 定时发布 | ⏳ 未开始 | 依赖 `publish_time`，任务扫描后置 |
+| 定时发布 | ✅ 已完成（2026-11-22） | `status='3'` 到点由后台扫描发布（§17） |
 | 内容版本 | ⏳ 未开始 | 表与页面均未建 |
 | `cms_content_ext` 自定义字段 | ⏳ 未开始 | 避免过早固定内容模型 |
 | 素材选择器 | ✅ 已完成（2026-11-22） | 站点 Logo / 栏目封面 / 文章封面接文件中心；仍兼容 URL 手填 |
@@ -616,4 +616,87 @@ node .local\portal-disabled.mjs
 # 后端 8080（关闭验证码）+ 前端 5173
 node .local\cms-recycle-check.mjs
 cd .local\uitest; node cms-recycle.mjs
+```
+
+---
+
+## 17. v1.1 CMS 文章定时发布（2026-11-22）
+
+内容生命周期的第二刀：让运营提前排期，到点由后台自动发布，不必守在电脑前点按钮。
+范围仍是**文章一次性排期**：不做周期性内容、不做审核流、不做定时下线。
+
+### 17.1 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `db/migration/cms/V23__cms_article_schedule.sql` | `schedule_time` 列、`(status, schedule_time)` 索引、按钮权限 3053 |
+| 实体 | `CmsArticle` | 新增 `scheduleTime`，注释写清仅 `status='3'` 时有效 |
+| DTO | `dto/CmsArticleScheduleDTO` | 只接一个 `scheduleTime`，`@NotNull` 走 i18n 校验消息 |
+| Mapper | `CmsArticleMapper` | `scheduleById` / `cancelScheduleById` / `selectDueScheduledIds` / `publishScheduledById` |
+| Service | `CmsArticleService` | 新增状态常量 `STATUS_SCHEDULED='3'`、`schedule` / `cancelSchedule` / `publishDueScheduled` |
+| 任务 | `task/CmsScheduleTask` | `@Scheduled` 扫描，CMS 开启时注册；异常兜住，下一轮重试 |
+| Controller | `CmsArticleController` | `PUT /{id}/schedule`、`PUT /{id}/schedule/cancel` |
+| 配置 | `application.yml` | `lx.cms.schedule-scan-interval-ms` / `initial-delay-ms` / `batch-size` |
+| 前端接口 | `api/cms.js` | `scheduleArticle` / `cancelScheduleArticle` |
+| 前端页面 | `views/cms/article/index.vue` | 状态筛选、计划时间列、定时弹窗、取消定时、已发布隐藏排期入口 |
+| 单测 | `CmsArticleServiceTest` | 新增 7 项：过去时间、已发布拒绝、排期、取消、非定时拒绝、扫描计数、无候选 |
+
+### 17.2 状态机与关键决策
+
+```text
+草稿(0) ──schedule──> 定时待发布(3) ──到点扫描──> 已发布(1)
+   ▲                        │
+   └────cancelSchedule──────┘
+已下线(2) ──schedule──> 定时待发布(3)
+已发布(1) ──offline──> 已下线(2)
+```
+
+1. **新增独立状态 `3`，而不是复用草稿 + 一个时间字段。**
+   列表筛选、门户可见性、按钮显隐都能直接按状态判断；门户只认 `status='1'`，
+   定时文章天然不可见，不需要在门户查询里再加“时间未到”条件。
+2. **到点发布用条件 UPDATE 抢占。**
+   `status='3' AND schedule_time <= now` 才能改成 `1`；多实例同时扫描时只有一个
+   影响行数为 1，其余跳过，等价于数据库行锁，不需要额外锁表。
+3. **`publish_time = COALESCE(publish_time, schedule_time)`。**
+   首次发布用计划时间，重新发布的文章保留历史首次发布时间，与手动发布口径一致；
+   `schedule_time` 发布后清空，不参与历史展示。
+4. **已发布文章必须先下线才能排期。**
+   直接排期等于“悄悄替换线上内容”；运营必须先明确下线，再决定何时重新发布。
+   重复排期视为改时间，允许。
+5. **手动发布 / 下线 / 回收站恢复都清空 `schedule_time`。**
+   人已经接管状态，计划时间不应残留；恢复统一回草稿，排期需要重新设置。
+6. **扫描任务不依赖 job 模块。**
+   内容排期是 CMS 自身业务能力，关掉 job 模块也该能发；任务只在 CMS 开启时注册，
+   关闭 CMS 后接口与扫描一起消失。
+7. **单轮有上限、失败不阻塞。**
+   默认每轮最多 200 篇、间隔 30 秒；单篇就是一条 UPDATE，某篇失败不回滚其它篇，
+   下一轮自动重试。异常在任务里兜住并记日志，避免调度线程停摆。
+
+### 17.3 验证结果
+
+| 项 | 结果 |
+|---|---|
+| 编译 / 打包 | `mvn -q -DskipTests package` 通过 |
+| Flyway | `V23 - cms article schedule` 成功；菜单 3053 与超管授权已落库 |
+| 单测 | CMS 36 项（文章 19 项）；全仓 **148 项 / 28 类**，JDK 8 与 JDK 11 各跑一遍全部通过 |
+| 接口验收 | `.local/cms-schedule-check.mjs` **39/39**：过去时间 / 空时间 / 已发布拒绝、排期与改期、筛选、取消、手动发布 / 下线 / 恢复清定时、到点自动发布、门户可见、清理 |
+| 浏览器验收 | `.local/uitest/cms-schedule.mjs` **10/10**：入口、弹窗提示、选时间提交、列表状态与计划时间、取消回草稿、到点自动发布、门户可见、已发布隐藏排期入口 |
+| 前端 | `check-i18n-keys.mjs` zh=1051、en=1051，无 missing / dotted-leaf；`npm run build` 通过 |
+| 关闭模块 | 不新增外部依赖；关闭 CMS 时排期接口 404，扫描任务不注册 |
+
+### 17.4 当前限制
+
+- 扫描粒度默认 30 秒：到点文章最多晚 30 秒对外可见，需要更准时可调小间隔。
+- 只支持一次性排期，不支持周期发布、批量排期、定时下线。
+- 排期成功 / 失败没有站内通知，失败只在日志里，下一轮自动重试；成功与否可在列表状态看到。
+- 时间统一按服务器本地时区解释，站点级时区未做。
+- 排期后仍允许普通编辑（内容会先保存，到点发布的是最新版本），这是有意为之，
+  但运营需要知道“排期的是文章，不是某个版本”；内容版本功能后置。
+
+### 17.5 复验命令
+
+```powershell
+# 后端 8080（关闭验证码）+ 前端 5173；扫描间隔默认 30 秒
+node .local\cms-schedule-check.mjs
+cd .local\uitest; node cms-schedule.mjs
 ```

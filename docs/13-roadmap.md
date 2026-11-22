@@ -663,3 +663,27 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 
 详见 `docs/20-cms-embed-plan.md` §16、`docs/21-build-log.md` §52、
 `lx-modules/lx-module-cms/README.md`。
+
+### 12.12 P1：v1.1 CMS 文章定时发布（✅ 已完成，2026-11-22）
+
+**完成内容**：
+
+- 新增迁移 `V23__cms_article_schedule.sql`：`cms_article.schedule_time` 与
+  `(status, schedule_time)` 索引；新增按钮权限 `platform:cms:article:schedule`（菜单 3053）；
+- 文章状态增加 `3 定时待发布`；门户只认 `status='1'`，定时文章天然不可见；
+- 新增接口 `PUT /api/admin/cms/article/{id}/schedule` 与 `/schedule/cancel`；
+  只允许草稿 / 已下线排期，已发布必须先下线；重复排期视为改时间；
+- 新增 `CmsScheduleTask` 固定间隔扫描，用条件 UPDATE 抢占到点文章，
+  多实例同时扫描只有一台成功；不依赖 job 模块，CMS 关闭时不注册；
+- 到点发布：`publish_time = COALESCE(publish_time, schedule_time)`，发布后清空
+  `schedule_time`；手动发布 / 下线 / 回收站恢复都会清空排期；
+- 前端文章列表补状态筛选、计划时间列、定时弹窗与取消定时入口，中英文文案补齐。
+
+**验收**：CMS 单测 36 项（文章 19 项）；全仓 **148 项 / 28 类**，JDK 8 / 11 均通过；
+真实接口 39/39；浏览器 10/10；i18n 1051/1051；`vite build` 通过。
+
+详见 `docs/20-cms-embed-plan.md` §17、`docs/21-build-log.md` §53、
+`lx-modules/lx-module-cms/README.md`。
+
+**下一步**：内容版本（发布 / 编辑快照、回滚），随后进入 v1.2 会员体系；
+门户工程与模板列表按 v1.3 计划推进。

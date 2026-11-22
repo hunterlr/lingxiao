@@ -426,7 +426,19 @@ export default {
         summaryPlaceholder: 'Summary shown in lists (optional)',
         coverPlaceholder: 'fileId or an image URL starting with https://',
         sourcePlaceholder: 'e.g. Original, Some News',
-        sourceUrlPlaceholder: 'Link to the original post (optional)'
+        sourceUrlPlaceholder: 'Link to the original post (optional)',
+        scheduled: 'Scheduled',
+        schedule: 'Schedule',
+        scheduleTitle: 'Schedule article',
+        scheduleTime: 'Publish at',
+        scheduleHint: 'A background task publishes it at the scheduled time. You can cancel or reschedule before then. Published articles must be taken offline first.',
+        scheduleSubmit: 'Schedule',
+        scheduleRequired: 'Select a publish time',
+        scheduleFuture: 'The publish time must be in the future',
+        scheduleSuccess: 'Article scheduled',
+        cancelSchedule: 'Cancel schedule',
+        cancelScheduleConfirm: 'Cancel the schedule for "{title}"? It returns to draft.',
+        cancelScheduleSuccess: 'Schedule cancelled'
       },
       recycle: {
         title: 'Recycle bin',

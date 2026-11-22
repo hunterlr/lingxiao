@@ -38,7 +38,7 @@ import java.util.Set;
  * 不依赖前端、也不依赖数据库。</p>
  *
  * <p><b>状态流转：</b>新建一律草稿；普通编辑只改内容，不改状态与发布时间；
- * 发布 / 下线走独立接口。这样“改个错别字”不会把已下线文章悄悄重新发布。</p>
+ * 发布 / 下线 / 定时走独立接口。这样“改个错别字”不会把已下线文章悄悄重新发布。</p>
  *
  * <p><b>列表不查正文：</b>{@code content} 是 longtext，列表页用不到；
  * 分页查询显式排除该列，避免一页几十篇正文把内存和网络拖慢。</p>
@@ -48,10 +48,11 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class CmsArticleService {
 
-    /** 文章状态：草稿 / 已发布 / 已下线 */
+    /** 文章状态：草稿 / 已发布 / 已下线 / 定时待发布 */
     public static final String STATUS_DRAFT = "0";
     public static final String STATUS_PUBLISHED = "1";
     public static final String STATUS_OFFLINE = "2";
+    public static final String STATUS_SCHEDULED = "3";
 
     private final CmsArticleMapper articleMapper;
     private final CmsArticleTagMapper articleTagMapper;
@@ -106,6 +107,7 @@ public class CmsArticleService {
         article.setContent(HtmlSanitizer.clean(article.getContent()));
         article.setStatus(STATUS_DRAFT);
         article.setPublishTime(null);
+        article.setScheduleTime(null);
         article.setViewCount(0L);
         article.setSort(article.getSort() == null ? 0 : article.getSort());
         fillAuthor(article);
@@ -140,13 +142,18 @@ public class CmsArticleService {
         replaceTags(articleId, siteId, article.getTagIds());
     }
 
-    /** 发布：草稿 / 已下线 → 已发布；首次发布写 publishTime，重新发布保留原时间。 */
+    /**
+     * 发布：草稿 / 已下线 → 已发布；首次发布写 publishTime，重新发布保留原时间。
+     *
+     * <p>手动发布会顺带取消定时：既然人已经决定现在发，计划时间不应再留着。</p>
+     */
     public void publish(Long articleId) {
         CmsArticle existing = mustGet(articleId);
         LambdaUpdateWrapper<CmsArticle> update = new LambdaUpdateWrapper<CmsArticle>()
                 .eq(CmsArticle::getArticleId, articleId)
                 .set(CmsArticle::getStatus, STATUS_PUBLISHED)
-                .set(CmsArticle::getUpdateBy, LoginHelper.getUserId());
+                .set(CmsArticle::getScheduleTime, null)
+                .set(CmsArticle::getUpdateBy, currentUserId());
         if (existing.getPublishTime() == null) {
             update.set(CmsArticle::getPublishTime, LocalDateTime.now());
         }
@@ -159,7 +166,69 @@ public class CmsArticleService {
         articleMapper.update(null, new LambdaUpdateWrapper<CmsArticle>()
                 .eq(CmsArticle::getArticleId, articleId)
                 .set(CmsArticle::getStatus, STATUS_OFFLINE)
-                .set(CmsArticle::getUpdateBy, LoginHelper.getUserId()));
+                .set(CmsArticle::getScheduleTime, null)
+                .set(CmsArticle::getUpdateBy, currentUserId()));
+    }
+
+    /**
+     * 定时发布：草稿 / 已下线 → 定时待发布。
+     *
+     * <p>已发布文章必须先下线：直接排期等于“悄悄替换线上内容”，
+     * 运营需要明确知道自己在改动什么。重复排期视为改时间，允许。</p>
+     */
+    public void schedule(Long articleId, LocalDateTime scheduleTime) {
+        CmsArticle existing = mustGet(articleId);
+        if (scheduleTime == null) {
+            throw new ServiceException(ErrorCode.BAD_REQUEST, "请选择定时发布时间");
+        }
+        if (!scheduleTime.isAfter(LocalDateTime.now())) {
+            throw new ServiceException(ErrorCode.BAD_REQUEST, "定时发布时间必须晚于当前时间");
+        }
+        if (STATUS_PUBLISHED.equals(existing.getStatus())) {
+            throw new ServiceException(ErrorCode.BAD_REQUEST, "文章已发布，请先下线再设置定时发布");
+        }
+        int updated = articleMapper.scheduleById(articleId, scheduleTime, currentUserId(),
+                LocalDateTime.now());
+        if (updated == 0) {
+            throw new ServiceException(ErrorCode.BAD_REQUEST, "文章状态已变化，请刷新后重试");
+        }
+    }
+
+    /** 取消定时：定时待发布 → 草稿；其它状态调用直接拒绝，避免误清线上文章。 */
+    public void cancelSchedule(Long articleId) {
+        CmsArticle existing = mustGet(articleId);
+        if (!STATUS_SCHEDULED.equals(existing.getStatus())) {
+            throw new ServiceException(ErrorCode.BAD_REQUEST, "只有定时待发布的文章可以取消定时");
+        }
+        int updated = articleMapper.cancelScheduleById(articleId, currentUserId(),
+                LocalDateTime.now());
+        if (updated == 0) {
+            throw new ServiceException(ErrorCode.BAD_REQUEST, "文章状态已变化，请刷新后重试");
+        }
+    }
+
+    /**
+     * 扫描并发布到点的定时文章。
+     *
+     * <p>抢占靠 Mapper 的条件 UPDATE（status='3' → '1'），多实例同时扫描时
+     * 只有一个实例影响行数为 1，不需要额外的全局锁表。</p>
+     *
+     * <p>每次最多处理 {@code limit} 篇，避免一次扫描把数据库拖住；
+     * 剩余的下一轮继续。</p>
+     *
+     * @return 本轮实际发布篇数
+     */
+    public int publishDueScheduled(int limit) {
+        LocalDateTime now = LocalDateTime.now();
+        List<Long> dueIds = articleMapper.selectDueScheduledIds(now, Math.max(limit, 1));
+        if (dueIds == null || dueIds.isEmpty()) {
+            return 0;
+        }
+        int published = 0;
+        for (Long articleId : dueIds) {
+            published += articleMapper.publishScheduledById(articleId, now);
+        }
+        return published;
     }
 
     /**

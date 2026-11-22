@@ -21,7 +21,7 @@ import java.util.List;
  * <p>正文是富文本 HTML，服务端写入 / 读取两侧都走
  * {@code com.lingxiao.common.web.util.HtmlSanitizer}。</p>
  *
- * <p>状态：0 草稿 / 1 已发布 / 2 已下线。发布、下线单独走接口，
+ * <p>状态：0 草稿 / 1 已发布 / 2 已下线 / 3 定时待发布。发布、下线、定时都走独立接口，
  * 普通编辑不改状态与发布时间，避免“改个错别字把下线文章又发出去”。</p>
  */
 @Data
@@ -66,10 +66,13 @@ public class CmsArticle extends BaseEntity {
     @Size(max = 255, message = "{valid.cms.source.url.max}")
     private String sourceUrl;
 
-    /** 0 草稿 / 1 已发布 / 2 已下线 */
+    /** 0 草稿 / 1 已发布 / 2 已下线 / 3 定时待发布 */
     private String status;
 
     private LocalDateTime publishTime;
+
+    /** 计划发布时间；status=3 时有效，到点发布后清空 */
+    private LocalDateTime scheduleTime;
 
     private Long viewCount;
 

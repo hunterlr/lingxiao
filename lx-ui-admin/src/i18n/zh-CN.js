@@ -428,7 +428,19 @@ export default {
         summaryPlaceholder: '列表页摘要，可空',
         coverPlaceholder: 'fileId 或 https:// 开头的图片地址',
         sourcePlaceholder: '如 本站原创、某某新闻',
-        sourceUrlPlaceholder: '原文链接，可空'
+        sourceUrlPlaceholder: '原文链接，可空',
+        scheduled: '定时待发布',
+        schedule: '定时发布',
+        scheduleTitle: '定时发布文章',
+        scheduleTime: '计划发布时间',
+        scheduleHint: '到点后由后台任务自动发布；到点前可随时取消或改时间。已发布文章需先下线。',
+        scheduleSubmit: '确定定时',
+        scheduleRequired: '请选择计划发布时间',
+        scheduleFuture: '计划发布时间必须晚于当前时间',
+        scheduleSuccess: '已设置定时发布',
+        cancelSchedule: '取消定时',
+        cancelScheduleConfirm: '确认取消文章「{title}」的定时发布吗？取消后回到草稿。',
+        cancelScheduleSuccess: '已取消定时'
       },
       recycle: {
         title: '回收站',

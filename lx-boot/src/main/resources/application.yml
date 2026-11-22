@@ -180,6 +180,15 @@ lx:
     medium-size: 800
     # 参与处理的最大像素数：超过只入库宽高，不生成变体，防止解压炸弹
     max-pixels: 20000000
+  # CMS 运行时参数（基础设施，不放 sys_config）
+  cms:
+    # 定时发布扫描间隔（毫秒）：到点文章最多晚这么久对外可见。
+    # 30 秒是“可接受延迟”和“别把数据库刷爆”的折中，可按部署规模调整。
+    schedule-scan-interval-ms: 30000
+    # 启动后延迟多久开始第一轮扫描：避开应用启动时的迁移 / 缓存预热高峰
+    schedule-scan-initial-delay-ms: 15000
+    # 单轮最多发布多少篇：积压时下一轮继续，避免一次大事务拖住数据库
+    schedule-batch-size: 200
 
 logging:
   level:

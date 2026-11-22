@@ -5131,3 +5131,128 @@ ext IN ('jpg','jpeg','png','gif','bmp','webp','svg')
 | 数据范围 | 回收站列表未接数据范围，与当前 CMS 其它列表一致，权限细化时统一处理 |
 | 内容生命周期后续 | 定时发布（`publish_time` 扫描）、内容版本仍待做 |
 | 门户解析 | 门户仍原样返回 `fileId` / URL，消费端按 `docs/29` 约定拼接 |
+
+---
+
+## 53. CMS 文章定时发布（2026-11-22）
+
+### 53.1 背景与范围
+
+回收站收口后，内容生命周期继续：**定时发布 → 内容版本**。本批做一次性排期：
+
+- 运营可以提前选时间，到点由后台任务自动把文章从“定时待发布”改成“已发布”；
+- 不做周期发布、批量排期、定时下线，也不接审核流；
+- 不引入 Quartz / 消息队列，沿用 Spring Task + 数据库条件更新。
+
+### 53.2 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `V23__cms_article_schedule.sql` | `schedule_time datetime(3)`、`(status, schedule_time)` 索引、按钮 3053 |
+| 实体 | `CmsArticle` | `scheduleTime`；状态注释补 `3 定时待发布` |
+| DTO | `CmsArticleScheduleDTO` | 只接 `scheduleTime`，`@NotNull` 使用 `valid.cms.article.schedule.required` |
+| Mapper | `CmsArticleMapper` | `scheduleById`（条件 0/2/3）、`cancelScheduleById`（条件 3）、`selectDueScheduledIds`、`publishScheduledById`（条件抢占） |
+| Service | `CmsArticleService` | `STATUS_SCHEDULED`、`schedule` / `cancelSchedule` / `publishDueScheduled`；发布 / 下线清定时；创建 / 恢复清定时 |
+| 任务 | `task/CmsScheduleTask` | `@Scheduled` 固定间隔扫描，CMS 开启才注册；异常兜底 |
+| Controller | `CmsArticleController` | `PUT /{id}/schedule`、`PUT /{id}/schedule/cancel`，权限码 `platform:cms:article:schedule` |
+| 配置 | `application.yml` | `lx.cms.schedule-scan-interval-ms=30000`、`schedule-scan-initial-delay-ms=15000`、`schedule-batch-size=200` |
+| 前端接口 | `api/cms.js` | `scheduleArticle` / `cancelScheduleArticle` |
+| 前端页面 | `views/cms/article/index.vue` | 状态筛选加“定时待发布”、计划时间列、定时弹窗、取消定时 |
+| 单测 | `CmsArticleServiceTest` | 19 项（新增 7 项排期相关） |
+
+### 53.3 关键决策
+
+1. **状态值 `3` 而不是“草稿 + 时间”。**
+   列表筛选、按钮显隐、门户可见性都只判断状态；门户本来就只查 `status='1'`，
+   定时文章不需要额外过滤时间。
+2. **数据库条件更新当锁。**
+   `UPDATE ... WHERE status='3' AND schedule_time <= now`，多实例同时扫描只有一台成功；
+   不建锁表、不引分布式锁，和项目“Spring Task + 数据库锁”的主线一致。
+3. **首次发布时间取计划时间。**
+   `publish_time = COALESCE(publish_time, schedule_time)`，重新发布保留历史首次时间；
+   发布后 `schedule_time=NULL`，避免列表残留“已发布但还显示计划时间”。
+4. **已发布必须先下线。**
+   直接排期等于悄悄替换线上内容；重复排期视为改时间，允许。
+5. **人接管状态时清定时。**
+   手动发布、下线、回收站恢复都会清 `schedule_time`；恢复仍是草稿，需要重新排期。
+6. **扫描不依赖 job 模块。**
+   CMS 关闭时任务不注册；job 模块关闭不影响内容发布。单轮最多 200 篇，失败下一轮重试。
+7. **时间按服务器本地时区。**
+   当前不做站点级时区；私有化单时区部署够用，跨时区运营后续再补。
+
+### 53.4 施工步骤
+
+1. **数据库**
+   - `cms_article` 增 `schedule_time`，建 `(status, schedule_time)` 索引；
+   - 插按钮 3053 `cms:article:schedule`，`module_code='cms'`，补 `role_id=1` 授权；
+   - SQL 继续用 `INSERT ... SELECT ... WHERE NOT EXISTS`，不用 MySQL 方言。
+2. **后端**
+   - 实体 / DTO / 校验消息中英文各一份；
+   - Mapper：排期、取消、到点候选、条件发布四条显式 SQL；
+   - Service：状态校验、时间必须晚于当前、已发布拒绝、扫描批量处理；
+   - Task：固定间隔扫描，异常兜住并记录本轮发布篇数；
+   - Controller：两个接口共用 `schedule` 权限码。
+3. **前端**
+   - 文章列表状态筛选与标签补“定时待发布”，新增计划时间列；
+   - 行内新增“定时发布”（非已发布）与“取消定时”（仅状态 3）；
+   - 弹窗用 `el-date-picker` 选到秒，提交前再校验必须晚于当前；
+   - 中英文文案补齐，i18n 键数量 1039 → 1051。
+
+### 53.5 验证
+
+**A. 后端**
+
+- `mvn -q -pl lx-modules/lx-module-cms -am test` 通过；
+- 全仓 `mvn clean test`：JDK 8 / JDK 11 各一遍，**148 项 / 28 类**，0 失败 0 错误；
+- `mvn -q -DskipTests package` 通过；Flyway 执行到 V23，应用正常启动；
+- 菜单 3053 与 `role_id=1` 授权已落库。
+
+**B. 接口 39/39**
+
+`.local/cms-schedule-check.mjs`：
+
+- 过去时间、空时间、已发布文章排期都被拒绝；
+- 草稿排期后 `status=3`、`scheduleTime` 有值、门户不可见、列表可按状态 3 筛选；
+- 重复排期成功改时间；
+- 取消排期回草稿并清空时间，再次取消被拒绝；
+- 手动发布 / 下线 / 删除后恢复都清空 `scheduleTime`；
+- 到点后扫描自动发布：`status=1`、`publishTime` 等于计划时间、`scheduleTime` 为空、门户可见；
+- 清理站点 / 栏目。
+
+**C. 浏览器 10/10**
+
+`.local/uitest/cms-schedule.mjs`：
+
+- 草稿行出现“定时发布”，弹窗含标题与“到点后由后台任务自动发布”提示；
+- 输入未来时间提交后，列表显示“定时待发布”和计划时间；
+- 取消定时确认后回草稿；
+- 第二篇排期到 5 秒后，刷新列表等到“已发布”，发布时间列显示计划时间；
+- 门户接口能看到该文章；已发布行不再出现“定时发布 / 取消定时”。
+
+截图：`.local/uitest/cms-schedule.png`（定时待发布列表）。
+
+**D. 前端**
+
+- `node scripts/check-i18n-keys.mjs`：zh=1051、en=1051，无 missing / 单边 / dotted-leaf；
+- `npm run build` 通过。
+
+### 53.6 踩坑
+
+| 问题 | 处理 |
+|---|---|
+| 单测里 `LambdaUpdateWrapper` 读不到 TableInfo 缓存 | 排期 / 取消改成 Mapper 显式条件 SQL，顺带获得并发安全，不再依赖实体缓存 |
+| 排期和“改状态”并发时可能互相覆盖 | 条件 UPDATE 限定可排期状态，影响行数为 0 时提示刷新重试 |
+| 手动发布后计划时间残留 | `publish` / `offline` / `restore` 全部显式 `schedule_time=NULL` |
+| 浏览器脚本中途调登录会踢掉页面会话 | 所有前置数据用启动时 Token 建好，浏览器登录后不再刷新 Token，末尾再 `refreshToken` 清理 |
+| Element Plus 日期时间选择器 | 直接点输入框输入 `YYYY-MM-DD HH:mm:ss` 后回车，再点“确定定时” |
+| 扫描任务异常会让后续轮次停摆 | 任务方法整体 try/catch，记录日志后等下一轮 |
+
+### 53.7 遗留
+
+| 项 | 说明 |
+|---|---|
+| 精度 | 默认 30 秒扫描一次，到点文章最多晚 30 秒可见 |
+| 排期能力 | 仅一次性；周期发布、批量排期、定时下线未做 |
+| 通知 | 发布成功 / 失败只进日志，无站内信；失败下一轮重试 |
+| 时区 | 按服务器本地时区解释，站点级时区未做 |
+| 内容版本 | 排期发布的是“到点时最新内容”；版本快照仍待做 |

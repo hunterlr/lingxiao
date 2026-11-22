@@ -5698,3 +5698,111 @@ Flyway                            V27 - member channel config 成功
 | 发送审计 | 目前只写应用日志，后续可增加发送记录表与失败重试 |
 | 多实例限流 | 仍为内存窗口，后续可换 Redis / 网关限流 |
 | 会员业务 | 等级升级、积分、互动、第三方登录、权限码仍未做 |
+
+---
+
+## 58. 门户第一刀：Nuxt3 内容页（2026-11-22）
+
+### 58.1 背景
+
+后台 CMS 与门户只读接口已经闭环，但内容还没有一个真正可访问、可索引、可分享的
+公开站点。v1.3 第一刀新建 Nuxt3 门户，只消费 `/api/portal/cms/**`，
+验证「后台发布 → 门户可见」的完整阅读链路。
+
+第一刀刻意不做会员登录、评论互动、标签页、sitemap / RSS 与内容级多语言；
+先把首页、栏目、详情、搜索与 SEO 跑通。
+
+### 58.2 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 工程 | `lx-ui-portal/package.json` / `nuxt.config.ts` | Nuxt 3.21.11、SSR、端口 3000、runtimeConfig |
+| 代理 | `server/api/[...path].ts` | `/api/**` 同源转发到 `NUXT_BACKEND_BASE` |
+| 数据 | `composables/usePortalApi.ts` | 只调门户接口，`1004 → 404`、异常 → `502` |
+| 类型 | `types/portal.ts` | 站点 / 栏目 / 文章 / 分页，ID 按字符串处理 |
+| 页面 | `pages/index.vue` | 首页 hero + 最新 6 篇 + 栏目入口 |
+| 页面 | `pages/category/[key].vue` | 栏目列表、面包屑、分页 |
+| 页面 | `pages/article/[id].vue` | 详情、标签、来源、同栏目推荐、JSON-LD |
+| 页面 | `pages/search.vue` | 关键字搜索、`noindex,follow` |
+| 框架 | `layouts/default.vue` | 站点头尾、导航、页头搜索、全站 SEO 默认值 |
+| 组件 | `ArticleCard.vue` / `PortalPager.vue` / `EmptyState.vue` | 卡片、分页、空状态 |
+| 样式 | `assets/css/main.css` | 纯 CSS 响应式，无 UI 框架 |
+| 静态 | `public/favicon.svg` / `public/robots.txt` | 图标与爬虫入口 |
+| 配置 | `.env.example` / `.gitignore` / `README.md` | 启动、部署与边界说明 |
+
+### 58.3 关键决策
+
+1. **同源代理，不让浏览器直连后端。**
+   页面请求 `/api/**`，Nitro 按 `NUXT_BACKEND_BASE` 转发；本地无 CORS，
+   部署时只改环境变量，也避免把内网地址写进前端产物。
+2. **只读接口 + 统一 404。**
+   门户不 import 任何后台 API；站点 / 栏目 / 文章不可见时后端返回 `1004`，
+   门户转 404，不暴露「存在但没权限」的差异。
+3. **SSR 优先。**
+   页面数据在服务端取，首屏 HTML 带正文与 SEO 标签；使用 `useRequestFetch`
+   让 SSR 与客户端共用相对地址。
+4. **不引入 UI 框架。**
+   第一刀只有内容展示，原生 CSS + 系统字体足够，依赖面小、构建快、
+   后续换设计不需要拆组件库。
+5. **页面 key 跟随 fullPath。**
+   栏目与搜索页用 `definePageMeta({ key: route => route.fullPath })`，
+   `page` / `keyword` 变化时整页重建，避免手写 watch 与竞态。
+6. **图片地址白名单。**
+   数字 `fileId` 走 `/api/file/{id}`，`/api/file/` 原样，http(s) 外链直用，
+   其它协议忽略；来源链接同样只放行 http(s)。
+7. **首页标题交给 layout。**
+   页面若再设站点 `seoTitle`，`titleTemplate` 会拼成「站点名 · 站点名」；
+   首页不设 `title`，由 layout 统一兜底。
+8. **搜索页 noindex。**
+   搜索结果属于薄内容，`noindex,follow` 保留链接发现能力但不进索引。
+
+### 58.4 验证
+
+```text
+npm install                            577 packages，nuxt prepare 成功
+npm run build                          通过，产物 .output/
+SSR / HTTP 断言                        8/8：首页 / 栏目 / 子栏目 / 详情 / 搜索 / 分页 / 两类 404
+浏览器验收 .local/uitest/portal.mjs     25/25
+移动端 390px                           无横向溢出
+控制台                                 无脚本错误（预期 404 资源单独放行）
+```
+
+种子数据通过真实后台接口创建：`siteKey=main` 站点、4 个栏目（含 1 个子栏目）、
+4 个标签、12 篇已发布文章，封面走文件中心 `fileId`。
+
+浏览器验收覆盖：
+
+```text
+首页 hero / 6 张卡片 / 导航 / title / description / canonical / 封面加载
+首页 → 详情 / 正文 / 标签 / JSON-LD / og:type / canonical / 同栏目推荐
+栏目 / 面包屑 / 分页控件 / 第 2 页
+页头搜索 / 结果非空 / noindex
+未发布文章 404 / 错误页文案
+移动端无横向溢出 / 控制台无脚本错误
+```
+
+### 58.5 踩坑
+
+| 问题 | 处理 |
+|---|---|
+| Windows 未开开发者模式，Nitro 为多版本依赖建 symlink 报 `EPERM`，启动时缺 `entities` | `nitro.externals.inline: ['entities']` |
+| 首页 title 重复拼站点名 | 首页不设 `title`，交给 `titleTemplate` |
+| 后台更新站点 Logo 传 `null` 被 MyBatis-Plus 忽略，清不掉 | 改为传空字符串；门户空值回退文字标记 |
+| 页头搜索按钮被输入框挤掉 | 输入框 `flex: 1 1 120px`，按钮 `flex: 0 0 auto` |
+| 搜索页客户端跳转后 `meta robots` 稍晚出现 | 浏览器验收等待页面标题与 robots 节点 |
+| 文章 404 在控制台留下资源错误 | 验收按 URL 放行，不误判为脚本错误 |
+| `PageResult` 数字字段可能序列化成字符串 | 比较前统一 `Number()` |
+| 详情接口每次请求会自增阅读量 | 验收不重复预取详情 |
+
+### 58.6 遗留
+
+| 项 | 说明 |
+|---|---|
+| 会员登录 / 个人中心 | 门户第二刀 |
+| 评论 / 收藏 / 点赞 | 依赖会员体系 |
+| 标签独立页 | 当前只在详情展示 |
+| sitemap / RSS | `robots.txt` 已预留注释位 |
+| 内容级多语言 | 等 `i18n_*` 内容翻译阶段 |
+| 缓存 | 当前每次请求查后端，可加 Nitro / Nginx 短 TTL |
+| 多站点 | 一个部署对应一个 `siteKey`，多站点需按域名解析 |
+| 静态化 | 尚未做预渲染 / ISR / CDN |

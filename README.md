@@ -103,6 +103,17 @@
 
 </details>
 
+<details>
+<summary>展开内容门户截图（首页 / 栏目 / 文章详情 / 移动端）</summary>
+
+| 门户首页 | 栏目列表 |
+|:---:|:---:|
+| <img src="docs/images/25-portal-home.png" width="430" alt="门户首页" /> | <img src="docs/images/26-portal-category.png" width="430" alt="栏目列表" /> |
+| **文章详情** | **移动端** |
+| <img src="docs/images/27-portal-article.png" width="430" alt="文章详情" /> | <img src="docs/images/28-portal-mobile.png" width="200" alt="移动端首页" /> |
+
+</details>
+
 ## 技术栈
 
 | 层 | 选型 |
@@ -115,6 +126,7 @@
 | 文档 | SpringDoc 1.7 + Knife4j 4.4 |
 | 工具 | Hutool 5.8 · Lombok · Velocity 2.3（代码生成模板）· Thumbnailator 0.4.8 |
 | 前端 | Vue 3.5 · Vite 5 · Element Plus 2.8 · Pinia 2 · Vue Router 4 · axios |
+| 门户 | Nuxt 3.21 · Vue 3.5 · Nitro 2（SSR，纯 CSS，无 UI 框架） |
 | 数据库 | MySQL 5.7 / 8.0（首发）· PostgreSQL / 达梦 / 人大金仓 规划中 |
 
 依赖版本统一收口在 [`lx-dependencies/pom.xml`](lx-dependencies/pom.xml)，逐项用途见 [docs/22-dependencies.md](docs/22-dependencies.md)。
@@ -135,9 +147,18 @@ DB_PORT=3306 DB_PASSWORD=<你的密码> java -jar lx-boot/target/lingxiao.jar
 cd lx-ui-admin
 npm ci
 npm run dev
+
+# 4. 启动内容门户（可选，在仓库根目录另开终端）
+cd lx-ui-portal
+npm install
+npm run dev
 ```
 
 打开 <http://127.0.0.1:5173>，用 `admin / admin123` 登录。业务表由 Flyway 在首次启动时自动创建。
+
+门户在 <http://127.0.0.1:3000>，只展示已发布内容；默认站点标识 `main`，
+需在后台「CMS → 站点」建好同 `siteKey` 的站点并发布文章。
+`/api/**` 由门户 Nitro 代理到 `NUXT_BACKEND_BASE`（默认 `http://127.0.0.1:8080`）。
 
 > Windows PowerShell 里设置环境变量用 `$env:DB_PORT="3306"`。
 > 想跳过逐条迁移、直接拿到带菜单和参数的完整数据，可以导入版本快照
@@ -172,10 +193,12 @@ lingxiao/
 │  ├─ lx-module-file         #   文件与图片管线
 │  ├─ lx-module-job          #   定时任务（Spring Task + 数据库锁）
 │  ├─ lx-module-cms          #   内容管理（v1.1：站点 / 栏目 / 文章 / 标签）
+│  ├─ lx-module-member       #   会员（账号 / 安全 / 渠道配置）
 │  └─ lx-module-generator    #   代码生成（开发期，生产可关）
 ├─ lx-api/lx-admin-api/      # /api/admin 的 DTO 与契约
 ├─ lx-boot/                  # 启动类、配置、打包
 ├─ lx-ui-admin/              # Vue3 + Element Plus 后台前端
+├─ lx-ui-portal/             # Nuxt3 内容门户（SSR，只读门户接口）
 ├─ deploy/                   # SQL、启停脚本、Nginx、发布包组装
 └─ docs/                     # 设计文档与施工记录
 ```
@@ -191,6 +214,8 @@ lingxiao/
 /api/admin/monitor/job/**               定时任务与执行日志
 /api/admin/cms/site|category|article|tag 内容管理（v1.1 模块）
 /api/portal/cms/**                      门户只读接口（站点 / 栏目 / 文章 / 标签 / 搜索）
+/api/admin/member/**                     会员管理 / 渠道配置（v1.2 模块）
+/api/app/**                              会员注册 / 登录 / 找回 / 个人中心
 /api/admin/tool/gen/**                  代码生成
 /api/admin/file/**                      上传 / 秒传 / 列表 / 改名 / 下载
 /api/file/{fileId}                      公开访问（?size=thumb|medium）
@@ -215,15 +240,18 @@ lingxiao/
 | [27-github-onboarding.md](docs/27-github-onboarding.md) | 换机器继续开发：建库、启动、排错 |
 | [28-third-party-login.md](docs/28-third-party-login.md) | 第三方登录预留：绑定表、头像处理、边界 |
 | [29-portal-api.md](docs/29-portal-api.md) | CMS 门户接口契约：路径、参数、可见性、字段与缓存建议 |
+| [30-member-embed-plan.md](docs/30-member-embed-plan.md) | 会员模块嵌入：双账号隔离、注册登录、安全与渠道配置 |
+| [31-portal-frontend.md](docs/31-portal-frontend.md) | 门户前端：页面、代理、SEO、验收与踩坑 |
 
 ## 路线图
 
 | 版本 | 内容 | 状态 |
 |---|---|---|
 | v1.0 | 后台基座：权限、文件、任务、监控、生成器、部署 | ✅ 已完成 |
-| v1.1 | 多语言 L1（界面双语）、CMS 模块嵌入（后台链路 + 门户 API + 素材选择器已落地） | 🚧 进行中 |
-| v1.2 | 会员体系、门户 Nuxt3 | 规划中 |
-| v1.3 | 工作流（Flowable）、SaaS 多租户 | 规划中 |
+| v1.1 | 多语言 L1（界面双语）、CMS 模块嵌入（后台链路 + 门户 API + 素材选择器） | ✅ 已完成 |
+| v1.2 | 会员体系（注册 / 登录 / 个人中心 / 安全补口 / 渠道配置） | ✅ 已完成 |
+| v1.3 | Nuxt3 内容门户（首页 / 栏目 / 详情 / 搜索 / SEO） | 🚧 进行中 |
+| v1.4 | 工作流（Flowable）、SaaS 多租户 | 规划中 |
 
 ## 参与贡献
 

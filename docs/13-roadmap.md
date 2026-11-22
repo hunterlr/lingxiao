@@ -737,3 +737,69 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 `lx-modules/lx-module-member/README.md`。
 
 **下一步**：会员等级升级 / 积分规则、评论收藏、第三方登录绑定。
+
+### 12.15 P1：v1.2 会员第二刀 — 安全补口（✅ 已完成，2026-11-22）
+
+**完成内容**：
+
+- 新增迁移 `V26__member_security_hardening.sql`：参数 19~25，覆盖验证码尝试次数与
+  注册 / 登录 / 找回 / 重置四类限流；
+- `MemberRateLimitService`：内存固定窗口，按动作 + 账号 + IP 双维度计数，
+  超限返回 `1006`；IP 阈值自动放宽为账号阈值的 10 倍；
+- `MemberCaptchaService`：同一验证码允许输错 N 次（默认 3），达到上限立即作废，
+  验证成功同样一次性删除；
+- 短信 / 邮件通道 SPI：`MemberSmsSender` / `MemberEmailSender`，
+  开发实现只写应用日志，按手机号 / 邮箱路由；
+- 注册 / 登录 / 找回 / 重置入口统一先限流，再进入业务校验。
+
+**验收**：会员单测 49 项；全仓 **205 项 / 34 类**，失败 0 错误 0；
+`.local/member-check.mjs` **69/69**；JDK 8 / 11 均通过。
+
+详见 `docs/30-member-embed-plan.md` §10、`docs/21-build-log.md` §56。
+
+### 12.16 P1：v1.2 会员渠道配置独立页面（✅ 已完成，2026-11-22）
+
+**完成内容**：
+
+- 新增迁移 `V27__member_channel_config.sql` 与 `mem_channel_config` 表，
+  短信 / 邮件各一行；菜单 4020~4022 与 `platform:member:channel:*` 权限码；
+- 通道配置从 `application.yml` 迁到数据库，后台运行期修改立即生效，不需要重启；
+- 独立页面「会员管理 → 渠道配置」：列表、编辑、测试发送；中英文文案同步；
+- `accessSecret` 只写不读，列表与详情不回显；留空表示沿用原值；
+- 切 `prod` 前校验真实 `MemberSmsSender` / `MemberEmailSender` Bean，
+  缺失返回 `1001`，避免找回密码静默失效；
+- 测试发送区分模式：dev 回显验证码并写日志，prod 只返回提交结果；
+  通道停用或手机号 / 邮箱格式错误明确报错。
+
+**验收**：会员单测 49 项；全仓 **205 项 / 34 类**；
+`member-check.mjs` **69/69**；渠道浏览器验收 **7/7**；
+`npm run build`、i18n（zh 1155 / en 1155）通过。
+
+详见 `docs/21-build-log.md` §57、`docs/30-member-embed-plan.md` §10.5。
+
+### 12.17 P1：v1.3 门户第一刀 — Nuxt3 内容页（✅ 已完成，2026-11-22）
+
+**完成内容**：
+
+- 新建 `lx-ui-portal`：Nuxt 3.21.11、SSR、端口 3000、原生 CSS，不引入 UI 框架；
+- 首页（hero + 6 卡片 + 栏目入口）、栏目列表（分页 / 面包屑）、
+  文章详情（标签 / 来源 / 同栏目推荐）、站内搜索四个页面；
+- 同源代理 `server/api/[...path].ts` 把 `/api/**` 转发到
+  `NUXT_BACKEND_BASE`，浏览器不直接访问后端，部署只改环境变量；
+- 只调用 `/api/portal/cms/**`；`code=1004` 统一转 404，
+  其他接口异常转 502 并进错误页；
+- SEO：layout `titleTemplate`、页面级 `title / description / keywords /
+  canonical / OG`、文章 `NewsArticle` JSON-LD、搜索页 `noindex,follow`；
+- 图片兼容数字 `fileId`、`/api/file/{id}` 与 http(s) 外链，
+  来源链接只放行 http(s)；正文按后端已清洗 HTML 直接渲染；
+- 分页按 `route.fullPath` 作为页面 key，query 变化自动重新取数；
+- `favicon.svg`、`robots.txt`、`.env.example` 与工程 README 落地。
+
+**验收**：`nuxt build` 通过；SSR/HTTP **8/8**（首页、栏目、详情、搜索、分页与两类 404）；
+浏览器 **25/25**（含移动端 390px 无横向溢出、控制台无脚本错误）；
+12 篇已发布文章与 `siteKey=main` 演示站点经真实后台接口播种。
+
+详见 `docs/31-portal-frontend.md`、`docs/29-portal-api.md`、`lx-ui-portal/README.md`。
+
+**下一步**：门户第二刀（会员登录 / 个人中心）、评论收藏、标签页、
+sitemap / RSS 与缓存策略；随后进入工作流 / SaaS 规划。

@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /search
+
+# sitemap 与 RSS 属于后续切片，落地后在这里补 Sitemap: 行。

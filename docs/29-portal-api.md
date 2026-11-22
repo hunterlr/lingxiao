@@ -1,7 +1,8 @@
 # 29 · CMS 门户接口（`/api/portal/cms/**`）
 
 > 状态：v1.1 第一版已落地（2026-11-22），只读、只出已发布内容。
-> 门户工程（Nuxt3）尚未开工，本文是门户侧唯一需要遵守的接口契约。
+> v1.3 门户第一刀已按本契约接入（Nuxt3，见 `docs/31-portal-frontend.md`）；
+> 本文仍是门户侧唯一需要遵守的接口契约。
 > 后台维护接口在 `/api/admin/cms/**`，门户**禁止**调用。
 
 ---
@@ -165,5 +166,26 @@ curl http://127.0.0.1:8080/api/portal/cms/sites/main/articles/by-slug/hello-worl
 - 素材选择器已在后台落地；门户仍可能读到存量的 `fileId` 或 URL，消费端两种都要兼容。
 - 内容级多语言：走后续 `i18n_*` 内容翻译阶段。
 - 评论、点赞、会员可见性：属于 v1.2 会员互动。
-- sitemap / RSS / Open Graph 生成：属于 v1.3 门户工程。
+- sitemap / RSS：门户已预留 `robots.txt` 注释位，尚未生成；
+  Open Graph / JSON-LD 已由门户第一刀在页面侧输出。
 - 全量静态化、ES 搜索、CDN：不在本期范围。
+
+---
+
+## 8. 门户接入状态（2026-11-22）
+
+`lx-ui-portal` 已按本契约完成第一刀：
+
+| 页面 | 使用的接口 |
+|---|---|
+| 首页 | `GET /sites/{siteKey}`、`/categories`、`/articles?pageNum=1&pageSize=7` |
+| 栏目列表 | `/categories`、`/articles?categoryKey=...&pageNum=...&pageSize=...` |
+| 文章详情 | `/articles/{articleId}`、`/categories`、同栏目 `/articles` |
+| 站内搜索 | `/search?keyword=...&pageNum=...&pageSize=...` |
+
+- 浏览器与 SSR 都请求同源 `/api/**`，由 Nitro 代理到 Spring Boot；
+- `1004` 统一转 404，其它异常转 502；
+- 正文直接使用详情接口返回的已清洗 HTML；
+- 封面 / Logo 兼容 `fileId`、`/api/file/{id}` 与 http(s) 外链。
+
+详见 `docs/31-portal-frontend.md` 与 `lx-ui-portal/README.md`。

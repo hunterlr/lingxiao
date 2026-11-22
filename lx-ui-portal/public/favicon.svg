@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="凌霄门户">
+  <defs>
+    <linearGradient id="lx" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f5fd0" />
+      <stop offset="1" stop-color="#77a4ff" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#lx)" />
+  <path d="M18 44c8-2 14-9 16-19 2 10 8 17 16 19" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="37" cy="19" r="3" fill="#fff" />
+</svg>

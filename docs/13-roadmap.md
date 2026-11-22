@@ -801,5 +801,55 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 
 详见 `docs/31-portal-frontend.md`、`docs/29-portal-api.md`、`lx-ui-portal/README.md`。
 
-**下一步**：门户第二刀（会员登录 / 个人中心）、评论收藏、标签页、
-sitemap / RSS 与缓存策略；随后进入工作流 / SaaS 规划。
+**下一步**：门户第二刀（会员登录 / 个人中心）→ 已完成，见 §12.18；
+后续为收藏 / 点赞、评论、标签页、sitemap / RSS 与缓存策略。
+
+### 12.18 P1：v1.3 门户第二刀 — 会员账号与个人中心（✅ 已完成，2026-11-22）
+
+**完成内容**：
+
+- 新增 `composables/useMemberAuth.ts` 与 `types/member.ts`，会员 Token 存门户
+  Cookie `lx-portal-member-token`，请求头 `lx-member-token`，与后台
+  `lx-platform-token` 严格分离；
+- 登录、注册、找回密码三个页面：验证码按后端 `enabled` 开关渲染，
+  注册必须勾选协议，手机号 / 邮箱是否必填由会员设置决定；
+- 个人中心：资料展示、改昵称 / 头像 / 性别、修改密码、退出登录；
+  手机号 / 邮箱换绑留到后续切片；
+- layout 在 SSR 调 `GET /api/app/profile`，首屏直接渲染昵称 / 头像；
+  `401 / 1002` 清 Cookie 回匿名态，`1003` 展示「会员功能已关闭」；
+- 会员页面统一 `noindex`；已登录访问登录 / 注册页直接跳 `/account`。
+
+**验收**：`npm run build` 通过；注册 / 登录 / 改资料 / 改密 / 找回密码 / 退出全流程
+通过；带 Cookie 的 SSR 断言通过；`mem.enabled=false` 显示明确提示；
+控制台无错误；`git diff --check` 干净。
+
+详见 `docs/31-portal-frontend.md` §4、`docs/30-member-embed-plan.md` §10.5、
+`docs/21-build-log.md` §59。
+
+### 12.19 P1：v1.2 会员收藏与点赞（✅ 已完成，2026-11-22）
+
+**完成内容**：
+
+- 新增迁移 `V29__member_interaction.sql`：`mem_favorite`、`mem_like`，
+  只存 `tenant_id / member_id / article_id / create_time`，会员 + 文章唯一键，
+  不建跨模块外键、不复制文章标题 / 封面；
+- `MemberInteractionService`：文章统计、收藏 / 取消收藏、点赞 / 取消点赞、
+  我的收藏分页；写操作幂等，取消即物理删除；
+- `MemberInteractionController`：公开统计 `/api/app/public/interactions/**`
+  匿名可读，写操作 `/api/app/interactions/**` 必须登录，会员 ID 只从
+  `MemberLoginHelper` 读取；
+- CMS 门户接口新增 `GET /articles/batch?ids=...` 批量摘要，
+  收藏列表一次补齐标题 / 封面，且不累加阅读量；
+- 门户文章页新增收藏 / 点赞按钮与计数，个人中心新增「我的收藏」列表与
+  取消收藏；未登录点击跳 `/login?redirect=...`，`1002` 同样回登录页。
+
+**验收**：`mvn -q -DskipTests package`、`npm run build` 通过；V29 落库；
+`MemberInteractionServiceTest` 6 项通过；`.local/member-interaction-check.mjs`
+**20/20**（域隔离、匿名统计、幂等、取消、分页、批量摘要、非法 ID）；
+浏览器全流程与带 Cookie 的 SSR 断言通过，控制台无错误。
+
+详见 `docs/30-member-embed-plan.md` §12、`docs/29-portal-api.md` §4.4、
+`docs/31-portal-frontend.md` §4.5、`docs/21-build-log.md` §60。
+
+**下一步**：评论 / 消息；会员资料完善（头像上传、手机号 / 邮箱换绑、会话管理）；
+标签页、sitemap / RSS 与缓存策略；随后进入工作流 / SaaS 规划。

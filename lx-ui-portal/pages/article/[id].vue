@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import type { MemberInteraction } from '~/types/member'
+import { MemberApiError, memberErrorMessage } from '~/composables/useMemberAuth'
+
 definePageMeta({
   key: (route) => route.fullPath
 })
@@ -6,6 +9,8 @@ definePageMeta({
 const route = useRoute()
 const api = usePortalApi()
 const config = useRuntimeConfig()
+// 会员 composable 必须在首个 await 前初始化，避免异步 setup 丢上下文
+const { isLoggedIn, fetchInteraction, setFavorite, setLike } = useMemberAuth()
 
 const articleId = String(route.params.id || '')
 if (!/^\d+$/.test(articleId)) {
@@ -19,6 +24,70 @@ const { data: article } = await useAsyncData(`article-${articleId}`, () => api.f
 
 if (!article.value) {
   throw createError({ statusCode: 404, statusMessage: '文章不存在或尚未发布' })
+}
+
+// 会员模块关闭 / 网络异常时只回落为 0，不影响正文阅读
+const interaction = ref<MemberInteraction>({
+  articleId,
+  favoriteCount: 0,
+  likeCount: 0,
+  favorited: false,
+  liked: false
+})
+try {
+  interaction.value = await fetchInteraction(articleId)
+} catch {
+  // 匿名或会员功能关闭时保持默认值
+}
+
+const interactionPending = ref(false)
+const interactionError = ref('')
+
+function loginTarget(): string {
+  return `/login?redirect=${encodeURIComponent(route.fullPath)}`
+}
+
+async function ensureMember(): Promise<boolean> {
+  if (isLoggedIn.value) return true
+  await navigateTo(loginTarget())
+  return false
+}
+
+function handleInteractionError(error: unknown, fallback: string) {
+  if (error instanceof MemberApiError && error.code === 1002) {
+    // 会话已失效：回登录页，登录后回到当前文章
+    navigateTo(loginTarget())
+    return
+  }
+  interactionError.value = memberErrorMessage(error, fallback)
+}
+
+async function toggleFavorite() {
+  if (interactionPending.value) return
+  if (!(await ensureMember())) return
+  interactionError.value = ''
+  interactionPending.value = true
+  try {
+    interaction.value = await setFavorite(articleId, !interaction.value.favorited)
+  } catch (error) {
+    handleInteractionError(error, '收藏失败，请稍后再试')
+  } finally {
+    interactionPending.value = false
+  }
+}
+
+async function toggleLike() {
+  if (interactionPending.value) return
+  if (!(await ensureMember())) return
+  interactionError.value = ''
+  interactionPending.value = true
+  try {
+    interaction.value = await setLike(articleId, !interaction.value.liked)
+  } catch (error) {
+    handleInteractionError(error, '点赞失败，请稍后再试')
+  } finally {
+    interactionPending.value = false
+  }
 }
 
 const { data: categories } = await useAsyncData('portal-categories', api.fetchCategories)
@@ -114,6 +183,37 @@ useHead(() => {
 
     <!-- 正文已由后端 HtmlSanitizer 按白名单清洗，门户不再二次解析 -->
     <div class="article-content" v-html="article.content" />
+
+    <div class="interaction-bar" aria-label="文章互动">
+      <button
+        type="button"
+        class="interaction-button"
+        :class="{ 'is-active': interaction.favorited }"
+        :disabled="interactionPending"
+        @click="toggleFavorite"
+      >
+        <span aria-hidden="true">{{ interaction.favorited ? '★' : '☆' }}</span>
+        {{ interaction.favorited ? '已收藏' : '收藏' }}
+        <span class="interaction-count">{{ formatCount(interaction.favoriteCount) }}</span>
+      </button>
+      <button
+        type="button"
+        class="interaction-button"
+        :class="{ 'is-active': interaction.liked }"
+        :disabled="interactionPending"
+        @click="toggleLike"
+      >
+        <span aria-hidden="true">♥</span>
+        {{ interaction.liked ? '已点赞' : '点赞' }}
+        <span class="interaction-count">{{ formatCount(interaction.likeCount) }}</span>
+      </button>
+    </div>
+    <p v-if="interactionError" class="form-alert error interaction-alert" role="alert">
+      {{ interactionError }}
+    </p>
+    <p v-else-if="!isLoggedIn" class="form-hint interaction-hint">
+      登录后可收藏与点赞，收藏内容可在个人中心查看。
+    </p>
 
     <footer class="article-footer">
       <p v-if="article.source">

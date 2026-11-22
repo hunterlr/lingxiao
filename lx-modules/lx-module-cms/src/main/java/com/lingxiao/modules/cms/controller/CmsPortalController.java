@@ -88,6 +88,18 @@ public class CmsPortalController {
         return R.ok(portalService.article(siteKey, articleId));
     }
 
+    /**
+     * 按 ID 批量取已发布文章摘要。
+     *
+     * <p>会员收藏列表只有文章 ID，门户用本接口一次补齐标题 / 封面 / 链接，
+     * 避免逐篇请求详情（详情会累加阅读量）。不可见或已删除的 ID 直接省略。</p>
+     */
+    @GetMapping("/sites/{siteKey}/articles/batch")
+    public R<List<PortalArticleSummaryVO>> articleBatch(@PathVariable String siteKey,
+                                                        @RequestParam List<Long> ids) {
+        return R.ok(portalService.articleBatch(siteKey, ids));
+    }
+
     /** 按 slug 取详情；适合做门户的静态化 / 伪静态 URL。 */
     @GetMapping("/sites/{siteKey}/articles/by-slug/{slug}")
     public R<PortalArticleDetailVO> articleBySlug(@PathVariable String siteKey,

@@ -11,10 +11,11 @@
 - 站内搜索：按标题 / 摘要关键字搜索已发布文章；
 - 会员注册 / 登录 / 退出 / 找回密码；
 - 个人中心：资料展示、改昵称 / 头像 / 性别、修改密码；
+- 文章收藏 / 点赞，个人中心「我的收藏」；
 - SEO：`title` / `description` / `keywords` / `canonical` / Open Graph / 文章 JSON-LD；
 - 404 与接口不可用兜底：后台返回 `1004` 统一按 404 处理。
 
-**不做**（后续切片）：评论 / 收藏 / 点赞、手机号 / 邮箱换绑、第三方登录、
+**不做**（后续切片）：评论 / 消息、手机号 / 邮箱换绑、第三方登录、
 多站点切换、标签页、sitemap / RSS、内容级多语言、全量静态化。
 
 ## 快速开始
@@ -58,7 +59,7 @@ npm run dev                   # http://127.0.0.1:3000
 | `/login` | 会员登录 |
 | `/register` | 会员注册 |
 | `/forgot-password` | 找回密码（申请验证码 → 重置） |
-| `/account` | 个人中心（需登录） |
+| `/account` | 个人中心（需登录，含我的收藏） |
 
 栏目列表与搜索页按 `route.fullPath` 作为页面 key，查询参数变化时重新取数。
 会员页面统一 `noindex`，已登录访问登录 / 注册页会直接跳到 `/account`。
@@ -77,6 +78,20 @@ npm run dev                   # http://127.0.0.1:3000
 会员接口封装在 `composables/useMemberAuth.ts`，与只读的 `usePortalApi` 分开。
 注册必须勾选协议；手机号 / 邮箱是否必填由后台会员设置决定，前端不硬编码。
 修改密码或重置密码成功后，后端会注销该会员全部会话，门户同步清 Cookie 并回登录页。
+
+## 收藏与点赞
+
+| 动作 | 接口 | 说明 |
+|---|---|---|
+| 读统计 | `GET /api/app/public/interactions/articles/{articleId}` | 匿名可读；带 Token 时附带个人状态 |
+| 我的收藏 | `GET /api/app/interactions/favorites` | 只返回文章 ID 与收藏时间 |
+| 收藏 / 取消 | `PUT / DELETE /api/app/interactions/articles/{articleId}/favorite` | 幂等 |
+| 点赞 / 取消 | `PUT / DELETE /api/app/interactions/articles/{articleId}/like` | 幂等 |
+
+- 未登录点击收藏 / 点赞跳 `/login?redirect=/article/{id}`；`1002` 同样回登录页。
+- 收藏列表先取会员接口，再调 CMS `GET /articles/batch?ids=...` 补标题 / 封面；
+  批量摘要不累加阅读量，文章下线时条目显示「内容已下线或不可见」。
+- 会员功能关闭或统计接口异常时，文章页计数回落 0，正文不受影响。
 
 ## 目录结构
 
@@ -100,7 +115,7 @@ lx-ui-portal/
 │  └─ EmptyState.vue          空状态
 ├─ composables/
 │  ├─ usePortalApi.ts         内容接口封装与 1004 → 404
-│  └─ useMemberAuth.ts        会员会话、Token Cookie、资料与密码
+│  └─ useMemberAuth.ts        会员会话、Token Cookie、资料、密码、收藏 / 点赞
 ├─ server/api/[...path].ts    同源 API 反向代理
 ├─ utils/                     图片地址、时间/数字格式化、栏目树
 ├─ types/
@@ -141,9 +156,12 @@ curl.exe -s http://127.0.0.1:3000/ | Select-String 'article-title|hero-title'
 curl.exe -s -o NUL -w "%{http_code}" http://127.0.0.1:3000/article/1
 # 未登录访问个人中心显示守卫页
 node .local\portal-ssr-member.mjs
+# 带会员 Cookie 验证文章页收藏 / 点赞 SSR
+node .local\portal-interaction-ssr.mjs
 ```
 
 浏览器验收覆盖：首页 → 栏目 → 详情 → 搜索、分页、无前端报错、移动端布局；
-会员注册 / 登录 / 改资料 / 改密 / 找回密码 / 退出、`mem.enabled` 关闭提示。
+会员注册 / 登录 / 改资料 / 改密 / 找回密码 / 退出、收藏 / 点赞 / 我的收藏、
+`mem.enabled` 关闭提示。
 后端会员总开关在「系统管理 → 参数设置 → `mem.enabled`」，关闭后 `/api/app/**`
 返回 `1003`，门户显示明确提示而不是白屏。

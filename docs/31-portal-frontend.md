@@ -1,6 +1,6 @@
 # 31 · 门户前端（v1.3）
 
-> 状态：Nuxt3 门户第一刀（内容阅读）与第二刀（会员）已落地（2026-11-22）。
+> 状态：Nuxt3 门户前三刀（内容阅读、会员账号、收藏与点赞）已落地（2026-11-22）。
 > 门户只调用 `/api/portal/cms/**` 与会员自助接口 `/api/app/**`，
 > 不调用任何 `/api/admin/**` 接口。
 > 接口契约见 [`29-portal-api.md`](29-portal-api.md)，工程说明见
@@ -12,18 +12,19 @@
 
 | 本刀做 | 本刀不做 |
 |---|---|
-| 首页、栏目列表、文章详情、站内搜索 | 评论、收藏、点赞 |
+| 首页、栏目列表、文章详情、站内搜索 | 评论、消息 |
 | 会员注册 / 登录 / 退出 / 找回密码 | 手机号 / 邮箱换绑 |
 | 个人中心：资料、头像、性别、改密 | 第三方登录、扫码登录 |
-| 分页、面包屑、同栏目推荐 | sitemap、RSS |
-| `title / description / keywords / canonical / OG / JSON-LD` | 标签独立页 |
-| 404 与接口不可用兜底 | 多站点切换、内容级多语言 |
-| 同源 `/api/**` 代理 | 全量静态化、CDN、ES 搜索 |
+| 文章收藏 / 点赞、我的收藏 | sitemap、RSS |
+| 分页、面包屑、同栏目推荐 | 标签独立页 |
+| `title / description / keywords / canonical / OG / JSON-LD` | 多站点切换、内容级多语言 |
+| 404 与接口不可用兜底 | 全量静态化、CDN、ES 搜索 |
+| 同源 `/api/**` 代理 | |
 | 纯 CSS 响应式布局 | |
 
 第一刀验证「后台发布 → 门户可见 → 可索引可分享」的完整阅读链路，
-第二刀在同一套 Nuxt 工程里接会员自助能力，不引入 UI 框架和额外状态库，
-保持依赖面最小。
+第二刀在同一套 Nuxt 工程里接会员自助能力，第三刀补收藏与点赞；
+全程不引入 UI 框架和额外状态库，保持依赖面最小。
 
 ### 预览
 
@@ -66,12 +67,12 @@ node .output/server/index.mjs
 |---|---|---|
 | `/` | 首页 | 站点信息、栏目树、最新 7 篇文章 |
 | `/category/{categoryKey}` | 栏目列表 | 栏目树、该栏目（含子栏目）文章分页 |
-| `/article/{articleId}` | 文章详情 | 文章详情、同栏目 3 篇推荐、标签 |
+| `/article/{articleId}` | 文章详情 | 文章详情、同栏目 3 篇推荐、标签、收藏 / 点赞状态 |
 | `/search?keyword=` | 站内搜索 | 标题 / 摘要关键字搜索分页 |
 | `/login` | 会员登录 | 验证码、登录、失效回调提示 |
 | `/register` | 会员注册 | 验证码、注册并自动登录 |
 | `/forgot-password` | 找回密码 | 申请验证码 → 重置密码两步 |
-| `/account` | 个人中心 | 资料展示、改昵称 / 头像 / 性别、改密、退出 |
+| `/account` | 个人中心 | 资料展示、改昵称 / 头像 / 性别、改密、退出、我的收藏 |
 
 - 首页第 1 篇作为 hero，其余 6 篇为卡片；栏目第一层做快捷入口与页头导航。
 - 栏目列表和搜索页使用 `definePageMeta({ key: route => route.fullPath })`，
@@ -110,6 +111,26 @@ node .output/server/index.mjs
   登录成功后主动清 `loaded` 标记，进入个人中心时再取一次 `/api/app/profile`。
 - 页头根据 Cookie 显示：匿名 → 登录 / 注册；已登录 → 头像 + 昵称 + 个人中心入口。
 
+### 4.5 收藏与点赞
+
+| 动作 | 接口 | 说明 |
+|---|---|---|
+| 读统计 | `GET /api/app/public/interactions/articles/{articleId}` | 匿名可读；带 Token 时附带 `favorited / liked` |
+| 我的收藏 | `GET /api/app/interactions/favorites?pageNum=&pageSize=` | 必须登录，只返回文章 ID 与收藏时间 |
+| 收藏 / 取消 | `PUT / DELETE /api/app/interactions/articles/{articleId}/favorite` | 幂等，返回最新统计 |
+| 点赞 / 取消 | `PUT / DELETE /api/app/interactions/articles/{articleId}/like` | 幂等，返回最新统计 |
+
+- 文章页在 `setup` 里取一次统计；会员模块关闭或网络异常时计数回落 0，
+  正文照常渲染，不白屏。
+- 未登录点击收藏 / 点赞跳 `/login?redirect=/article/{id}`；
+  登录后回到原文，按钮状态随 SSR 数据显示。
+- `1002`（会话失效）回登录页，失效 Cookie 由布局在下一页清理；写操作串行化，
+  按钮在请求中禁用，避免连点。
+- “我的收藏”分两步：会员接口给文章 ID，再调 CMS
+  `GET /articles/batch?ids=...` 补标题 / 封面 / 栏目。
+  批量摘要不累加阅读量；不可见文章显示「内容已下线或不可见」。
+- 取消收藏后若当前页为空，自动退回上一页。
+
 ---
 
 ## 5. 数据与可见性
@@ -130,6 +151,8 @@ node .output/server/index.mjs
 - 封面 / Logo 兼容数字 `fileId`、`/api/file/{id}` 与 `http(s)` 外链；
   其它协议（如 `javascript:`）直接忽略。来源链接只渲染 `http(s)`。
 - 文章详情每次请求会让后端 `view_count + 1`，验收脚本不重复预取详情。
+- 收藏列表通过 `GET /articles/batch?ids=...` 批量补摘要；该接口不累加阅读量，
+  单次最多 50 个 ID，不可见条目直接省略。
 
 ---
 
@@ -160,7 +183,8 @@ npm run build
 $env:NUXT_PUBLIC_PAGE_SIZE='4'
 node .output/server/index.mjs
 node .local\portal-ssr-check.mjs
-node .local\portal-ssr-member.mjs   # 带 Cookie 验证登录态 SSR
+node .local\portal-ssr-member.mjs        # 带 Cookie 验证登录态 SSR
+node .local\portal-interaction-ssr.mjs   # 带 Cookie 验证收藏 / 点赞 SSR
 ```
 
 内容页覆盖首页、栏目、子栏目、文章详情、搜索、分页、文章 404、栏目 404，**8/8 通过**。
@@ -171,6 +195,11 @@ node .local\portal-ssr-member.mjs   # 带 Cookie 验证登录态 SSR
 - 带有效 Cookie 请求 `/`、`/account`，首屏 HTML 含会员昵称，不再出现登录 / 注册链接；
 - 带有效 Cookie 请求 `/login`、`/register`，返回 `302` 到 `/account`；
 - 无 Cookie 请求 `/account` 返回“需要登录”守卫页。
+
+互动 SSR 断言：
+
+- 带有效 Cookie 请求文章页，首屏 HTML 含「已收藏 / 已点赞」与会员昵称；
+- 匿名请求文章页不出现登录态文案，显示「登录后可收藏与点赞」。
 
 ### 7.2 浏览器
 
@@ -199,6 +228,15 @@ node .local\portal-ssr-member.mjs   # 带 Cookie 验证登录态 SSR
 - `mem.enabled=false` → 登录 / 注册页展示「会员功能已关闭」且按钮禁用，恢复后正常；
 - 全流程控制台无脚本错误、无失败请求。
 
+收藏 / 点赞流程（浏览器 + 接口）覆盖：
+
+- 登录 → 文章页收藏 / 点赞 → 按钮高亮、计数 +1；
+- 刷新 / 重新打开文章，SSR 首屏仍显示已收藏 / 已点赞；
+- 个人中心「我的收藏」显示标题、栏目与收藏时间；
+- 取消收藏 → 列表移除，空状态提示；
+- 退出登录 → 文章页显示「登录后可收藏与点赞」，点击跳登录页并带 `redirect`；
+- 接口域隔离、匿名统计、幂等、取消、批量摘要 **20/20** 通过。
+
 ### 7.3 构建
 
 ```text
@@ -225,6 +263,11 @@ SSR 首页                       <title> / description / canonical / hero 均存
 | 改密 / 重置后旧 Cookie 又被登录页回跳 | 改密、重置成功后立即 `clearSession()`，再跳登录页 |
 | 会员性别 0/1 与后台会员管理页标签映射相反 | 以接口与 `MemberUserService.normalizeSex` 为准：`0` 男、`1` 女、`2` 不公开 |
 | 后台 Token 与会员 Token 混用 | 会员接口只读 `lx-member-token`，门户 Cookie 与请求头都沿用该名 |
+| 收藏列表逐篇调详情会把阅读量刷高 | 新增 `GET /articles/batch`，只查摘要、不累加 `view_count` |
+| 取消收藏后当前页变空 | 删除最后一条时自动退回上一页 |
+| 文章下线后收藏条目无法渲染 | 批量摘要省略该 ID，门户显示「内容已下线或不可见」 |
+| 会员功能关闭时互动接口报错 | 文章页捕获异常，计数回落 0，不影响正文 |
+| 互动计数在 JSON 里可能是字符串 | 展示与比较前统一 `Number()` |
 
 ---
 
@@ -232,7 +275,8 @@ SSR 首页                       <title> / description / canonical / hero 均存
 
 | 项 | 说明 |
 |---|---|
-| 评论 / 收藏 / 点赞 | 依赖会员体系，下一刀 |
+| 评论 / 消息 | 切片 3 剩余部分 |
+| 点赞防刷 | 当前一个会员对一篇文章只能点一次，未做频率限制 |
 | 会员头像上传 | 当前填图片地址或后台文件 ID，未接上传组件 |
 | 手机号 / 邮箱换绑 | 需要短信 / 邮件双向验证，暂未开放 |
 | 标签独立页 | 当前只在详情展示标签，不跳转 |

@@ -183,6 +183,46 @@ public class CmsPortalService {
         return toDetail(site, article);
     }
 
+    /**
+     * 按 ID 批量取已发布文章摘要。
+     *
+     * <p>用于会员收藏这类“只有文章 ID”的场景：只查摘要字段（排除正文），
+     * 不累加阅读量，并按请求顺序返回；不可见或已删除的 ID 直接省略。</p>
+     */
+    public List<PortalArticleSummaryVO> articleBatch(String siteKey, List<Long> ids) {
+        CmsSite site = siteService.detailByKey(siteKey);
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Long> normalized = ids.stream()
+                .filter(Objects::nonNull)
+                .filter(id -> id > 0)
+                .distinct()
+                .limit(MAX_PAGE_SIZE)
+                .collect(Collectors.toList());
+        if (normalized.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<CmsArticle> articles = articleMapper.selectList(new LambdaQueryWrapper<CmsArticle>()
+                .select(CmsArticle.class, field -> !"content".equals(field.getColumn()))
+                .in(CmsArticle::getArticleId, normalized)
+                .eq(CmsArticle::getSiteId, site.getSiteId())
+                .eq(CmsArticle::getStatus, CmsArticleService.STATUS_PUBLISHED)
+                .apply("EXISTS (SELECT 1 FROM cms_category c "
+                        + "WHERE c.category_id = cms_article.category_id "
+                        + "AND c.site_id = {0} AND c.status = '0')", site.getSiteId())
+                .apply("NOT EXISTS (SELECT 1 FROM cms_category_closure cc "
+                        + "JOIN cms_category ac ON ac.category_id = cc.ancestor_id "
+                        + "WHERE cc.category_id = cms_article.category_id "
+                        + "AND cc.depth > 0 AND ac.status = '1')"));
+        Map<Long, PortalArticleSummaryVO> byId = toSummaries(site.getSiteId(), articles).stream()
+                .collect(Collectors.toMap(PortalArticleSummaryVO::getArticleId, item -> item, (a, b) -> a));
+        return normalized.stream()
+                .map(byId::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
     // ==================== 内部方法 ====================
 
     private PortalArticleDetailVO toDetail(CmsSite site, CmsArticle article) {

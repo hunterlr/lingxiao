@@ -99,6 +99,9 @@ POST /api/app/auth/login
 POST /api/app/auth/logout
 POST /api/app/auth/forgot-password
 POST /api/app/auth/reset-password
+
+# 公开只读：匿名可看总数，带会员 Token 时附带个人状态
+GET  /api/app/public/interactions/articles/{articleId}
 ```
 
 ### 4.2 会员端（必须登录）
@@ -107,6 +110,12 @@ POST /api/app/auth/reset-password
 GET  /api/app/profile
 PUT  /api/app/profile
 PUT  /api/app/profile/password
+
+GET    /api/app/interactions/favorites
+PUT    /api/app/interactions/articles/{articleId}/favorite
+DELETE /api/app/interactions/articles/{articleId}/favorite
+PUT    /api/app/interactions/articles/{articleId}/like
+DELETE /api/app/interactions/articles/{articleId}/like
 ```
 
 ### 4.3 后台（`/api/admin/member`，平台域）
@@ -210,7 +219,7 @@ DELETE /api/admin/member/{memberId}
 | 1 | 表结构、独立 StpLogic、注册 / 登录 / 找回密码、个人中心、后台 CRUD | v1.2 第一刀，已完成 |
 | 1.5 | 注册 / 登录 / 找回密码限流、验证码错误次数、短信 / 邮件通道接口与开发实现 | v1.2 第二刀，已完成 |
 | 2 | 会员等级升级任务、积分 / 成长值规则 | 待排期 |
-| 3 | 评论 / 收藏 / 点赞 / 消息 | 待排期 |
+| 3 | 评论 / 收藏 / 点赞 / 消息 | 收藏 + 点赞已完成（2026-11-22），评论 / 消息待排期 |
 | 4 | 第三方登录绑定（`mem_oauth`） | 待排期 |
 | 5 | 会员角色与细粒度权限 | 待排期 |
 
@@ -222,14 +231,15 @@ DELETE /api/admin/member/{memberId}
 
 ## 9. 验收基线
 
-- 单测：会员模块共 49 项 —— `MemberUserServiceTest` 19 项、
+- 单测：会员模块共 55 项 —— `MemberUserServiceTest` 19 项、
   `MemberPasswordPolicyTest` 5 项、`MemberCaptchaServiceTest` 7 项、
   `MemberRateLimitServiceTest` 4 项、`RoutingMemberResetCodeSenderTest` 5 项、
-  `MemberChannelConfigServiceTest` 9 项。
-- 全仓：**205 项 / 34 类**，JDK 8 下失败 0 错误 0。
+  `MemberChannelConfigServiceTest` 9 项、`MemberInteractionServiceTest` 6 项。
+- 全仓：**211 项 / 35 类**，JDK 8 下失败 0 错误 0。
 - 接口：`.local/member-check.mjs` **69 项全部通过**（域隔离、注册登录、找回密码、
   短信 / 邮件开发通道、渠道配置、锁定、启停、删除、菜单下发、验证码开关、
-  注册 / 登录 / 找回 / 重置限流）。
+  注册 / 登录 / 找回 / 重置限流）；`.local/member-interaction-check.mjs`
+  **20 项全部通过**（收藏 / 点赞、域隔离、幂等、公开统计、批量摘要）。
 - 浏览器：`.local/uitest/member.mjs` 12 项全部通过（列表、筛选、编辑、启停、
   重置密码、删除、无前端报错）。
 - 关闭态：`.local/member-off-check.mjs` 7 项全部通过。`member.enabled=false` 重启后
@@ -374,3 +384,93 @@ mvn -q test
 | 接口 - 批量 | 合法批量保存成功；含非法值整批拒绝且前一项未被修改 |
 | 接口 - 开关 | 关闭后 app 接口与后台会员接口均 1003，会员菜单隐藏，参数页仍可读；重新开启恢复 |
 | 浏览器 | 总开关卡片、10 行非会员参数、分组设置页、保存提示、关闭后菜单隐藏与路由 404 均通过 |
+
+---
+
+## 12. v1.2 第三刀（前半）：收藏与点赞（2026-11-22）
+
+切片 3 原本是「评论 / 收藏 / 点赞 / 消息」。本轮只做收藏与点赞：
+不涉及内容审核，读写模型简单，风险最小，同时为评论复用同一套
+「会员 Token + 互动表 + 公开统计」骨架。
+
+### 12.1 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `db/migration/member/V29__member_interaction.sql` | `mem_favorite`、`mem_like`，会员 + 文章唯一键 |
+| 实体 | `MemFavorite` / `MemLike` | 只存 `tenant_id / member_id / article_id / create_time` |
+| Mapper | `MemFavoriteMapper` / `MemLikeMapper` | 原生 `BaseMapper`，不做逻辑删除 |
+| 服务 | `MemberInteractionService` | 统计、收藏 / 取消、点赞 / 取消、我的收藏分页 |
+| 控制器 | `MemberInteractionController` | 公开统计 + 登录写操作，只挂 `/api/app/**` |
+| 白名单 | `MemberSaTokenConfigure` | 显式放行 `/api/app/public/**`，写接口仍需登录 |
+| DTO | `MemberInteractionVO` / `MemberFavoriteVO` | 统计状态；收藏只返回文章 ID 与时间 |
+| CMS | `CmsPortalController` / `CmsPortalService` | 新增 `articles/batch` 批量摘要，不累加阅读量 |
+| 门户 | `useMemberAuth` / `usePortalApi` / `types/member.ts` | 互动请求与批量摘要封装 |
+| 页面 | `pages/article/[id].vue` / `pages/account.vue` | 文章页收藏 / 点赞；个人中心「我的收藏」 |
+| 样式 | `assets/css/main.css` | 互动按钮、收藏列表、空状态、分页 |
+| 单测 | `MemberInteractionServiceTest` | 6 项：匿名、幂等、取消、非法 ID、分页 |
+
+### 12.2 关键决策
+
+1. **只存 ID，不复制文章字段。**
+   `mem_favorite / mem_like` 只有 `member_id + article_id`，不建跨模块外键、
+   不存标题 / 封面。文章改标题或下线后，收藏列表不会展示旧文案。
+2. **取消即删，不做逻辑删除。**
+   收藏 / 点赞是轻量关系，物理删除后可以重新收藏；若用 `del_flag`，
+   再次收藏会与唯一键冲突。并发重复插入由唯一键兜底，捕获
+   `DuplicateKeyException` 视为成功。
+3. **写接口幂等。**
+   重复收藏 / 点赞、取消不存在的记录都返回成功后的最新状态，
+   前端不需要先查再写，弱网重试也不会报错。
+4. **公开读独立前缀。**
+   统计接口放在 `/api/app/public/interactions/**` 并显式加入会员拦截器白名单；
+   写操作仍在 `/api/app/interactions/**`，必须先登录。匿名访问统计时
+   `favorited / liked` 固定 `false`，不会泄露个人状态。
+5. **会员 Token 与后台 Token 严格分离。**
+   控制器只用 `MemberLoginHelper` 取会员 ID，不读平台 `LoginHelper`、
+   不接受前端传 `memberId`。后台 Token 调会员接口返回 401 / `1002`，
+   会员 Token 调 `/api/admin/**` 同样不通。
+6. **收藏列表分两步取。**
+   会员接口只给文章 ID；门户再调 CMS `articles/batch` 补标题 / 封面 / 栏目。
+   批量接口按请求顺序返回、忽略不可见 ID、**不累加阅读量**，避免收藏页
+   把阅读量刷高。下线条目在门户显示「内容已下线或不可见」。
+7. **SSR 取互动，失败不阻塞正文。**
+   文章页在 setup 里取一次统计；会员模块关闭或网络异常时回落为 0，
+   正文照常渲染。`1002` 会话失效时清 Cookie 并带 `redirect` 回登录页。
+8. **未登录操作先跳登录。**
+   门户按钮不静默失败：未登录点击收藏 / 点赞跳
+   `/login?redirect=/article/{id}`，登录后回到原文。
+
+### 12.3 验证结果
+
+| 项 | 结果 |
+|---|---|
+| 编译 / 打包 | `mvn -q -DskipTests package` 通过 |
+| Flyway | `V29 - member interaction` 成功，两表与唯一键已落库 |
+| 单测 | `MemberInteractionServiceTest` 6 项通过 |
+| 接口验收 | `.local/member-interaction-check.mjs` **20/20**：域隔离、匿名统计、幂等、取消、分页、批量摘要、非法 ID |
+| 门户构建 | `npm run build` 通过 |
+| 浏览器 | 登录 → 收藏 / 点赞 → 刷新仍保留 → 个人中心列表 → 取消收藏 → 退出 → 未登录点击跳登录，控制台无错误 |
+| SSR | 带会员 Cookie 的文章页首屏含「已收藏 / 已点赞」与会员昵称，不再出现登录提示 |
+
+### 12.4 复验命令
+
+```powershell
+# 后端 8080（关闭验证码），门户 3000
+java -jar lx-boot\target\lingxiao.jar --lx.captcha.enabled=false
+node .local\member-interaction-check.mjs
+node .local\portal-interaction-ssr.mjs
+
+# 单测
+mvn -q -pl lx-modules/lx-module-member -am test -Dtest=MemberInteractionServiceTest -DfailIfNoTests=false
+```
+
+### 12.5 遗留
+
+| 项 | 说明 |
+|---|---|
+| 评论 / 消息 | 切片 3 剩余部分，复用本刀的会员会话与互动表风格 |
+| 点赞防刷 | 当前一个会员对一篇文章只能点一次；未做频率限制 |
+| 计数缓存 | 统计每次 `COUNT`，热门文章可加计数冗余或缓存 |
+| 文章下线清理 | 收藏关系保留，由门户按批量摘要结果隐藏 |
+| 批量上限 | 收藏页单页 6 条，批量接口上限 50 条 |

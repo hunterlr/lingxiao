@@ -72,6 +72,64 @@
 
     <div v-if="profile" class="account-panels">
       <section class="account-panel">
+        <h2 class="panel-title">
+          我的收藏
+          <span v-if="favoritesTotal" class="panel-count">{{ favoritesTotal }} 篇</span>
+        </h2>
+        <p class="panel-description">收藏只对当前账号可见，文章下线后会显示为不可访问。</p>
+
+        <p v-if="favoritesError" class="form-alert error" role="alert">{{ favoritesError }}</p>
+        <p v-else-if="favoritesLoading" class="form-hint">正在加载收藏…</p>
+        <p v-else-if="!favorites.length" class="favorites-empty">还没有收藏，去文章页点“收藏”试试。</p>
+        <ul v-else class="favorites-list">
+          <li v-for="row in favorites" :key="String(row.item.articleId)" class="favorite-item">
+            <NuxtLink v-if="row.summary" :to="`/article/${row.item.articleId}`" class="favorite-link">
+              <img
+                v-if="favoriteCover(row.summary)"
+                :src="favoriteCover(row.summary) || ''"
+                alt=""
+                class="favorite-cover"
+              />
+              <span class="favorite-body">
+                <strong>{{ row.summary.title }}</strong>
+                <span class="favorite-meta">
+                  {{ row.summary.categoryName || '文章' }} · 收藏于 {{ formatDate(row.item.createTime) }}
+                </span>
+              </span>
+            </NuxtLink>
+            <span v-else class="favorite-missing">内容已下线或不可见</span>
+            <button
+              type="button"
+              class="favorite-remove"
+              :disabled="favoritesRemovingId === String(row.item.articleId)"
+              @click="removeFavorite(row.item.articleId)"
+            >
+              {{ favoritesRemovingId === String(row.item.articleId) ? '处理中…' : '取消收藏' }}
+            </button>
+          </li>
+        </ul>
+        <div v-if="favoritePageCount > 1" class="favorites-pager">
+          <button
+            type="button"
+            class="button ghost small"
+            :disabled="favoritesPage <= 1 || favoritesLoading"
+            @click="loadFavorites(favoritesPage - 1)"
+          >
+            上一页
+          </button>
+          <span>{{ favoritesPage }} / {{ favoritePageCount }}</span>
+          <button
+            type="button"
+            class="button ghost small"
+            :disabled="favoritesPage >= favoritePageCount || favoritesLoading"
+            @click="loadFavorites(favoritesPage + 1)"
+          >
+            下一页
+          </button>
+        </div>
+      </section>
+
+      <section class="account-panel">
         <h2 class="panel-title">基本资料</h2>
         <p class="panel-description">昵称、头像与性别可自助修改；手机号 / 邮箱更换需要验证，暂未开放。</p>
 
@@ -188,7 +246,8 @@
 </template>
 
 <script setup lang="ts">
-import type { MemberProfile } from '~/types/member'
+import type { MemberFavoriteItem, MemberProfile } from '~/types/member'
+import type { PortalArticleSummary } from '~/types/portal'
 import { MemberApiError, memberErrorMessage } from '~/composables/useMemberAuth'
 
 const {
@@ -197,8 +256,11 @@ const {
   ensureProfile,
   updateProfile,
   changePassword,
-  logout
+  logout,
+  fetchFavorites,
+  setFavorite
 } = useMemberAuth()
+const portalApi = usePortalApi()
 
 await ensureProfile(true)
 
@@ -211,15 +273,99 @@ const profileError = ref('')
 const profileSuccess = ref('')
 const passwordError = ref('')
 
+interface FavoriteRow {
+  item: MemberFavoriteItem
+  summary?: PortalArticleSummary
+}
+
+const FAVORITE_PAGE_SIZE = 6
+const favorites = ref<FavoriteRow[]>([])
+const favoritesTotal = ref(0)
+const favoritesPage = ref(1)
+const favoritesLoading = ref(false)
+const favoritesRemovingId = ref('')
+const favoritesError = ref('')
+
 const displayName = computed(() => profile.value?.nickname || profile.value?.username || '会员')
 const avatarUrl = computed(() => mediaUrl(profile.value?.avatar, 'thumb'))
 const previewAvatar = computed(() => mediaUrl(profileForm.avatar, 'thumb'))
 const initial = computed(() => (displayName.value || '会').slice(0, 1))
+const favoritePageCount = computed(() =>
+  Math.max(1, Math.ceil(favoritesTotal.value / FAVORITE_PAGE_SIZE))
+)
 const sexLabel = computed(() => {
   const value = profile.value?.sex
   if (value === '0') return '男'
   if (value === '1') return '女'
   return '不公开'
+})
+
+function favoriteCover(summary?: PortalArticleSummary): string | null {
+  return summary ? mediaUrl(summary.cover, 'thumb') : null
+}
+
+/**
+ * 收藏列表分两步取：会员接口只给文章 ID，再调 CMS 公开批量摘要补标题 / 封面。
+ * 批量摘要接口不会累加阅读量，下线文章会被省略，因此这里允许出现“不可见”条目。
+ */
+async function loadFavorites(page = 1) {
+  if (!profile.value) return
+  favoritesLoading.value = true
+  favoritesError.value = ''
+  try {
+    const result = await fetchFavorites(page, FAVORITE_PAGE_SIZE)
+    const items = result.records || []
+    const summaries = items.length
+      ? await portalApi.fetchArticleBatch(items.map((item) => item.articleId))
+      : []
+    const summaryMap = new Map(summaries.map((item) => [String(item.articleId), item]))
+    favorites.value = items.map((item) => ({
+      item,
+      summary: summaryMap.get(String(item.articleId))
+    }))
+    favoritesTotal.value = Number(result.total) || 0
+    favoritesPage.value = page
+  } catch (error) {
+    favorites.value = []
+    favoritesTotal.value = 0
+    favoritesError.value = memberErrorMessage(error, '收藏加载失败，请稍后再试')
+  } finally {
+    favoritesLoading.value = false
+  }
+}
+
+function resetFavorites() {
+  favorites.value = []
+  favoritesTotal.value = 0
+  favoritesPage.value = 1
+  favoritesError.value = ''
+  favoritesRemovingId.value = ''
+}
+
+async function removeFavorite(articleId: string | number) {
+  if (favoritesRemovingId.value) return
+  const key = String(articleId)
+  favoritesRemovingId.value = key
+  favoritesError.value = ''
+  try {
+    await setFavorite(key, false)
+    // 删除当前页最后一条时退回上一页，避免停在空页
+    const target = favorites.value.length === 1 && favoritesPage.value > 1
+      ? favoritesPage.value - 1
+      : favoritesPage.value
+    await loadFavorites(target)
+  } catch (error) {
+    favoritesError.value = memberErrorMessage(error, '取消收藏失败，请稍后再试')
+  } finally {
+    favoritesRemovingId.value = ''
+  }
+}
+
+onMounted(() => {
+  if (profile.value) loadFavorites(1)
+})
+watch(profile, (value) => {
+  if (!value) resetFavorites()
 })
 
 /** 资料返回后回填表单；保存成功返回同一份资料时也会刷新。 */

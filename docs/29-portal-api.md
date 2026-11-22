@@ -46,6 +46,7 @@
 | GET | `/api/portal/cms/sites/{siteKey}/tags` | 启用标签列表 |
 | GET | `/api/portal/cms/sites/{siteKey}/articles` | 已发布文章分页 |
 | GET | `/api/portal/cms/sites/{siteKey}/articles/{articleId}` | 文章详情（按 ID） |
+| GET | `/api/portal/cms/sites/{siteKey}/articles/batch?ids=1,2,3` | 按 ID 批量取摘要（最多 50 条） |
 | GET | `/api/portal/cms/sites/{siteKey}/articles/by-slug/{slug}` | 文章详情（按 slug，适合伪静态） |
 | GET | `/api/portal/cms/sites/{siteKey}/search` | 关键字搜索（标题 / 摘要） |
 
@@ -112,6 +113,16 @@
 `content` 是 `HtmlSanitizer` 清洗后的 HTML；`category` 是完整栏目节点（含 SEO 与封面）；
 `tags` 只含启用标签。`viewCount` 是本次访问累加后的值。
 
+### 4.4 批量摘要
+
+`GET /articles/batch?ids=1,2,3` 返回与列表相同的摘要结构，用于“只有文章 ID”的场景
+（典型是会员收藏列表）。规则：
+
+- 最多 50 个 ID，重复 ID 去重，非正数忽略；
+- 只返回当前站点且已发布的文章，按请求顺序输出；
+- 不可见 / 已下线的 ID 直接省略，不报错，门户据此显示“内容已下线”；
+- **不累加阅读量**，因此收藏列表不能改用逐篇详情接口补标题。
+
 **阅读量**：详情接口每调用一次 `view_count = view_count + 1`（单条 UPDATE 自增，
 不先查后写）。当前没有防刷策略，门户上线前需要按 IP / 会话做限流或改异步统计。
 
@@ -138,6 +149,9 @@ curl "http://127.0.0.1:8080/api/portal/cms/sites/main/search?keyword=发布"
 # 详情
 curl http://127.0.0.1:8080/api/portal/cms/sites/main/articles/1234567890
 curl http://127.0.0.1:8080/api/portal/cms/sites/main/articles/by-slug/hello-world
+
+# 批量摘要（不累加阅读量）
+curl "http://127.0.0.1:8080/api/portal/cms/sites/main/articles/batch?ids=1234567890,1234567891"
 ```
 
 多语言：门户接口本身不做内容翻译。错误文案受 `X-Lang / ?lang / Accept-Language` 影响，
@@ -174,7 +188,7 @@ curl http://127.0.0.1:8080/api/portal/cms/sites/main/articles/by-slug/hello-worl
 
 ## 8. 门户接入状态（2026-11-22）
 
-`lx-ui-portal` 已按本契约完成第一刀：
+`lx-ui-portal` 已按本契约完成第一、二、三刀：
 
 | 页面 | 使用的接口 |
 |---|---|
@@ -182,6 +196,7 @@ curl http://127.0.0.1:8080/api/portal/cms/sites/main/articles/by-slug/hello-worl
 | 栏目列表 | `/categories`、`/articles?categoryKey=...&pageNum=...&pageSize=...` |
 | 文章详情 | `/articles/{articleId}`、`/categories`、同栏目 `/articles` |
 | 站内搜索 | `/search?keyword=...&pageNum=...&pageSize=...` |
+| 个人中心 · 我的收藏 | 会员 `/api/app/interactions/favorites` + `/articles/batch` 补标题 / 封面 |
 
 - 浏览器与 SSR 都请求同源 `/api/**`，由 Nitro 代理到 Spring Boot；
 - `1004` 统一转 404，其它异常转 502；

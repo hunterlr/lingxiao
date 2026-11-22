@@ -5806,3 +5806,162 @@ SSR / HTTP 断言                        8/8：首页 / 栏目 / 子栏目 / 详
 | 缓存 | 当前每次请求查后端，可加 Nitro / Nginx 短 TTL |
 | 多站点 | 一个部署对应一个 `siteKey`，多站点需按域名解析 |
 | 静态化 | 尚未做预渲染 / ISR / CDN |
+
+## 59. 门户第二刀：会员账号与个人中心（2026-11-22）
+
+### 59.1 背景
+
+第一刀把内容阅读链路跑通，但门户仍是匿名站点。第二刀接会员自助接口，
+验证「门户 Cookie → 会员 Token → `/api/app/**`」的账号闭环，同时把会员
+Token 与后台 Token 的边界钉死：门户永远不碰 `/api/admin/**`。
+
+### 59.2 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 数据 | `composables/useMemberAuth.ts` | 会员 Token Cookie、请求头、错误归一化 |
+| 类型 | `types/member.ts` | 会员资料、验证码、登录 / 注册 / 找回表单 |
+| 登录 | `pages/login.vue` | 验证码、登录、`redirect` 回跳 |
+| 注册 | `pages/register.vue` | 协议勾选、动态必填项、注册后自动登录 |
+| 找回 | `pages/forgot-password.vue` | 申请验证码 → 重置密码两步 |
+| 个人中心 | `pages/account.vue` | 资料、改昵称 / 头像 / 性别、改密、退出 |
+| 框架 | `layouts/default.vue` | 页头会员入口与登录态头像 / 昵称 |
+| 样式 | `assets/css/main.css` | 表单、提示、资料卡、响应式 |
+| 文档 | `docs/31-portal-frontend.md` / `README.md` | 会话、页面与验收说明 |
+
+### 59.3 关键决策
+
+1. **Token 双域隔离。**
+   会员 Token 只存门户 Cookie `lx-portal-member-token`，请求时写
+   `lx-member-token`；后台管理端仍是 `lx-platform-token`。两边后端各自
+   只读自己的头，混用直接 401 / `1002`。
+2. **会员封装与内容封装分开。**
+   `usePortalApi` 保持只读；`useMemberAuth` 单独处理 Token、401、
+   `1002`、`1003`。内容页失败不能因为会员模块异常而白屏。
+3. **SSR 登录态。**
+   layout 在服务端调一次 `/api/app/profile`，首屏 HTML 直接带昵称 / 头像；
+   取不到就回匿名态，不阻塞首页。
+4. **验证码跟随后端开关。**
+   `GET /api/app/auth/captcha` 返回 `enabled`，关闭时页面不渲染输入框，
+   本地验收可用 `--lx.captcha.enabled=false`。
+5. **注册必填项不硬编码。**
+   手机号 / 邮箱是否必填由 `mem.register.*Required` 决定，前端按接口报错
+   提示，不写死规则。
+6. **改密 / 重置后立即清本地会话。**
+   后端会注销该会员全部会话；门户同步 `clearSession()`，避免登录页拿旧
+   Token 又回跳个人中心。
+7. **会员页统一 noindex。**
+   账号页没有搜索价值；已登录访问登录 / 注册页直接跳 `/account`。
+
+### 59.4 验证
+
+```text
+npm run build                     通过
+注册 / 登录 / 改资料 / 改密       通过
+找回密码（开发日志取码）          通过
+退出 / 未登录守卫                 通过
+带 Cookie 的 SSR 断言             通过
+验证码开关（开 / 关）             通过
+mem.enabled=false                 登录 / 注册页明确提示，不白屏
+控制台                            无脚本错误
+git diff --check                  干净
+```
+
+### 59.5 踩坑
+
+| 问题 | 处理 |
+|---|---|
+| 登录响应只带摘要，页头仍显示匿名 | `applySession` 清 `loaded`，进入个人中心再取完整资料 |
+| 改密后旧 Cookie 被登录页回跳 | 改密 / 重置成功立即清 Cookie |
+| 性别值与后台管理页标签映射不同 | 门户以接口为准：`0` 男、`1` 女、`2` 不公开 |
+| 会员关闭时页面空白 | `1003` 展示「会员功能已关闭」并禁用提交 |
+
+### 59.6 遗留
+
+| 项 | 说明 |
+|---|---|
+| 收藏 / 点赞 | 已在 §60 落地 |
+| 评论 / 消息 | 切片 3 剩余部分 |
+| 头像上传 | 当前填图片地址或后台文件 ID |
+| 手机号 / 邮箱换绑 | 需要短信 / 邮件双向验证 |
+| 第三方登录 | `mem_oauth` 尚未建表 |
+
+## 60. 会员收藏与点赞 + 门户互动（2026-11-22）
+
+### 60.1 背景
+
+会员账号闭环完成后，先做风险最小的收藏与点赞：不涉及内容审核，
+读写模型简单，同时为后续评论复用「会员 Token + 互动表 + 公开统计」骨架。
+
+### 60.2 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `db/migration/member/V29__member_interaction.sql` | `mem_favorite`、`mem_like` |
+| 实体 | `MemFavorite` / `MemLike` | 只存会员、文章、时间 |
+| Mapper | `MemFavoriteMapper` / `MemLikeMapper` | `BaseMapper`，取消即删 |
+| 服务 | `MemberInteractionService` | 统计、收藏 / 取消、点赞 / 取消、收藏分页 |
+| 控制器 | `MemberInteractionController` | 公开统计 + 登录写操作 |
+| 拦截器 | `MemberSaTokenConfigure` | 放行 `/api/app/public/**` |
+| DTO | `MemberInteractionVO` / `MemberFavoriteVO` | 统计状态、收藏条目 |
+| CMS | `CmsPortalController` / `CmsPortalService` | `articles/batch` 批量摘要，不累加阅读量 |
+| 门户数据 | `useMemberAuth` / `usePortalApi` / `types/member.ts` | 互动与批量摘要封装 |
+| 门户页面 | `pages/article/[id].vue` / `pages/account.vue` | 收藏 / 点赞按钮、我的收藏 |
+| 单测 | `MemberInteractionServiceTest` | 6 项 |
+
+### 60.3 关键决策
+
+1. **只存 ID，不建跨模块外键。**
+   `member_id + article_id` 足够；文章标题 / 封面由 CMS 门户接口补，
+   会员模块不 import CMS 类。
+2. **取消即删。**
+   物理删除后允许重新收藏；若用逻辑删除，唯一键会让第二次收藏失败。
+   并发重复插入捕获 `DuplicateKeyException`，仍返回成功状态。
+3. **写操作幂等。**
+   重复收藏 / 点赞、取消不存在记录都不报错，前端不必先查后写。
+4. **公开统计独立前缀。**
+   `/api/app/public/interactions/**` 匿名可读，带会员 Token 时附带个人状态；
+   写操作在 `/api/app/interactions/**`，必须先登录。后台 Token 调会员接口
+   仍是 401 / `1002`。
+5. **收藏列表两步取数。**
+   会员接口只返回文章 ID + 收藏时间；门户再调 CMS `articles/batch`
+   补标题 / 封面。批量接口不会累加阅读量，避免收藏页刷高 `view_count`。
+6. **SSR 互动失败不阻塞正文。**
+   文章页取统计失败时回落为 0；未登录点击收藏 / 点赞跳
+   `/login?redirect=...`，`1002` 同样回登录页。
+
+### 60.4 验证
+
+```text
+mvn -q -DskipTests package                     通过
+Flyway                                         V29 成功
+MemberInteractionServiceTest                   6/6
+member-interaction-check.mjs                   20/20
+npm run build                                  通过
+浏览器：收藏 / 点赞 / 刷新 / 收藏列表 / 取消   通过
+SSR：已收藏 / 已点赞 / 会员昵称                通过
+控制台                                         无脚本错误
+```
+
+接口验收覆盖：会员 / 后台 Token 双向隔离、匿名统计、后台 Token 不给会员状态、
+匿名收藏列表 401、收藏 / 点赞幂等、个人状态、收藏分页、批量摘要、
+不可见 ID 省略、取消后可重新收藏、非法文章 ID 被拒。
+
+### 60.5 踩坑
+
+| 问题 | 处理 |
+|---|---|
+| 点赞数是非字符串 / 字符串混用 | 前端统一 `Number()` 后再比较 |
+| 收藏列表逐篇调详情会累加阅读量 | 新增 `articles/batch`，只查摘要 |
+| 取消收藏后当前页可能为空 | 删除最后一条时自动退回上一页 |
+| 文章下线后收藏条目无法渲染 | 批量摘要省略该 ID，门户显示「内容已下线」 |
+| 会员功能关闭时互动接口报错 | 文章页捕获异常，计数回落 0，不影响正文 |
+
+### 60.6 遗留
+
+| 项 | 说明 |
+|---|---|
+| 评论 / 消息 | 切片 3 剩余部分 |
+| 点赞防刷 | 未做频率限制，可复用会员限流服务 |
+| 计数缓存 | 当前每次 `COUNT`，热门文章可加冗余计数 |
+| 文章下线清理 | 收藏关系保留，门户按批量摘要结果隐藏 |

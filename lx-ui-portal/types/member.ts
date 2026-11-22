@@ -79,3 +79,18 @@ export interface MemberResetPasswordForm {
   code: string
   newPassword: string
 }
+
+/** 单篇文章的收藏 / 点赞状态；匿名访问时 favorited / liked 固定 false。 */
+export interface MemberInteraction {
+  articleId: string | number
+  favoriteCount: number | string
+  likeCount: number | string
+  favorited: boolean
+  liked: boolean
+}
+
+/** 我的收藏条目：只有文章 ID 与收藏时间，标题由 CMS 门户接口补齐。 */
+export interface MemberFavoriteItem {
+  articleId: string | number
+  createTime?: string | null
+}

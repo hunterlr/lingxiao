@@ -1,5 +1,7 @@
 import type {
   MemberCaptcha,
+  MemberFavoriteItem,
+  MemberInteraction,
   MemberLoginForm,
   MemberPasswordForm,
   MemberProfile,
@@ -8,6 +10,7 @@ import type {
   MemberResetPasswordForm,
   MemberSession
 } from '~/types/member'
+import type { PageResult } from '~/types/portal'
 
 interface ApiEnvelope<T> {
   code: number
@@ -16,7 +19,7 @@ interface ApiEnvelope<T> {
 }
 
 interface MemberRequestOptions {
-  method?: 'GET' | 'POST' | 'PUT'
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   body?: Record<string, unknown>
   query?: Record<string, unknown>
 }
@@ -237,6 +240,36 @@ export function useMemberAuth() {
     clearSession()
   }
 
+  // ==================== 收藏 / 点赞 ====================
+
+  function articleSegment(articleId: string | number): string {
+    return encodeURIComponent(String(articleId))
+  }
+
+  /** 公开读：匿名也能拿到总数；带 Token 时附带当前会员状态。 */
+  function fetchInteraction(articleId: string | number): Promise<MemberInteraction> {
+    return request<MemberInteraction>(`/public/interactions/articles/${articleSegment(articleId)}`)
+  }
+
+  /** 我的收藏分页；只返回文章 ID 与收藏时间。 */
+  function fetchFavorites(pageNum = 1, pageSize = 6): Promise<PageResult<MemberFavoriteItem>> {
+    return request<PageResult<MemberFavoriteItem>>('/interactions/favorites', {
+      query: { pageNum, pageSize }
+    })
+  }
+
+  function setFavorite(articleId: string | number, favorited: boolean): Promise<MemberInteraction> {
+    return request<MemberInteraction>(`/interactions/articles/${articleSegment(articleId)}/favorite`, {
+      method: favorited ? 'PUT' : 'DELETE'
+    })
+  }
+
+  function setLike(articleId: string | number, liked: boolean): Promise<MemberInteraction> {
+    return request<MemberInteraction>(`/interactions/articles/${articleSegment(articleId)}/like`, {
+      method: liked ? 'PUT' : 'DELETE'
+    })
+  }
+
   const isLoggedIn = computed(() => Boolean(token.value))
 
   return {
@@ -252,6 +285,10 @@ export function useMemberAuth() {
     changePassword,
     fetchCaptcha,
     forgotPassword,
-    resetPassword
+    resetPassword,
+    fetchInteraction,
+    fetchFavorites,
+    setFavorite,
+    setLike
   }
 }

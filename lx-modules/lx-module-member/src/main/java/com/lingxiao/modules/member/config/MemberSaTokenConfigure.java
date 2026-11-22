@@ -80,7 +80,10 @@ public class MemberSaTokenConfigure implements WebMvcConfigurer {
                         "/api/app/auth/register",
                         "/api/app/auth/login",
                         "/api/app/auth/forgot-password",
-                        "/api/app/auth/reset-password"
+                        "/api/app/auth/reset-password",
+                        // 公开只读统计：匿名可看收藏 / 点赞数，带 Token 时附带个人状态。
+                        // 写操作仍在 /api/app/interactions/** 下，不在白名单里。
+                        "/api/app/public/**"
                 );
     }
 }

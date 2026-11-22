@@ -6,7 +6,7 @@
 会员与平台后台**物理隔离**——独立账号表 `mem_user`、独立 Token 名
 `lx-member-token`、独立 StpLogic（`member` 域），两边账号不能互相登录。
 
-**v1.2 第一刀 + 第二刀已实装**（2026-11-22）：
+**v1.2 第一刀 + 第二刀 + 第三刀（收藏 / 点赞）已实装**（2026-11-22）：
 
 - 会员注册（图形验证码、协议勾选、手机号 / 邮箱按参数选填、默认等级）；
 - 会员登录 / 登出（用户名 / 手机号 / 邮箱三选一，失败计数落库、达到阈值锁定）；
@@ -16,6 +16,7 @@
 - 短信 / 邮件通道接口化（`MemberSmsSender` / `MemberEmailSender`），
   开发环境默认日志实现，生产可替换；
 - 个人中心（资料查看 / 修改昵称头像性别 / 自助改密）；
+- 文章收藏 / 点赞与“我的收藏”分页，公开统计匿名可读；
 - 后台会员管理（分页搜索、新增、编辑、启停、重置密码、逻辑删除）；
 - 多端登录策略参数 `mem.account.multiDeviceLogin`，默认关闭（新登录踢旧会话）；
 - 会员头像只存 `fileId` 或外链，复用文件中心，不建 `mem_file`；
@@ -27,7 +28,7 @@
   后台可运行期切到 `prod`，但上线前必须先实现
   `MemberSmsSender` / `MemberEmailSender`；
 - 会员等级升级任务 / 积分规则 / 成长值衰减（表与字段已预留）；
-- 评论、收藏、点赞、消息通知；
+- 评论、消息通知；
 - 第三方登录绑定（`mem_oauth` 预留）；
 - 会员角色 / 细粒度权限（当前只有登录态，没有会员权限码）。
 
@@ -72,6 +73,9 @@ POST /api/app/auth/login
 POST /api/app/auth/logout
 POST /api/app/auth/forgot-password
 POST /api/app/auth/reset-password
+
+# 公开只读：匿名可看总数，带会员 Token 时附带个人状态
+GET  /api/app/public/interactions/articles/{articleId}
 ```
 
 ### 会员端（必须登录）
@@ -80,6 +84,12 @@ POST /api/app/auth/reset-password
 GET  /api/app/profile
 PUT  /api/app/profile
 PUT  /api/app/profile/password
+
+GET    /api/app/interactions/favorites
+PUT    /api/app/interactions/articles/{articleId}/favorite
+DELETE /api/app/interactions/articles/{articleId}/favorite
+PUT    /api/app/interactions/articles/{articleId}/like
+DELETE /api/app/interactions/articles/{articleId}/like
 ```
 
 ### 后台（平台域 + `platform:member:user:*`）
@@ -113,10 +123,12 @@ com.lingxiao.modules.member
 ├─ controller/
 │  ├─ MemberAuthController     注册 / 登录 / 登出 / 验证码 / 找回密码
 │  ├─ MemberProfileController  个人中心资料与改密
+│  ├─ MemberInteractionController 收藏 / 点赞 / 公开互动统计
 │  ├─ MemberAdminController    后台会员列表与维护
 │  └─ MemberChannelAdminController 后台渠道配置与测试发送
 ├─ dto/                        请求 / 响应对象（含后台与会员端两套重置密码请求）
-├─ entity/                     MemUser / MemLevel / MemPasswordReset / MemChannelConfig
+├─ entity/                     MemUser / MemLevel / MemPasswordReset / MemChannelConfig /
+│                              MemFavorite / MemLike
 ├─ mapper/                     MyBatis-Plus Mapper
 ├─ security/
 │  ├─ MemberLoginHelper        会员 Session 读写（与平台 LoginHelper 分离）
@@ -131,6 +143,7 @@ com.lingxiao.modules.member
 │  ├─ MemberResetCodeSender    找回密码验证码下发入口（路由器）
 │  ├─ RoutingMemberResetCodeSender 按账号选择短信 / 邮件通道
 │  ├─ MemberChannelConfigService 渠道配置读写、dev / prod 选择、测试发送
+│  ├─ MemberInteractionService 收藏 / 点赞 / 公开互动统计与我的收藏
 │  ├─ MemberSmsSender          短信通道 SPI
 │  ├─ MemberEmailSender        邮件通道 SPI
 │  ├─ DevMemberSmsSender       开发短信通道（只写日志）
@@ -138,7 +151,9 @@ com.lingxiao.modules.member
 └─ resources/db/migration/member/
    ├─ V25__member_schema.sql    mem_* 表、参数 11~18、菜单 4000 段与授权
    ├─ V26__member_security_hardening.sql 参数 19~25（限流与验证码尝试次数）
-   └─ V27__member_channel_config.sql     渠道配置表、菜单 4020 段与授权
+   ├─ V27__member_channel_config.sql     渠道配置表、菜单 4020 段与授权
+   ├─ V28__member_settings.sql           mem.enabled 总开关、会员设置页 4030 段
+   └─ V29__member_interaction.sql        mem_favorite / mem_like
 ```
 
 ## 参数
@@ -204,3 +219,20 @@ com.lingxiao.modules.member
 - 「测试发送」：dev 模式回显验证码并写应用日志，prod 模式只返回提交结果；
   通道停用、手机号 / 邮箱格式错误会明确报错。
 - 默认两个通道都是 `mode=dev`、启用状态，与搜索 / 找回密码行为一致。
+
+## 收藏与点赞（第三刀）
+
+- 表：`mem_favorite`、`mem_like`（V29），只存
+  `tenant_id / member_id / article_id / create_time`；
+  **不建跨模块外键**，也不复制文章标题 / 封面。
+- 取消即物理删除，允许重新收藏；重复收藏 / 点赞幂等，
+  并发由 `(tenant_id, member_id, article_id)` 唯一键兜底。
+- 会员 ID 只从 `MemberLoginHelper` 读取，不接受前端传入；
+  后台 Token 调用会员互动接口仍是 401 / `1002`。
+- 公开统计 `GET /api/app/public/interactions/articles/{articleId}`
+  匿名可读，带会员 Token 时附带 `favorited / liked`；
+  写操作全部在 `/api/app/interactions/**`，必须先登录。
+- `GET /interactions/favorites` 只返回文章 ID 与收藏时间；
+  门户再用 CMS `GET /api/portal/cms/sites/{siteKey}/articles/batch`
+  补标题 / 封面，批量接口不累加阅读量。
+- 统计接口每次 `COUNT`，当前没有缓存或防刷；热门文章可后续加计数冗余。

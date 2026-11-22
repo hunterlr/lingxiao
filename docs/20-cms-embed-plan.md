@@ -333,9 +333,9 @@ platform:cms:tag:list|add|edit|remove
 - [x] CMS 打开：迁移、菜单、权限、发文、发布、**门户可见**全链路通过。
       后台链路见 §14.5，门户读取见 §15。
 - [x] CMS 关闭再打开：数据与引用关系完整。
-- [ ] 会员 Token 与后台 Token 互不认（会员模块未开工）。
-- [x] 门户接口只出白名单字段、只出已发布内容；门户工程本身未开工，
-      落地时仍须只调 `/api/portal`（契约见 `docs/29-portal-api.md`）。
+- [x] 会员 Token 与后台 Token 互不认（会员模块与门户已落地，双向 401 / `1002` 验收通过）。
+- [x] 门户接口只出白名单字段、只出已发布内容；门户工程只调 `/api/portal/cms/**`
+      与会员自助接口 `/api/app/**`（契约见 `docs/29-portal-api.md`）。
 - [x] 文件只走 `fileId`，CMS / 会员无自己的文件表（封面 / Logo 存 `fileId` 或 URL）。
 - [x] 无跨模块外键；删除走应用层校验。
 - [x] 菜单 SQL 幂等，重复执行不产生重复菜单（`INSERT IGNORE` + `menu_key` 唯一键）。

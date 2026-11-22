@@ -55,6 +55,10 @@ export function usePortalApi() {
       request<PortalArticleDetail>(`/articles/${encodeURIComponent(String(articleId))}`),
     fetchArticleBySlug: (slug: string) =>
       request<PortalArticleDetail>(`/articles/by-slug/${encodeURIComponent(slug)}`),
+    fetchArticleBatch: (ids: Array<string | number>) => {
+      if (!ids.length) return Promise.resolve<PortalArticleSummary[]>([])
+      return request<PortalArticleSummary[]>('/articles/batch', { ids: ids.join(',') })
+    },
     search: (query: ArticleQuery = {}) =>
       request<PageResult<PortalArticleSummary>>('/search', query as Record<string, unknown>)
   }

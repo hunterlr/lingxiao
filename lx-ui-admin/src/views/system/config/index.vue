@@ -1,5 +1,27 @@
 <template>
   <div class="page-container">
+    <div v-if="memberSwitch" class="page-card member-switch-card">
+      <div class="member-switch-main">
+        <div class="member-switch-text">
+          <div class="member-switch-title">
+            <span>{{ t('page.config.memberSwitch') }}</span>
+            <el-tag :type="memberSwitchOn ? 'success' : 'info'" size="small" effect="plain">
+              {{ memberSwitchOn ? t('page.config.switchOn') : t('page.config.switchOff') }}
+            </el-tag>
+          </div>
+          <div class="member-switch-desc">{{ t('page.config.memberSwitchHint') }}</div>
+        </div>
+        <el-switch
+          v-hasPerm="'platform:system:config:edit'"
+          v-model="memberSwitchValue"
+          :active-value="memberSwitchValues.on"
+          :inactive-value="memberSwitchValues.off"
+          :loading="memberSwitchSaving"
+          @change="handleMemberSwitchChange"
+        />
+      </div>
+    </div>
+
     <div class="page-card">
       <el-form :inline="true" :model="query" class="search-form" @submit.prevent>
         <el-form-item :label="t('page.config.configName')">
@@ -48,6 +70,9 @@
         <div class="toolbar-left">
           <span class="text-secondary">
             {{ t('page.config.hint') }}
+          </span>
+          <span v-if="memberSwitch" class="member-setting-tip">
+            {{ t('page.config.memberMovedHint') }}
           </span>
         </div>
         <div class="toolbar-right">
@@ -311,6 +336,41 @@ function configLabel(row) {
   return key && te(key) ? t(key) : row.configName
 }
 
+/* ==================== 会员功能总开关 ==================== */
+const memberSwitch = ref(null)
+const memberSwitchValue = ref('')
+const memberSwitchSaving = ref(false)
+const memberSwitchValues = computed(() => parseSwitchValues(memberSwitch.value?.configOptions))
+const memberSwitchOn = computed(() => memberSwitchValue.value === memberSwitchValues.value.on)
+
+async function loadMemberSwitch() {
+  try {
+    const data = await listConfigs({ pageNum: 1, pageSize: 10, configKey: 'mem.enabled' })
+    const row = (data.records || []).find((item) => item.configKey === 'mem.enabled')
+    memberSwitch.value = row || null
+    memberSwitchValue.value = row ? String(row.configValue) : ''
+  } catch (e) {
+    // 会员模块未安装时没有这个参数；开关卡片直接不显示，不影响通用参数页
+    memberSwitch.value = null
+  }
+}
+
+async function handleMemberSwitchChange(value) {
+  if (!memberSwitch.value) return
+  const { on, off } = memberSwitchValues.value
+  const previous = value === on ? off : on
+  memberSwitchSaving.value = true
+  try {
+    await updateConfig(memberSwitch.value.configId, { ...memberSwitch.value, configValue: value })
+    memberSwitch.value.configValue = value
+    ElMessage.success(t('page.config.memberSwitchSaved'))
+  } catch (e) {
+    memberSwitchValue.value = previous
+  } finally {
+    memberSwitchSaving.value = false
+  }
+}
+
 const loading = ref(false)
 const rows = ref([])
 const total = ref(0)
@@ -332,7 +392,9 @@ async function loadList() {
       configName: query.configName || undefined,
       configKey: query.configKey || undefined,
       configType: query.configType || undefined,
-      controlType: query.controlType || undefined
+      controlType: query.controlType || undefined,
+      // 会员参数集中在「会员管理 → 会员设置」，通用参数页不再混排
+      excludeConfigKeyPrefix: 'mem.'
     })
     rows.value = data.records || []
     total.value = Number(data.total || 0)
@@ -354,7 +416,10 @@ function handleReset() {
   handleSearch()
 }
 
-onMounted(loadList)
+onMounted(() => {
+  loadList()
+  loadMemberSwitch()
+})
 
 /* ==================== 列表展示 ==================== */
 function isSwitchOn(row) {
@@ -606,6 +671,34 @@ async function handleDelete(row) {
 </script>
 
 <style scoped>
+.member-switch-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.member-switch-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.member-switch-desc {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
+}
+
+.member-setting-tip {
+  margin-left: 12px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
 .config-value {
   word-break: break-all;
 }

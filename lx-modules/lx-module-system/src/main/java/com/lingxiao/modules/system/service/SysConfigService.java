@@ -8,6 +8,7 @@ import com.lingxiao.common.core.domain.PageResult;
 import com.lingxiao.common.core.enums.ErrorCode;
 import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.common.security.util.LoginHelper;
+import com.lingxiao.modules.system.dto.SysConfigValueRequest;
 import com.lingxiao.modules.system.entity.SysConfig;
 import com.lingxiao.modules.system.mapper.SysConfigMapper;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -68,12 +70,22 @@ public class SysConfigService implements ConfigProvider {
 
     private final SysConfigMapper configMapper;
 
+    /**
+     * 分页查询参数。
+     *
+     * <p>{@code configKeyPrefix} / {@code excludeConfigKeyPrefix} 用于按模块拆分参数页：
+     * 通用参数页排除 {@code mem.}，会员设置页只看 {@code mem.}。
+     * 用前缀而不是精确 key，是为了以后模块新增参数时页面不用改代码。</p>
+     */
     public PageResult<SysConfig> page(long pageNum, long pageSize, String configName, String configKey,
-                                      String configType, String controlType) {
+                                      String configType, String controlType,
+                                      String configKeyPrefix, String excludeConfigKeyPrefix) {
         Page<SysConfig> page = new Page<>(Math.max(pageNum, 1), Math.min(Math.max(pageSize, 1), 100));
         LambdaQueryWrapper<SysConfig> wrapper = new LambdaQueryWrapper<SysConfig>()
                 .like(StringUtils.hasText(configName), SysConfig::getConfigName, configName)
                 .like(StringUtils.hasText(configKey), SysConfig::getConfigKey, configKey)
+                .likeRight(StringUtils.hasText(configKeyPrefix), SysConfig::getConfigKey, configKeyPrefix)
+                .notLikeRight(StringUtils.hasText(excludeConfigKeyPrefix), SysConfig::getConfigKey, excludeConfigKeyPrefix)
                 .eq(StringUtils.hasText(configType), SysConfig::getConfigType, configType)
                 .eq(StringUtils.hasText(controlType), SysConfig::getControlType, controlType)
                 .orderByAsc(SysConfig::getConfigId);
@@ -168,6 +180,35 @@ public class SysConfigService implements ConfigProvider {
         existing.setUpdateBy(LoginHelper.getUserId());
         configMapper.updateById(existing);
         log.info("修改系统参数: key={}, 操作人={}", existing.getConfigKey(), LoginHelper.getUsername());
+    }
+
+    /**
+     * 批量改值：设置类页面一次保存多个参数。
+     *
+     * <p>先全部校验再统一写库，避免前几个参数已保存、后一个参数校验失败，
+     * 页面却提示“保存失败”的半个状态。只改值，不改键名 / 控件 / 选项，
+     * 因此同样受内置参数约束与控件校验保护。</p>
+     */
+    public void updateValues(List<SysConfigValueRequest> items) {
+        if (items == null || items.isEmpty()) {
+            throw new ServiceException(ErrorCode.BAD_REQUEST, "至少提交一个参数");
+        }
+        List<SysConfig> pending = new ArrayList<>(items.size());
+        for (SysConfigValueRequest item : items) {
+            SysConfig existing = mustGet(item.getConfigId());
+            SysConfig probe = new SysConfig();
+            probe.setConfigValue(item.getConfigValue() == null ? "" : item.getConfigValue().trim());
+            probe.setControlType(existing.getControlType());
+            probe.setConfigOptions(existing.getConfigOptions());
+            normalizeAndValidateControl(probe);
+            existing.setConfigValue(probe.getConfigValue());
+            existing.setUpdateBy(LoginHelper.getUserId());
+            pending.add(existing);
+        }
+        for (SysConfig existing : pending) {
+            configMapper.updateById(existing);
+        }
+        log.info("批量修改系统参数: count={}, 操作人={}", pending.size(), LoginHelper.getUsername());
     }
 
     /** 删除参数：内置参数拒绝删除。 */

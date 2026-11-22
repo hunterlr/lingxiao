@@ -137,16 +137,27 @@ DELETE /api/admin/member/{memberId}
 | `platform:member:user:remove` | 删除会员 |
 
 菜单：`4000 member` → `4010 member:user`（`member/user/index`）→ `4011~4016` 按钮。
+`4020 member:channel`（`member/channel/index`）→ `4021~4022` 按钮；
+`4030 member:setting`（`member/setting/index`）→ `4031` 保存按钮，
+权限沿用 `platform:system:config:list|edit`（编辑的仍是 `sys_config`）。
 超管角色在迁移里自动授权。
 
 ---
 
 ## 6. 参数
 
-全部在「系统管理 → 参数设置」，键名前缀 `mem.`：
+会员参数从通用参数页拆成两处维护：
+
+- **总开关**留在「系统管理 → 参数设置」，只有 `mem.enabled` 一行；
+- **其余参数**集中在「会员管理 → 会员设置」（`/member/setting`），按安全 / 账号 /
+  注册 / 找回分组展示，一次保存只提交改动项。
+
+通用参数页通过 `excludeConfigKeyPrefix=mem.` 过滤，会员设置页通过
+`configKeyPrefix=mem.` 读取；以后新增 `mem.*` 参数会自动出现在设置页的「其他」分组。
 
 | 键 | 控件 | 默认 | 用途 |
 | --- | --- | --- | --- |
+| `mem.enabled` | switch | true | 运行期总开关；关闭后会员端与后台会员接口返回 1003，会员菜单不下发 |
 | `mem.security.captchaEnabled` | switch | true | 会员验证码开关 |
 | `mem.security.passwordPolicy` | select | basic | 密码复杂度（off / basic / strong） |
 | `mem.account.maxRetryCount` | number | 5 | 登录失败锁定阈值 |
@@ -164,6 +175,14 @@ DELETE /api/admin/member/{memberId}
 | `mem.register.resetRateLimitMinutes` | number | 10 | 找回 / 重置密码限流窗口（分钟） |
 
 删除参数时模块回退代码里的默认值，不会出现空指针。
+
+**两级开关的区别：**
+
+- `lx.module.modules.member.enabled`：Spring 启动期开关，决定会员 Bean 是否装配，
+  改动需要重启；关闭时接口 404、菜单不下发，数据和表保留。
+- `mem.enabled`：运行期业务开关，改完立即生效；关闭时 `/api/app/**` 与
+  `/api/admin/member/**` 返回 `1003 会员功能已关闭`，会员菜单不下发，
+  但平台后台、CMS 与参数页本身保持可用。会员 Bean 仍在，重新开启不需要重启。
 
 ---
 
@@ -309,3 +328,49 @@ mvn -q test
 - **生产保护**：切到 `prod` 前检查部署方是否已提供
   `MemberSmsSender` / `MemberEmailSender` Bean；缺失时拒绝保存，避免找回密码静默失效。
 - **默认值**：两个通道均为 `mode=dev`、`status=0`（启用），与第一刀行为一致。
+
+---
+
+## 11. v1.2 参数页重组与运行期总开关（2026-11-22）
+
+会员参数原来和系统、CMS 参数混在一张表里，共 15 行 `mem.*`，运营定位困难。
+本次只做“拆分 + 总开关”，不改业务逻辑。
+
+### 11.1 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `db/migration/member/V28__member_settings.sql` | `mem.enabled`（configId 26）；菜单 4030 / 4031 |
+| 查询 | `SysConfigService.page` / `SysConfigController.list` | 新增 `configKeyPrefix` / `excludeConfigKeyPrefix` |
+| 批量保存 | `SysConfigService.updateValues` + `PUT /api/admin/system/config/batch` | 先整体校验再写库，只改值 |
+| 通用参数页 | `views/system/config/index.vue` | 顶部总开关卡片；列表排除 `mem.` |
+| 会员设置页 | `views/member/setting/index.vue` | 按分组渲染 `mem.*`，只提交改动项 |
+| 运行期开关 | `MemberEnabledInterceptor` + `MemberSaTokenConfigure` | 拦截 `/api/app/**` 与 `/api/admin/member/**` |
+| 菜单过滤 | `AuthService.isModuleEnabled` | 会员模块额外检查 `mem.enabled` |
+
+### 11.2 关键决策
+
+1. **总开关不能只放在会员设置页。** 关闭后会员菜单会隐藏，用户无法再从设置页打开；
+   开关必须留在始终可见的「系统管理 → 参数设置」。
+2. **用前缀而不是硬编码键名。** 通用页排除 `mem.`，设置页读取 `mem.`，新增参数无需改页面；
+   未归类的参数落到「其他会员参数」，不会被静默藏起来。
+3. **批量保存先校验后写库。** 一半参数成功、一半失败会让页面状态与库不一致；
+   服务端先全量校验，任何一项不合法都整体拒绝。
+4. **开关是运行期参数，不是 Spring 模块开关。** 会员 Bean 仍由
+   `lx.module.modules.member.enabled` 启动期装配；`mem.enabled` 只控制对外可用性，
+   因此可以改完立即生效。
+5. **后台会员管理也受运行期开关控制。** 否则“关闭会员”后后台仍能新增 / 编辑会员，
+   语义不一致；平台后台与 CMS 不受影响。
+
+### 11.3 验证结果
+
+| 项 | 结果 |
+|---|---|
+| 编译 / 打包 | `mvn -DskipTests compile`、`mvn -DskipTests package` 通过 |
+| 全仓单测 | **205 项 / 34 类**，失败 0 错误 0 |
+| 前端构建 | `npm run build` 通过，生成 `member/setting` 独立 chunk |
+| Flyway | V28 成功，`mem.enabled` 落库；菜单 4030 / 4031 已授权超管 |
+| 接口 - 过滤 | 全量 26、排除 `mem.` 后 10、前缀 `mem.` 16 |
+| 接口 - 批量 | 合法批量保存成功；含非法值整批拒绝且前一项未被修改 |
+| 接口 - 开关 | 关闭后 app 接口与后台会员接口均 1003，会员菜单隐藏，参数页仍可读；重新开启恢复 |
+| 浏览器 | 总开关卡片、10 行非会员参数、分组设置页、保存提示、关闭后菜单隐藏与路由 404 均通过 |

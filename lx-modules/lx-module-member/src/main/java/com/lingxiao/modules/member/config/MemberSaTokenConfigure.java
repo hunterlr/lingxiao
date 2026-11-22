@@ -4,6 +4,8 @@ import cn.dev33.satoken.SaManager;
 import cn.dev33.satoken.config.SaTokenConfig;
 import cn.dev33.satoken.interceptor.SaInterceptor;
 import com.lingxiao.common.security.util.StpMemberUtil;
+import com.lingxiao.modules.member.security.MemberEnabledInterceptor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
@@ -27,6 +29,7 @@ import javax.annotation.PostConstruct;
  * <p>白名单只放注册 / 登录 / 验证码 / 找回密码；其它会员接口必须登录。</p>
  */
 @Configuration
+@RequiredArgsConstructor
 @ConditionalOnProperty(name = "lx.module.modules.member.enabled", havingValue = "true")
 public class MemberSaTokenConfigure implements WebMvcConfigurer {
 
@@ -35,6 +38,8 @@ public class MemberSaTokenConfigure implements WebMvcConfigurer {
 
     /** 不活跃失效：2 小时 */
     private static final long MEMBER_ACTIVE_TIMEOUT = 2 * 60 * 60L;
+
+    private final MemberEnabledInterceptor memberEnabledInterceptor;
 
     @PostConstruct
     public void initTokenConfig() {
@@ -56,6 +61,11 @@ public class MemberSaTokenConfigure implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        // 先判总开关，再判登录：关闭时不需要用户先登录也能得到明确提示。
+        // 后台会员管理接口同样受开关控制；菜单由 AuthService 同步隐藏。
+        registry.addInterceptor(memberEnabledInterceptor)
+                .addPathPatterns("/api/app/**", "/api/admin/member/**");
+
         registry.addInterceptor(new SaInterceptor(handler -> {
                     // 只对匹配到 Controller 的请求做登录校验；会员模块关闭时
                     // 路径不存在，交给 Spring 正常 404，避免被包装成 500

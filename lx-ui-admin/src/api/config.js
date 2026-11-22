@@ -33,6 +33,11 @@ export function updateConfig(configId, data) {
   return http.put(`/admin/system/config/${configId}`, data)
 }
 
+/** 批量改值：设置类页面一次保存多个参数，服务端先整体校验再写库。 */
+export function batchUpdateConfigs(items) {
+  return http.put('/admin/system/config/batch', { items })
+}
+
 export function deleteConfig(configId) {
   return http.delete(`/admin/system/config/${configId}`)
 }

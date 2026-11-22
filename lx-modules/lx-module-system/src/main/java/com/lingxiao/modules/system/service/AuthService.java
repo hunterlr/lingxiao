@@ -314,7 +314,15 @@ public class AuthService {
     private boolean isModuleEnabled(String moduleCode) {
         ModuleProvider provider = moduleProvider.getIfAvailable();
         // 没有模块注册表（单独启动系统模块）时不做过滤，避免误伤全部菜单
-        return provider == null || provider.isEnabled(moduleCode);
+        if (provider != null && !provider.isEnabled(moduleCode)) {
+            return false;
+        }
+        // 会员功能总开关：模块装配仍是启动期开关，这里控制运行期是否对用户开放。
+        // 关闭后会员菜单不下发；重新开启只需改参数，不需要重启。
+        if ("member".equals(moduleCode)) {
+            return configProvider.getBooleanValue("mem.enabled", true);
+        }
+        return true;
     }
 
     /**

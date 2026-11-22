@@ -5,6 +5,7 @@ import com.lingxiao.common.core.domain.R;
 import com.lingxiao.common.log.annotation.Log;
 import com.lingxiao.common.log.enums.BusinessType;
 import com.lingxiao.common.security.annotation.RequiresPermission;
+import com.lingxiao.modules.system.dto.SysConfigBatchUpdateRequest;
 import com.lingxiao.modules.system.entity.SysConfig;
 import com.lingxiao.modules.system.service.SysConfigService;
 import lombok.RequiredArgsConstructor;
@@ -40,8 +41,11 @@ public class SysConfigController {
                                          @RequestParam(required = false) String configName,
                                          @RequestParam(required = false) String configKey,
                                          @RequestParam(required = false) String configType,
-                                         @RequestParam(required = false) String controlType) {
-        return R.ok(configService.page(pageNum, pageSize, configName, configKey, configType, controlType));
+                                         @RequestParam(required = false) String controlType,
+                                         @RequestParam(required = false) String configKeyPrefix,
+                                         @RequestParam(required = false) String excludeConfigKeyPrefix) {
+        return R.ok(configService.page(pageNum, pageSize, configName, configKey, configType, controlType,
+                configKeyPrefix, excludeConfigKeyPrefix));
     }
 
     @RequiresPermission("platform:system:config:list")
@@ -80,6 +84,19 @@ public class SysConfigController {
     @PutMapping("/{configId}")
     public R<Void> edit(@PathVariable Long configId, @Valid @RequestBody SysConfig config) {
         configService.update(configId, config);
+        return R.ok();
+    }
+
+    /**
+     * 批量改值：只改 configValue，内置参数的键名 / 控件 / 选项保持不变。
+     *
+     * <p>设置类页面一次保存多个参数时使用，服务端先整体校验再写库。</p>
+     */
+    @RequiresPermission("platform:system:config:edit")
+    @Log(title = "系统参数", businessType = BusinessType.UPDATE)
+    @PutMapping("/batch")
+    public R<Void> batchEdit(@Valid @RequestBody SysConfigBatchUpdateRequest request) {
+        configService.updateValues(request.getItems());
         return R.ok();
     }
 

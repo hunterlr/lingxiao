@@ -12,12 +12,16 @@ com.lingxiao.common.core
 ├─ enums/     ErrorCode（错误码）
 ├─ exception/ ServiceException（业务异常）
 ├─ constant/  CommonConstants（状态、删除标记、安全域、超管 ID）
+├─ module/    ModuleProvider（模块启用状态 SPI）
 └─ config/    ConfigProvider（只读系统参数 SPI）
 ```
 
 `ConfigProvider` 只定义“按 key 读参数”，由 `lx-module-system` 实现，
 文件等业务模块用它读取 `sys.file.uploadMaxMb` 一类配置，避免反向依赖系统模块。
 接口只读、不缓存、允许返回 `null`，调用方必须给默认值。
+
+`ModuleProvider` 只定义“模块是否启用”，由 `lx-framework` 的 `ModuleRegistry` 实现。
+系统模块判断菜单 / 权限时依赖接口而不是 `lx-framework`，避免业务反向依赖基座实现。
 
 ## 依赖方向
 

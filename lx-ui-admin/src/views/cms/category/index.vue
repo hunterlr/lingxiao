@@ -169,10 +169,11 @@
           </el-col>
           <el-col :span="24">
             <el-form-item :label="t('page.cms.category.cover')">
-              <div class="asset-field">
-                <el-avatar :size="48" shape="square" :src="assetUrl(form.cover)">{{ (form.categoryName || '?').slice(0, 1) }}</el-avatar>
-                <el-input v-model="form.cover" maxlength="255" :placeholder="t('page.cms.category.coverPlaceholder')" />
-              </div>
+              <MediaPicker
+                v-model="form.cover"
+                :fallback="form.categoryName"
+                :placeholder="t('page.cms.category.coverPlaceholder')"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -218,6 +219,7 @@ import {
   listSiteOptions,
   updateCategory
 } from '@/api/cms'
+import MediaPicker from '@/components/MediaPicker.vue'
 
 /**
  * CMS 栏目管理。
@@ -234,12 +236,6 @@ const loading = ref(false)
 const rows = ref([])
 const expandAll = ref(true)
 const query = reactive({ keyword: '', status: '' })
-
-function assetUrl(value) {
-  if (!value) return ''
-  if (value.startsWith('http') || value.startsWith('/')) return value
-  return `/api/file/${value}`
-}
 
 const parentOptions = computed(() => [
   { categoryId: 0, categoryName: t('page.cms.category.root'), children: rows.value }
@@ -420,14 +416,5 @@ async function handleDelete(row) {
 </script>
 
 <style scoped>
-.asset-field {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
-
-.asset-field :deep(.el-input) {
-  flex: 1;
-}
+/* 封面字段的布局由 MediaPicker 自己负责，本页不再重复样式。 */
 </style>

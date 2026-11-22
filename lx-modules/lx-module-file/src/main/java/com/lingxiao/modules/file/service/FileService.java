@@ -33,6 +33,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -51,6 +52,15 @@ import java.util.UUID;
 public class FileService {
 
     private static final DateTimeFormatter MONTH_FORMAT = DateTimeFormatter.ofPattern("yyyy/MM");
+
+    /**
+     * 图片素材扩展名，供素材选择器按图片过滤。
+     *
+     * <p>与上传白名单解耦：这里只用于列表筛选，真正允许上传什么仍由
+     * {@code lx.file.allowed-extensions} 决定。</p>
+     */
+    private static final List<String> IMAGE_EXTENSIONS = Arrays.asList(
+            "jpg", "jpeg", "png", "gif", "bmp", "webp", "svg");
 
     /** 参数设置里的单文件上限（MB）；与 YAML 的 lx.file.max-size-mb 互为兜底。 */
     private static final String CONFIG_UPLOAD_MAX_MB = "sys.file.uploadMaxMb";
@@ -203,12 +213,16 @@ public class FileService {
     /**
      * 文件库分页。
      *
-     * @param keyword 匹配 display_name / original_name / remark
+     * @param keyword   匹配 display_name / original_name / remark
+     * @param bizType   业务类型，精确匹配
+     * @param imageOnly 为 true 时只返回图片扩展名，供素材选择器使用
      */
-    public PageResult<FileVO> list(long pageNum, long pageSize, String keyword, String bizType) {
+    public PageResult<FileVO> list(long pageNum, long pageSize, String keyword, String bizType,
+                                   Boolean imageOnly) {
         Page<SysFile> page = new Page<>(Math.max(pageNum, 1), Math.min(Math.max(pageSize, 1), 100));
         LambdaQueryWrapper<SysFile> wrapper = new LambdaQueryWrapper<SysFile>()
                 .eq(StringUtils.hasText(bizType), SysFile::getBizType, bizType)
+                .in(Boolean.TRUE.equals(imageOnly), SysFile::getExt, IMAGE_EXTENSIONS)
                 .and(StringUtils.hasText(keyword), w -> w
                         .like(SysFile::getDisplayName, keyword)
                         .or().like(SysFile::getOriginalName, keyword)

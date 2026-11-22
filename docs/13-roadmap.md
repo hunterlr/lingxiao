@@ -598,9 +598,9 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 - 后台用户头像自助编辑（上传 / 预览 / 移除，只接受 `fileId` 或 `http(s)`）；
 - 第三方登录 schema 预留 `V19__system_user_social.sql` + `docs/28`，默认“先绑定后登录”。
 
-**验收**：CMS 单测 14 项；全仓 126 项 / 26 类，JDK 8 / 11 均通过；
+**验收**：CMS 后台单测 14 项；当时全仓 126 项 / 26 类，JDK 8 / 11 均通过；
 真实接口 34/34；浏览器 13/13；关闭后接口 404 / 菜单与路由消失，重开数据保留；
-`vite build`、i18n 键检查通过。
+`vite build`、i18n 键检查通过。门户 API 落地后全仓为 134 项 / 28 类。
 
 详见 `docs/20-cms-embed-plan.md` §14、`docs/21-build-log.md` §49、
 `lx-modules/lx-module-cms/README.md`。
@@ -624,4 +624,22 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 
 详见 `docs/20-cms-embed-plan.md` §15、`docs/21-build-log.md` §50、`docs/29-portal-api.md`。
 
-**下一步**：素材选择器、内容版本 / 回收站、v1.3 门户工程；随后进入 v1.2 会员体系。
+**下一步**：素材选择器（见 §12.10）、内容版本 / 回收站、v1.3 门户工程；
+随后进入 v1.2 会员体系。
+
+### 12.10 P1：v1.1 CMS 素材选择器（✅ 已完成，2026-11-22）
+
+**完成内容**：
+
+- 新增前端通用组件 `MediaPicker.vue`：预览 + 手填地址 + 文件中心图片选择；
+- 站点 Logo、栏目封面、文章封面三处替换原纯文本输入；
+- 选中写 `fileId`，存量 `http(s)` 外链继续兼容；粘贴 `/api/file/{id}` 自动归一成 `fileId`；
+- 文件中心列表新增 `imageOnly=true`，后端按图片扩展名过滤，非图片不占分页；
+- 抽公共 `resolveAssetUrl`，顺带修掉用户列表把外链头像误拼成 `/api/file/...` 的问题；
+- 权限边界：浏览需 `platform:file:list`，上传需 `platform:file:upload`；
+  没有权限时按钮隐藏，字段仍可手填外链。
+
+**验收**：后台编译、`vite build`、i18n 键检查通过；素材接口 16/16；浏览器 6/6；
+站点 Logo 经选择器保存后，后台详情与门户接口都返回同一个 `fileId`。
+
+详见 `docs/21-build-log.md` §51、`lx-modules/lx-module-cms/README.md`。

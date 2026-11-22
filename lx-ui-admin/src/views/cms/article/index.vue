@@ -192,10 +192,11 @@
           </el-col>
           <el-col :span="24">
             <el-form-item :label="t('page.cms.article.cover')">
-              <div class="asset-field">
-                <el-avatar :size="48" shape="square" :src="assetUrl(form.cover)">{{ (form.title || '?').slice(0, 1) }}</el-avatar>
-                <el-input v-model="form.cover" maxlength="255" :placeholder="t('page.cms.article.coverPlaceholder')" />
-              </div>
+              <MediaPicker
+                v-model="form.cover"
+                :fallback="form.title"
+                :placeholder="t('page.cms.article.coverPlaceholder')"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -253,6 +254,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import RichEditor from '@/components/RichEditor.vue'
+import MediaPicker from '@/components/MediaPicker.vue'
 import {
   addArticle,
   deleteArticle,
@@ -295,12 +297,6 @@ const categoryNameMap = computed(() => {
   }
   return map
 })
-
-function assetUrl(value) {
-  if (!value) return ''
-  if (value.startsWith('http') || value.startsWith('/')) return value
-  return `/api/file/${value}`
-}
 
 function statusLabel(status) {
   if (status === '1') return t('page.cms.article.published')
@@ -607,17 +603,6 @@ async function openPreview(row) {
 </script>
 
 <style scoped>
-.asset-field {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
-
-.asset-field :deep(.el-input) {
-  flex: 1;
-}
-
 .article-preview {
   line-height: 1.8;
   font-size: 14px;

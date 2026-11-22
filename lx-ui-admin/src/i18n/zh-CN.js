@@ -1051,6 +1051,18 @@ export default {
     materialRemark: '富文本{label}（UEditor Plus）'
   },
 
+  mediaPicker: {
+    select: '选择素材',
+    clear: '清除',
+    dialogTitle: '选择图片素材',
+    searchPlaceholder: '搜索文件名 / 备注',
+    empty: '还没有图片素材，先上传一张',
+    upload: '上传图片',
+    uploadSuccess: '上传成功：{name}',
+    imageOnly: '只支持图片文件',
+    hint: '选中后保存文件 ID；也可直接粘贴 https:// 外链'
+  },
+
   fileLib: {
     searchPlaceholder: '按原名 / 现名 / 备注搜索',
     bizTypePlaceholder: '业务类型（如 notice）',

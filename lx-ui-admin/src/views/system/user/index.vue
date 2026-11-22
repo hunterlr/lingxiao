@@ -68,7 +68,7 @@
         <el-table-column prop="username" :label="t('page.user.username')" min-width="130">
           <template #default="{ row }">
             <div class="user-cell">
-              <el-avatar :size="26" :src="row.avatar ? `/api/file/${row.avatar}` : ''">
+              <el-avatar :size="26" :src="resolveAssetUrl(row.avatar, { size: 'thumb' })">
                 {{ (row.nickname || row.username || '?').slice(0, 1) }}
               </el-avatar>
               <span>{{ row.username }}</span>
@@ -329,6 +329,7 @@ import {
 import { getDeptTree } from '@/api/dept'
 import { listRoleOptions } from '@/api/role'
 import { listPostOptions } from '@/api/post'
+import { resolveAssetUrl } from '@/utils/asset'
 
 /**
  * 用户管理。

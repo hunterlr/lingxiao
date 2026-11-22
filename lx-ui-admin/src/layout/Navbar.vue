@@ -94,6 +94,7 @@ import { useAppStore } from '@/store/app'
 import { useAuthStore } from '@/store/auth'
 import { useLocaleStore } from '@/store/locale'
 import { resetDynamicRoutes } from '@/router/dynamic'
+import { resolveAssetUrl } from '@/utils/asset'
 
 /**
  * 顶栏：折叠开关、面包屑、语言切换、全屏、用户菜单。
@@ -114,12 +115,7 @@ const initials = computed(() => {
 })
 
 /** 头像地址：兼容外链、站内绝对路径和文件 ID。 */
-const avatarUrl = computed(() => {
-  const avatar = auth.avatar
-  if (!avatar) return ''
-  if (avatar.startsWith('http') || avatar.startsWith('/')) return avatar
-  return `/api/file/${avatar}`
-})
+const avatarUrl = computed(() => resolveAssetUrl(auth.avatar))
 
 function toggleFullscreen() {
   if (document.fullscreenElement) {

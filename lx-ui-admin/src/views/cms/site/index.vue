@@ -39,7 +39,9 @@
       <el-table v-loading="loading" :data="rows" border stripe row-key="siteId">
         <el-table-column :label="t('page.cms.site.logo')" width="80" align="center">
           <template #default="{ row }">
-            <el-avatar :size="34" :src="assetUrl(row.logo)">{{ (row.siteName || '?').slice(0, 1) }}</el-avatar>
+            <el-avatar :size="34" :src="resolveAssetUrl(row.logo, { size: 'thumb' })">
+              {{ (row.siteName || '?').slice(0, 1) }}
+            </el-avatar>
           </template>
         </el-table-column>
         <el-table-column prop="siteName" :label="t('page.cms.site.siteName')" min-width="160" show-overflow-tooltip />
@@ -120,10 +122,12 @@
           </el-col>
           <el-col :span="24">
             <el-form-item :label="t('page.cms.site.logo')">
-              <div class="asset-field">
-                <el-avatar :size="48" :src="assetUrl(form.logo)">{{ (form.siteName || '?').slice(0, 1) }}</el-avatar>
-                <el-input v-model="form.logo" maxlength="255" :placeholder="t('page.cms.site.logoPlaceholder')" />
-              </div>
+              <MediaPicker
+                v-model="form.logo"
+                shape="circle"
+                :fallback="form.siteName"
+                :placeholder="t('page.cms.site.logoPlaceholder')"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -164,6 +168,8 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { addSite, deleteSite, getSite, listSites, updateSite } from '@/api/cms'
+import MediaPicker from '@/components/MediaPicker.vue'
+import { resolveAssetUrl } from '@/utils/asset'
 
 /**
  * CMS 站点管理。
@@ -177,13 +183,6 @@ const loading = ref(false)
 const rows = ref([])
 const total = ref(0)
 const query = reactive({ pageNum: 1, pageSize: 10, keyword: '', status: '' })
-
-/** 头像 / 封面 / Logo 统一兼容 fileId 与 http(s) 外链。 */
-function assetUrl(value) {
-  if (!value) return ''
-  if (value.startsWith('http') || value.startsWith('/')) return value
-  return `/api/file/${value}`
-}
 
 async function loadList() {
   loading.value = true
@@ -335,14 +334,5 @@ async function handleDelete(row) {
 </script>
 
 <style scoped>
-.asset-field {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
-
-.asset-field :deep(.el-input) {
-  flex: 1;
-}
+/* Logo 字段的布局由 MediaPicker 自己负责，本页不再重复样式。 */
 </style>

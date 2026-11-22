@@ -1049,6 +1049,18 @@ export default {
     materialRemark: 'Rich text {label} (UEditor Plus)'
   },
 
+  mediaPicker: {
+    select: 'Choose media',
+    clear: 'Clear',
+    dialogTitle: 'Choose an image',
+    searchPlaceholder: 'Search by file name or remark',
+    empty: 'No images yet. Upload one first.',
+    upload: 'Upload image',
+    uploadSuccess: 'Uploaded: {name}',
+    imageOnly: 'Only image files are supported',
+    hint: 'Selection stores the file ID; you can also paste an https:// URL'
+  },
+
   fileLib: {
     searchPlaceholder: 'Search by original name / current name / remark',
     bizTypePlaceholder: 'Business type (e.g. notice)',

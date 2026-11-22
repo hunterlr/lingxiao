@@ -152,6 +152,7 @@ import { Edit, Lock } from '@element-plus/icons-vue'
 import { changePassword } from '@/api/auth'
 import { uploadAvatar } from '@/api/file'
 import { useAuthStore } from '@/store/auth'
+import { resolveAssetUrl } from '@/utils/asset'
 
 /**
  * 个人中心。
@@ -172,15 +173,8 @@ const avatarUploading = ref(false)
 const profileFormRef = ref()
 const profileForm = reactive({ nickname: '', avatar: '', email: '', phone: '' })
 
-/** 头像兼容 fileId 与 http(s) 外链，和后端 normalizeAvatar 的规则保持一致。 */
-function avatarSrc(value) {
-  if (!value) return ''
-  if (value.startsWith('http') || value.startsWith('/')) return value
-  return `/api/file/${value}`
-}
-
-const displayAvatar = computed(() => avatarSrc(auth.avatar))
-const formAvatarUrl = computed(() => avatarSrc(profileForm.avatar))
+const displayAvatar = computed(() => resolveAssetUrl(auth.avatar))
+const formAvatarUrl = computed(() => resolveAssetUrl(profileForm.avatar))
 
 async function handleAvatarUpload({ file }) {
   avatarUploading.value = true

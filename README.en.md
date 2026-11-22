@@ -58,6 +58,7 @@ Version **v1.0** ships the admin foundation. v1.1 is embedding CMS as an indepen
 - Draft / publish / take-offline state machine; publishing and unpublishing have their own permission codes
 - Rich-text content is sanitized against a whitelist on both write and read, so preview matches the portal
 - Referential guards for sites, categories and tags; tags never cross sites
+- Logos and covers use a file-center image picker; selections store a `fileId`, external URLs still work
 - Public read-only portal API `/api/portal/cms/**`: sites, navigation tree, tags, article list / detail / search; published content only
 
 **Operations & tooling**
@@ -222,7 +223,7 @@ Responses are uniform `{ code, msg, data }`: `0` success, `1xxx` general and val
 | Version | Scope | Status |
 |---|---|---|
 | v1.0 | Admin foundation: permissions, files, jobs, monitoring, generator, deployment | ✅ Done |
-| v1.1 | i18n L1 (bilingual UI), CMS module (admin flows + read-only portal API done) | 🚧 In progress |
+| v1.1 | i18n L1 (bilingual UI), CMS module (admin flows + portal API + media picker done) | 🚧 In progress |
 | v1.2 | Membership, Nuxt 3 portal | Planned |
 | v1.3 | Workflow (Flowable), SaaS multi-tenancy | Planned |
 

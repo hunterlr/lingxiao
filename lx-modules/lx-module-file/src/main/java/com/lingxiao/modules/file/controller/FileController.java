@@ -78,8 +78,9 @@ public class FileController {
     public R<PageResult<FileVO>> list(@RequestParam(defaultValue = "1") long pageNum,
                                       @RequestParam(defaultValue = "20") long pageSize,
                                       @RequestParam(required = false) String keyword,
-                                      @RequestParam(required = false) String bizType) {
-        return R.ok(fileService.list(pageNum, pageSize, keyword, bizType));
+                                      @RequestParam(required = false) String bizType,
+                                      @RequestParam(required = false) Boolean imageOnly) {
+        return R.ok(fileService.list(pageNum, pageSize, keyword, bizType, imageOnly));
     }
 
     @RequiresPermission("platform:file:list")

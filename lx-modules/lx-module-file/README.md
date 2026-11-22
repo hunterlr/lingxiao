@@ -91,6 +91,15 @@ SVG **默认不放行**（XSS 风险）；需要时在 `lx.file.allowed-extensio
 
 衍生图只写磁盘，不写 `sys_file`：它们不是独立业务文件，不参与秒传、改名与引用计数。
 
+## 后台列表筛选（素材选择器）
+
+`GET /api/admin/file/list` 支持可选参数 `imageOnly=true`，只返回
+`jpg / jpeg / png / gif / bmp / webp / svg`，供 CMS 素材选择器按图片分页。
+
+- 只影响列表筛选，不改变上传白名单；能否上传仍由 `lx.file.allowed-extensions` 决定。
+- 不传或传 `false` 时行为与 v1.0 一致，文件中心页面无需改动。
+- 非图片文件仍可通过文件中心访问，只是不会出现在图片选择器里。
+
 ## 配置
 
 ```yaml

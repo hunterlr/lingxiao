@@ -2,8 +2,8 @@
 
 ## 这个目录是做什么的
 
-后台内容管理：站点 → 栏目树 → 文章 → 标签。v1.1 已做**后台维护链路 + 门户只读接口**，
-不包含门户渲染、内容版本、回收站和内容级多语言。
+后台内容管理：站点 → 栏目树 → 文章 → 标签。v1.1 已做**后台维护链路 + 门户只读接口 +
+素材选择器**，不包含门户渲染、内容版本、回收站和内容级多语言。
 
 **已实装（v1.1 第一刀 + 门户 API，2026-11-22）**：
 
@@ -13,14 +13,14 @@
 - 标签 CRUD，文章多标签，标签不能跨站点复用；
 - 删除保护：站点 / 栏目 / 标签被引用时拒绝删除；
 - 后台页面四个：站点、栏目、文章、标签；菜单与按钮权限随模块开关下线；
-- 门户只读接口 `/api/portal/cms/**`：站点、导航树、标签、文章列表 / 详情 / 搜索。
+- 门户只读接口 `/api/portal/cms/**`：站点、导航树、标签、文章列表 / 详情 / 搜索；
+- 素材选择器：站点 Logo、栏目封面、文章封面接文件中心图片库。
 
 **明确未做（后置）**：
 
 - Nuxt3 门户工程、SEO / sitemap / 静态化（v1.3 前）；
 - 内容版本、回收站、定时发布；
 - `cms_content_ext` 自定义字段；
-- 素材选择器（当前 Logo / 封面是 `fileId 或 https://` 文本输入）；
 - 内容级多语言（L3，`i18n_*` 表）。
 
 ## 模块开关
@@ -152,6 +152,17 @@ com.lingxiao.modules.cms
 - `pageSize` 上限 50；`keyword` 最长 50 字符；阅读量单条 UPDATE 自增。
 - 完整契约、参数、缓存建议见 [`docs/29-portal-api.md`](../../docs/29-portal-api.md)。
 
+## 素材选择器
+
+站点 Logo、栏目封面、文章封面统一使用 `lx-ui-admin/src/components/MediaPicker.vue`：
+
+- 浏览文件中心需要 `platform:file:list`，上传需要 `platform:file:upload`；
+  没有权限时对应按钮不渲染，字段仍可手工粘贴外链，不会把编辑流程卡死。
+- 选中后写 `fileId`，不把当前环境域名写进业务数据；存量 `http(s)` 外链继续兼容。
+- 粘贴 `/api/file/{id}` 形式的地址时，失焦自动归一成 `fileId`。
+- 列表请求带 `imageOnly=true`，后端按图片扩展名过滤，非图片文件不占分页。
+- 预览走 `/api/file/{fileId}?size=thumb`，与文件中心使用同一套公开访问接口。
+
 ## 前端页面
 
 ```text
@@ -186,8 +197,14 @@ node .local\cms-api-check.mjs
 # 门户接口：38 项
 node .local\portal-api-check.mjs
 
+# 素材筛选与 fileId 落库：16 项
+node .local\media-picker-check.mjs
+
 # 浏览器：13 项
 cd .local\uitest; node cms-ui.mjs
+
+# 素材选择器：6 项
+cd .local\uitest; node media-picker.mjs
 
 # 模块关闭：接口 404、菜单 / 路由消失、数据保留
 cd .local\uitest; node cms-disabled.mjs
@@ -195,4 +212,5 @@ node .local\portal-disabled.mjs
 ```
 
 2026-11-22 结果：22 项单测（后台 14 + 门户 8）；后台接口 34/34；门户接口 38/38；
-浏览器 13/13；关闭态门户 / 后台接口均 404（5/5），重新开启后数据保留。
+素材选择器接口 16/16、浏览器 6/6；后台浏览器 13/13；
+关闭态门户 / 后台接口均 404（5/5），重新开启后数据保留。

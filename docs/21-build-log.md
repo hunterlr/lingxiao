@@ -4847,6 +4847,149 @@ A 站的 key 不能拿来筛 B 站。slug 同样只在站点内唯一。
 |---|---|
 | 缓存 / 限流 | 未做；详情阅读量可被脚本刷高，上线前补限流或异步统计 |
 | 闭包一致性 | 手工改库改栏目状态不会自动重建闭包；需要走一次后台栏目编辑 |
-| 素材选择器 | Logo / 封面仍兼容 `fileId` 与 URL，门户两种都要处理 |
+| 素材选择器 | 已在 §51 补齐；Logo / 封面仍兼容 `fileId` 与 URL，门户两种都要处理 |
 | 内容生命周期 | 定时发布、版本、回收站仍未做 |
 | 门户工程 | Nuxt3、SEO、sitemap、ES、CDN 属 v1.3 |
+
+---
+
+## 51. 第三十二刀：CMS 素材选择器（2026-11-22）
+
+### 51.1 背景与目标
+
+上一刀（§49）里站点 Logo、栏目封面、文章封面还是“`fileId` 或 `https://` 地址”
+纯文本输入。用户要么自己去文件中心翻 ID，要么把绑定当前域名的绝对地址写进业务数据；
+换域名、换环境后图片全部失效。这一刀把三处字段统一接到文件中心图片库。
+
+**目标**：
+
+- 选图即可用，落库只存 `fileId`，不存当前环境域名；
+- 存量 `http(s)` 外链继续可用，不强制迁移；
+- 上传 / 浏览按文件中心权限走，没有文件权限的 CMS 编辑仍能手工填外链；
+- 不改变门户契约：门户继续原样返回字段值，由消费端解析。
+
+### 51.2 代码落点
+
+| 层 | 文件 | 改动 |
+|---|---|---|
+| 组件 | `lx-ui-admin/src/components/MediaPicker.vue` | 新增：预览 / 输入 / 选择 / 上传 / 清除 |
+| 工具 | `lx-ui-admin/src/utils/asset.js` | 新增 `resolveAssetUrl`，统一 fileId 与外链解析 |
+| 后端 | `FileController.list` | 新增可选参数 `imageOnly` |
+| 后端 | `FileService.list` / `IMAGE_EXTENSIONS` | `imageOnly=true` 时按图片扩展名过滤 |
+| 页面 | `views/cms/site/index.vue` | Logo 换成 `MediaPicker` |
+| 页面 | `views/cms/category/index.vue` | 封面换成 `MediaPicker` |
+| 页面 | `views/cms/article/index.vue` | 封面换成 `MediaPicker` |
+| 会话 / 头像 | `layout/Navbar.vue`、`views/profile/index.vue`、`views/system/user/index.vue` | 头像统一走 `resolveAssetUrl` |
+| 多语言 | `i18n/zh-CN.js` / `en-US.js` | 新增 `mediaPicker.*` |
+
+### 51.3 关键设计
+
+**A. 只写 `fileId`，不写绝对地址**
+
+选择器 `choose()` 与上传成功都只 `emit(String(file.fileId))`。
+字段里因此不会出现 `http://127.0.0.1:8080/api/file/...` 这种环境相关地址；
+门户 / 前台拿到 `fileId` 后自行拼公开访问前缀。
+
+**B. 兼容存量外链，并在失焦时归一**
+
+输入框允许手工粘贴。`handleBlur()` 用
+`/\/api\/file\/(\d+)(?:[?#].*)?$/` 识别“页面内文件地址”，归一成纯 `fileId`；
+`https://cdn.example.com/a.png` 这类外链保持原样，不会被误改。
+
+**C. 地址解析抽公共函数**
+
+`resolveAssetUrl(value, { size })`：
+
+- 空白 → `''`；
+- `http://` / `https://` / `data:` / `blob:` → 原样返回；
+- 纯数字 → `/api/file/{id}`，传 `size` 时追加 `?size=thumb|medium`；
+- 其它相对地址 → 原样返回。
+
+顺手修掉系统用户列表的老问题：外链头像以前会被拼成 `/api/file/http...`，
+现在三个页面共用同一套判断。
+
+**D. 权限边界**
+
+- “选择素材”按钮 `v-hasPerm="'platform:file:list'"`；
+- “上传”按钮 `v-hasPerm="'platform:file:upload'"`；
+- 两个按钮都只是隐藏，输入框始终存在；没有文件权限的角色仍可手填外链，
+  不会因为 CMS 权限与文件权限耦合而完全无法编辑。
+
+**E. 服务端 `imageOnly` 过滤，而不是前端过滤当前页**
+
+只在 `files` 上做前端 `filter` 会让非图片文件占满分页，出现“第 1 页 0 张图、
+第 2 页才有图”的假空状态。因此列表参数下沉到后端：
+
+```sql
+-- MyBatis-Plus LambdaQueryWrapper，实际为 IN 条件
+ext IN ('jpg','jpeg','png','gif','bmp','webp','svg')
+```
+
+- 只影响列表筛选，不改上传白名单；
+- 不传 / `false` 时行为与 v1.0 完全一致，文件中心页面无需改动；
+- 前端保留一次轻量兜底过滤（ext 或 `image/*`），防止历史数据 ext 为空。
+
+**F. 上传后自动选中**
+
+`doUpload()` 走既有 `uploadFile(file, { bizType })`，成功后直接写回 `fileId`
+并关闭弹窗，省掉“上传完还要再找一遍”的步骤。`beforeUpload` 先挡非图片，
+减少一次无意义请求。
+
+### 51.4 验证
+
+**A. 前端**
+
+- `node scripts/check-i18n-keys.mjs`：zh=1022、en=1022，无 missing / 单边；
+- `npm run build` 通过；
+- 后端 `mvn -q -DskipTests -pl lx-modules/lx-module-file -am compile` 通过。
+
+**B. 接口 16/16**
+
+`.local/media-picker-check.mjs`：
+
+- 登录、文件列表、`imageOnly` 列表可用；
+- `imageOnly` 结果全部是图片扩展名，且总数不大于全量；
+- 上传 1×1 PNG 后能按文件名在 `imageOnly` 下查到，`fileId` 不变；
+- 不带 `imageOnly` 也能查到同一张图（证明过滤没动数据）；
+- 上传 `.txt` 后，`imageOnly` 下查不到，不带过滤能查到；
+- 用 `fileId` 建站点 → 后台详情回读一致 → 门户站点接口返回同一 `fileId` → 清理。
+
+> 文件中心按 SHA-256 秒传：同一张 1×1 PNG 重复上传会返回**旧文件与旧文件名**，
+> 脚本因此改用返回的 `originalName` 查询，而不是自己拼 remark。
+
+**C. 浏览器 6/6**
+
+`.local/uitest/media-picker.mjs`：
+
+- 管理员登录，进入站点列表并打开编辑弹窗；
+- 弹窗渲染出素材选择器；
+- 打开选择弹窗，列出图片卡片（6 张）；
+- 点击卡片后输入框写入纯 `fileId`；
+- 预览 `src` 解析为 `/api/file/{id}?size=thumb`；
+- 保存后后台详情回读到同一 `fileId`。
+
+截图：`media-picker-dialog.png`（图片库弹窗）、`media-picker-selected.png`（选中后的预览）。
+
+**D. 回归**
+
+`mvn clean test`：JDK 8 / JDK 11 各跑一遍，134 项 / 28 类，0 失败 0 错误；
+后台 CMS 34/34、门户 38/38、CMS 浏览器 13/13 不受影响。
+
+### 51.5 踩坑
+
+| 问题 | 处理 |
+|---|---|
+| 秒传导致“查不到新图” | 重复上传返回旧文件名；验收改用接口返回的 `originalName` 查询 |
+| 分页总数是字符串 | 后端 `PageResult.total` 序列化为字符串，脚本统一 `Number(...)` 再比较 |
+| 浏览器登录踢掉 API 会话 | 单会话模式下浏览器登录会让脚本 Token 失效；保存后重新登录再回读 |
+| 弹窗动画期间点击落空 | 等 `.media-card` 出现后再留 700ms，避免点到遮罩 |
+| 后端占用 jar 导致 clean 失败 | `mvn clean` 前先停掉 8080 进程，否则删不掉 `lx-boot/target/lingxiao.jar` |
+
+### 51.6 遗留
+
+| 项 | 说明 |
+|---|---|
+| 文件引用计数 | 选择器只写 `fileId`，不做引用登记；删除文件仍可能留下悬空引用 |
+| 上传权限耦合 | 无 `platform:file:upload` 的编辑只能手填外链，属预期取舍 |
+| 图片裁剪 / 尺寸建议 | 未做；站点 Logo 与文章封面的推荐尺寸只能靠文档约定 |
+| 门户解析 | 门户仍原样返回 `fileId` / URL，消费端按 `docs/29` 约定拼接 |

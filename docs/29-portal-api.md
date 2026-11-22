@@ -162,7 +162,7 @@ curl http://127.0.0.1:8080/api/portal/cms/sites/main/articles/by-slug/hello-worl
 ## 7. 明确不做（留给后续）
 
 - 定时发布、内容版本、回收站：后台尚未实现，门户自然读不到。
-- 素材选择器：Logo / 封面仍可能存 `fileId` 或 URL，门户两种都要兼容。
+- 素材选择器已在后台落地；门户仍可能读到存量的 `fileId` 或 URL，消费端两种都要兼容。
 - 内容级多语言：走后续 `i18n_*` 内容翻译阶段。
 - 评论、点赞、会员可见性：属于 v1.2 会员互动。
 - sitemap / RSS / Open Graph 生成：属于 v1.3 门户工程。

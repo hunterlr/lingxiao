@@ -311,6 +311,13 @@ public class MemberPermissionProvider implements StpInterface {
 
 **关键：`StpInterface` 内根据 `loginType` 分流，绝不能在一个实现里同时查 `sys_user` 和 `mem_user`。**
 
+> **v1.2 实装说明（2026-11-22）：** 平台域实际类名是 `StpPlatformUtil`
+> （`TYPE=platform`，Token `lx-platform-token`）；会员域是 `StpMemberUtil`
+> （`TYPE=member`，Token `lx-member-token`）。会员第一刀只有登录态，
+> 没有 `mem_role` / 会员权限码，因此暂未实现 `MemberPermissionProvider`；
+> 会员接口只用 `StpMemberUtil.checkLogin()` 校验登录。
+> 详见 `docs/30-member-embed-plan.md`。
+
 ### 5.3 后台登录流程
 
 ```mermaid

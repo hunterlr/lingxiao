@@ -14,7 +14,11 @@
         lx-module-generator  代码生成器（导入表 / 配置字段 / 预览 / 下载）
         lx-module-demo       可选模块契约验证（生产不打包）
 
-      不建 cms / member / portal；它们按 docs/20-cms-embed-plan.md 后续嵌入。
+      v1.1 起按计划嵌入可选模块：
+        lx-module-cms        内容管理（站点 / 栏目 / 文章 / 标签）
+        lx-module-member     前台会员（注册 / 登录 / 个人中心 / 后台会员管理）
+
+      不建 portal；门户工程按 v1.3 计划独立交付。
     -->
     <parent>
         <groupId>com.lingxiao</groupId>
@@ -34,6 +38,7 @@
         <module>lx-module-generator</module>
         <module>lx-module-demo</module>
         <module>lx-module-cms</module>
+        <module>lx-module-member</module>
     </modules>
 
     <dependencies>

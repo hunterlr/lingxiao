@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      lx-module-member：前台会员模块（v1.2，可选模块，启动期插拔）
+      =====================================================================
+      边界
+        - 只操作 mem_* 表；不碰 sys_user / sys_role / sys_menu 的业务数据，
+          菜单与参数只通过自己的迁移脚本幂等导入。
+        - 会员 Token 走 lx-member-token，独立 StpLogic；不复用平台 Token。
+        - 会员头像只存 fileId / URL，不建 mem_file。
+        - 不引 lx-module-system：验证码、密码策略、Token 配置都在本模块内实现，
+          避免两个业务模块互相依赖。
+
+      开关
+        lx.module.modules.member.enabled=true    Bean 装配、迁移执行、菜单下发
+        lx.module.modules.member.enabled=false   接口 404、迁移不扫描、菜单不下发
+        改开关必须重启（启动期插拔，不做运行期热切换）。
+    -->
+    <parent>
+        <groupId>com.lingxiao</groupId>
+        <artifactId>lx-modules</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>lx-module-member</artifactId>
+    <name>lx-module-member</name>
+    <description>前台会员：注册 / 登录 / 找回 / 个人中心 / 后台会员管理</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-mybatis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-common-log</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <!-- 只用 BCrypt，不引入完整 Spring Security -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-captcha</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

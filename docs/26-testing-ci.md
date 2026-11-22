@@ -2,7 +2,7 @@
 
 > 本文回答两个问题：**哪些逻辑必须用单测锁住？没有数据库的机器上怎么自动验证？**
 >
-> 结论：v1.0 基线 + v1.1 CMS 共 156 个单测（28 个测试类），
+> 结论：v1.0 基线 + v1.1 CMS + v1.2 会员共 182 个单测（31 个测试类），
 > 完全不依赖 MySQL / Redis，`mvn test` 一条命令跑完；
 > 再用 GitHub Actions 覆盖 JDK 8/11/17 与前端构建。
 
@@ -68,7 +68,7 @@ mvn -B -ntp -DskipTests package
 
 ---
 
-## 3. 当前测试清单（156 项 / 28 个类）
+## 3. 当前测试清单（182 项 / 31 个类）
 
 | 模块 | 测试类 | 项数 | 锁住什么 |
 |---|---|---|---|
@@ -100,8 +100,11 @@ mvn -B -ntp -DskipTests package
 | `lx-module-cms` | `CmsSiteServiceTest` | 3 | 有栏目 / 文章（含回收站）时拒绝删除、空站点物理删除 |
 | `lx-module-cms` | `CmsTagServiceTest` | 2 | 被文章引用时拒绝删除、未引用物理删除 |
 | `lx-module-cms` | `CmsPortalServiceTest` | 8 | 草稿 / 跨站点 / 停用栏目 / 停用祖先按不存在处理、正文清洗与阅读量、导航树剔除与提升、空 slug、站点字段白名单 |
+| `lx-module-member` | `MemberUserServiceTest` | 15 | 注册落 `mem_user` 与默认等级 / 渠道、未勾协议拒绝、重名拒绝、登录清零失败计数、密码错误累计、第 5 次锁定、锁定期内不比对密码、找回密码静默与验证码一次性、过期验证码拒绝、后台列表补等级名、停用 / 删除踢会话 |
+| `lx-module-member` | `MemberPasswordPolicyTest` | 5 | 缺失配置回退 basic、basic 拒绝弱密码、strong 要求四类字符、off 放行、非法值回退 basic |
+| `lx-module-member` | `MemberCaptchaServiceTest` | 6 | 图片与 key 生成、5 分钟有效、一次性、场景隔离、总闸关闭不生成、参数关闭不生成、非法场景拒绝 |
 
-合计：**Tests run: 156, Failures: 0, Errors: 0, Skipped: 0**（2026-11-22 在 JDK 8 / JDK 11 各 `clean test` 一遍均通过；148 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，141 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，134 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，126 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，112 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，99 项基线于 2026-11-21 在 JDK 8 跑通，66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
+合计：**Tests run: 182, Failures: 0, Errors: 0, Skipped: 0**（2026-11-22 在 JDK 8 / JDK 11 各 `clean test` 一遍均通过；156 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍均通过；148 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，141 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，134 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，126 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，112 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，99 项基线于 2026-11-21 在 JDK 8 跑通，66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
 
 ---
 

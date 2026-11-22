@@ -162,6 +162,12 @@ lx:
         enabled: true
         name: 内容管理
         description: 站点 / 栏目 / 文章 / 标签 / 门户 API；关闭后 /api/admin/cms 与 /api/portal/cms 不加载
+      # 前台会员（v1.2）：true = 装配会员 Bean 并执行 mem_* 迁移；false = 接口 404、菜单不下发
+      # 会员域与平台后台物理隔离：独立 Token（lx-member-token）、独立账号表 mem_user
+      member:
+        enabled: true
+        name: 前台会员
+        description: 注册 / 登录 / 个人中心 / 后台会员管理；关闭后 /api/app/** 与 /api/admin/member 不加载
   # 定时任务运行参数（与业务参数分开：这些是基础设施，不放 sys_config）
   job:
     # 调度线程池大小：同一时刻最多并行跑几个任务

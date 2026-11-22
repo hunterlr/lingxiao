@@ -5386,3 +5386,150 @@ ext IN ('jpg','jpeg','png','gif','bmp','webp','svg')
 | 保留策略 | 只按数量截断（默认 30），没有按时间 / 存储量的清理界面 |
 | 数据范围 | 版本列表与其它 CMS 列表一致，暂未接数据范围 |
 | 后续方向 | v1.2 会员体系；内容级多语言与门户工程按 v1.3 计划推进 |
+
+---
+
+## 55. v1.2 会员第一刀（2026-11-22）
+
+### 55.1 背景与范围
+
+v1.0 基座与 v1.1 CMS 之后进入会员体系。第一刀只打穿“账号 + 登录 + 个人中心 +
+后台可管”这条最短闭环，等级升级、积分、评论、第三方登录都后置。
+
+- 会员与平台后台**物理隔离**：独立表、独立 Token、独立 StpLogic；
+- 注册 / 登录 / 找回密码 / 自助改密 / 后台会员管理；
+- 头像复用文件中心，只存 `fileId` 或外链；
+- 不做会员角色与权限码、不做真实短信 / 邮件、不做注销入口。
+
+### 55.2 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 依赖 | `lx-dependencies/pom.xml`、`lx-modules/pom.xml`、`lx-boot/pom.xml` | 新增 `lx-module-member` |
+| 开关 | `application.yml` | `lx.module.modules.member.enabled=true` |
+| 迁移 | `db/migration/member/V25__member_schema.sql` | `mem_level` / `mem_user` / `mem_password_reset`、参数 11~18、菜单 4000 段 |
+| 安全域 | `StpMemberUtil` | `member` 域独立 `StpLogic` |
+| 配置 | `MemberSaTokenConfigure` | Token 名 `lx-member-token`、`/api/app/**` 拦截与白名单 |
+| 实体 | `MemUser` / `MemLevel` / `MemPasswordReset` | 密码 / 验证码哈希 `WRITE_ONLY` |
+| 服务 | `MemberUserService` | 会员端 + 后台全部账号逻辑 |
+| 服务 | `MemberLevelService` / `MemberCaptchaService` / `MemberPasswordPolicy` / `MemberTokenIssuer` | 等级、验证码、密码策略、Token 签发 |
+| 下发 | `LogMemberResetCodeSender` | 开发环境验证码只写日志 |
+| 接口 | `MemberAuthController` / `MemberProfileController` / `MemberAdminController` | `/api/app/auth/**`、`/api/app/profile/**`、`/api/admin/member/**` |
+| 前端接口 | `lx-ui-admin/src/api/member.js` | 后台会员接口封装 |
+| 前端页面 | `views/member/user/index.vue` | 列表、筛选、新增编辑、启停、重置密码、删除 |
+| 单测 | `MemberUserServiceTest` / `MemberPasswordPolicyTest` / `MemberCaptchaServiceTest` | 15 + 5 + 6 = 26 项 |
+| 文档 | `docs/30-member-embed-plan.md` | 会员模块边界与切片计划 |
+
+### 55.3 关键决策
+
+1. **物理隔离不是“逻辑分表”。**
+   会员表前缀 `mem_*`，平台表 `sys_*`；会员 Token 名为 `lx-member-token`，
+   与 `lx-platform-token` 并存。两套安全域只共享底层存储。
+2. **会员模块不依赖 system。**
+   后台账号、参数、菜单仍由基座提供；会员模块只依赖 common / framework，
+   将来单独售卖时不需要搬系统管理。
+3. **唯一性由应用层校验。**
+   不建带 `del_flag` 的唯一键，否则两条逻辑删除记录会互相冲突；
+   查询统一带 `del_flag='0'`，删除后允许同名重新注册。
+4. **登录失败计数落库。**
+   `mem_user.login_fail_count` / `lock_time`，阈值和锁定时长由 `mem.account.*` 控制；
+   锁定期内不再比对密码，避免计时攻击和无效哈希计算。
+5. **验证码复用 SaTokenDao。**
+   单机走内存、Redis 走 Redis，按 `login / register / reset` 场景隔离；
+   总闸 `lx.captcha.enabled` 与参数 `mem.security.captchaEnabled` 双重控制。
+6. **找回密码不暴露账号是否存在。**
+   账号不存在时静默成功；验证码只存 BCrypt 哈希，一次性使用，
+   过期或使用后立即失效；重置成功踢掉全部会话。
+7. **后台删除即释放账号。**
+   逻辑删除后列表、登录、唯一性校验都忽略该行，用户名 / 手机号 / 邮箱可重新注册；
+   历史业务数据仍指向原 `member_id`。
+8. **菜单段独立。**
+   会员占 4000 段，CMS 占 3000 段，后续会员子菜单不需要重排 CMS 菜单。
+9. **前端文案一次补齐。**
+   菜单、页面、校验提示中英同步，不把半成品文案留给下一刀。
+
+### 55.4 施工步骤
+
+1. **数据库**
+   - 建 `mem_level`、`mem_user`、`mem_password_reset`；
+   - 插入 3 条等级种子、参数 11~18、菜单 4000 段与超管授权；
+   - SQL 不使用 MySQL 方言，保持 MySQL / PG / 达梦 / 金仓可移植。
+2. **后端**
+   - 新建模块与依赖，注册模块开关；
+   - 独立 `StpMemberUtil` + `MemberSaTokenConfigure`；
+   - 实现注册 / 登录 / 找回 / 自助改密 / 后台 CRUD；
+   - 密码策略、验证码、Token 签发拆成独立服务，便于单测；
+   - 会员参数全部从 `ConfigProvider` 读取，缺失回退默认值。
+3. **前端**
+   - `api/member.js` 封装后台接口；
+   - `views/member/user/index.vue` 接 `MediaPicker` 上传头像；
+   - 菜单与文案中英同步，构建通过。
+4. **测试**
+   - 三个单测类锁住注册规则、失败锁定、验证码隔离、密码策略；
+   - 真实接口脚本覆盖域隔离与完整生命周期。
+
+### 55.5 验证
+
+**A. 后端**
+
+- `mvn -q -pl lx-modules/lx-module-member -am test` 通过；
+- 全仓 `mvn clean test`：JDK 8 / 11 **182 项 / 31 类**，0 失败 0 错误；
+- `mvn -q -DskipTests package` 通过；Flyway 执行到 V25，应用正常启动；
+- `mem_level` 3 条、参数 11~18、菜单 4000 段与 8 条超管授权已落库。
+
+**B. 接口 46/46**
+
+`.local/member-check.mjs`：
+
+- 后台登录、菜单下发、会员菜单组件路径正确；
+- 平台 Token 访问 `/api/app/profile` 401，会员 Token 访问后台 401，匿名访问 401；
+- 注册成功直接发 Token，Token 名 `lx-member-token`；资料不返回密码；
+- 手机号、邮箱登录；会员自助改密后旧 Token 失效；
+- 后台重置密码后旧 Token 失效；后台设置的密码可登录；
+- 找回密码验证码从日志读取，重置成功且同一验证码不能复用；
+- 前 4 次密码错误 2001，第 5 次 2004；锁定期内正确密码也拒绝；
+  后台重置解锁后可登录；
+- 停用后登录 2002，启用后恢复；
+- 删除后不能登录，原会员不在列表，同名可重新注册且 `memberId` 不同；
+- 验证码总闸关闭时会员验证码返回 `enabled=false`；
+- 平台后台会话全程不受影响。
+
+**C. 前端**
+
+- `npm run build` 通过；
+- i18n zh=1116、en=1116，无 missing / dotted-leaf；
+- 浏览器 `.local/uitest/member.mjs` **12/12**：入口、隔离提示、关键词筛选、
+  编辑时用户名锁定、改昵称、停用 / 启用、后台重置密码、删除后不能登录、无前端报错。
+
+**D. 关闭态 7/7**
+
+`.local/member-off-check.mjs`（`--lx.module.modules.member.enabled=false` 重启）：
+
+- 平台后台仍可登录，CMS 不受影响；
+- 会员菜单不下发；
+- `/api/admin/member/**`、`/api/app/auth/**`、`/api/app/profile` 均 404；
+- `mem_user` / `mem_level` / `mem_password_reset` 表与数据保留。
+
+### 55.6 踩坑
+
+| 问题 | 处理 |
+|---|---|
+| `lx-boot` 引用新模块时缺少版本 | 先在 `lx-dependencies` 的 `dependencyManagement` 加 `lx-module-member` |
+| 单独 `mvn -pl lx-module-member test` 找不到 common 依赖 | 内部模块未 install，必须加 `-am` |
+| 纯单测使用 Lambda 条件构造器报 `can not find lambda cache` | `@BeforeAll` 里 `TableInfoHelper.initTableInfo` 初始化实体元数据 |
+| `verify(mapper).update(eq(null), any())` 匹配不到 | 改用 `isNull()` 匹配 |
+| 验收脚本用中文正则匹配日志，PowerShell 输出乱码 | 改为匹配纯 ASCII 的 `memberId=..., code=..., expireMinutes=` |
+| 会员删除后同名注册，验证脚本最初按“用户名继续占用”写 | 按实际逻辑删除语义修正：删除即释放账号，可重新注册 |
+| 后台重置密码同时解锁 | 重置会清零失败计数与锁定时间，验收脚本先重置再测锁定 |
+
+### 55.7 遗留
+
+| 项 | 说明 |
+|---|---|
+| 短信 / 邮件 | `LogMemberResetCodeSender` 只写日志，生产上线前必须替换 |
+| 等级与积分 | 等级表与字段已就绪，升级任务、积分规则、权益未做 |
+| 互动 | 评论、收藏、点赞、消息通知未做 |
+| 第三方登录 | `mem_oauth` 表未建，绑定流程未做 |
+| 会员权限 | 只有登录态，没有会员角色 / 权限码 |
+| 注销 | 只有后台逻辑删除，没有会员自助注销 |
+| 后续方向 | 会员等级升级与积分规则、互动能力、第三方登录绑定 |

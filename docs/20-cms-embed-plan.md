@@ -279,6 +279,10 @@ platform:cms:tag:list|add|edit|remove
 
 ## 8. 会员功能范围（v1.2）
 
+> **状态（2026-11-22）**：第一刀已实装 —— 注册 / 登录 / 找回密码 / 个人中心 /
+> 后台会员管理；等级升级、积分规则、评论收藏、第三方登录绑定后置。
+> 详见 `docs/30-member-embed-plan.md` 与本文 §19。
+
 **做：**
 
 - 注册：用户名 / 手机 / 邮箱（按配置）、验证码、协议勾选。
@@ -781,3 +785,89 @@ cd .local\uitest; node cms-schedule.mjs
 node .local\cms-version-check.mjs
 cd .local\uitest; node cms-version.mjs
 ```
+
+---
+
+## 19. v1.2 会员第一刀（2026-11-22）
+
+会员模块骨架 + 注册 / 登录 / 找回密码 / 个人中心 / 后台会员管理。
+与平台后台**物理隔离**：独立 `mem_user`、独立 `lx-member-token`、
+独立 `member` 域 StpLogic，两边账号不能互相登录。
+
+### 19.1 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 模块 | `lx-modules/lx-module-member` | 新模块；`lx-dependencies` / `lx-modules` / `lx-boot` 加依赖 |
+| 迁移 | `db/migration/member/V25__member_schema.sql` | `mem_level`（3 条种子）/ `mem_user` / `mem_password_reset`、参数 11~18、菜单 4000 段 |
+| 安全域 | `lx-common-security/.../StpMemberUtil` | `member` 域 StpLogic，与 `StpPlatformUtil` 同构 |
+| 配置 | `MemberSaTokenConfigure` | 独立 Token 名与有效期、`/api/app/**` 拦截器与白名单 |
+| 实体 | `MemUser` / `MemLevel` / `MemPasswordReset` | 密码 / 验证码哈希标注 `WRITE_ONLY` |
+| 服务 | `MemberUserService` | 注册 / 登录 / 找回 / 自助改密 / 后台 CRUD / 启停 / 重置 / 删除 |
+| 服务 | `MemberLevelService` | 默认等级、选项、名称映射 |
+| 服务 | `MemberCaptchaService` | 会员验证码，SaTokenDao 存储、按场景隔离、一次性 |
+| 服务 | `MemberPasswordPolicy` | `mem.security.passwordPolicy`：off / basic / strong |
+| 服务 | `MemberTokenIssuer` | Token 签发、多端登录策略、踢全端 |
+| 服务 | `LogMemberResetCodeSender` | 开发环境验证码下发（只写日志，生产必须替换） |
+| 后台接口 | `MemberAdminController` | 列表 / 详情 / 新增 / 编辑 / 启停 / 重置密码 / 删除 |
+| 会员接口 | `MemberAuthController` / `MemberProfileController` | `/api/app/auth/**`、`/api/app/profile/**` |
+| 前端接口 | `lx-ui-admin/src/api/member.js` | 后台会员接口封装 |
+| 前端页面 | `views/member/user/index.vue` | 搜索、等级筛选、新增编辑抽屉、启停、重置密码、删除 |
+| 单测 | `MemberUserServiceTest` / `MemberPasswordPolicyTest` / `MemberCaptchaServiceTest` | 15 + 5 + 6 = 26 项 |
+
+### 19.2 关键决策
+
+1. **独立安全域，不共 Token。**
+   `mem_user` 与 `sys_user` 不共表、不共 Token、不共 Session 命名空间；
+   会员 Token 名为 `lx-member-token`，平台为 `lx-platform-token`。
+2. **模块不依赖 system。**
+   会员模块只依赖 common / framework；后台账号、参数、菜单仍由基座提供。
+3. **唯一性由应用层保证。**
+   用户名 / 手机号 / 邮箱不建带 `del_flag` 的唯一键，避免逻辑删除后无法重名注册；
+   查询全部带 `del_flag='0'`，删除后可以重新注册。
+4. **登录失败计数落库。**
+   `login_fail_count` / `lock_time`，达到阈值锁定；锁定期内不再比对密码。
+   参数 `mem.account.maxRetryCount` / `mem.account.lockMinutes` 独立于后台。
+5. **验证码双闸。**
+   总闸 `lx.captcha.enabled` 与参数 `mem.security.captchaEnabled` 任一关闭即不校验；
+   存 `SaTokenDao`，按场景隔离，5 分钟有效，用后即删。
+6. **找回密码只认哈希。**
+   验证码只存 BCrypt 哈希，一次性；账号不存在时静默成功，不暴露账号是否注册；
+   重置成功后踢掉该会员全部会话。
+7. **头像复用文件中心。**
+   `mem_user.avatar` 只存 `fileId` 或外链，不建 `mem_file`；后台页面接 `MediaPicker`。
+8. **删除即释放账号。**
+   逻辑删除后列表、登录、唯一校验都忽略该行，用户名 / 手机号 / 邮箱可重新注册；
+   历史业务数据仍指向原 `member_id`。
+9. **右侧菜单段预留。**
+   会员菜单占 `4000` 段，CMS 占 `3000` 段，互不冲突，便于后续加会员子菜单。
+
+### 19.3 验证结果
+
+| 项 | 结果 |
+|---|---|
+| 编译 / 打包 | `mvn -q -DskipTests package` 通过 |
+| Flyway | `V25 - member schema` 成功；`mem_level` 3 条、参数 11~18、菜单 4000 段与超管授权 8 条已落库 |
+| 单测 | 会员 26 项；全仓 **182 项 / 31 类**，JDK 8 / 11 均通过 |
+| 接口验收 | `.local/member-check.mjs` **46/46**：域隔离、注册登录、手机 / 邮箱登录、自助改密、后台重置、找回密码与验证码复用、失败锁定与解锁、启停、删除与重名注册、验证码开关、后台会话不受影响 |
+| 浏览器验收 | `.local/uitest/member.mjs` **12/12**：入口、隔离提示、关键词筛选、编辑锁定用户名、改昵称、停用 / 启用、后台重置密码、删除后不能登录、无前端报错 |
+| 关闭态 | `member.enabled=false` 重启：会员菜单不下发、`/api/app/**` 与 `/api/admin/member/**` 404，平台后台与 CMS 正常；`mem_*` 表与数据保留 |
+| 前端 | `npm run build` 通过；i18n zh=1116、en=1116，无 missing / dotted-leaf |
+
+### 19.4 当前限制
+
+- 真实短信 / 邮件通道未接，`LogMemberResetCodeSender` 只写应用日志。
+- 会员等级不会自动升级；积分 / 成长值规则、权益 `benefits_json` 只有字段。
+- 评论、收藏、点赞、消息通知未做。
+- 第三方登录绑定（`mem_oauth`）未做。
+- 会员只有登录态，没有会员角色与权限码。
+- 没有会员注销（自助删号）入口，只有后台逻辑删除。
+
+### 19.5 复验命令
+
+```powershell
+# 后端 8080（关闭验证码）
+java -jar lx-boot\target\lingxiao.jar --lx.captcha.enabled=false
+node .local\member-check.mjs
+```
+

@@ -27,9 +27,9 @@
 
 ---
 
-## 2. 后端 103 个运行时 jar
+## 2. 后端 104 个运行时 jar
 
-### 2.1 项目自研模块（14）
+### 2.1 项目自研模块（15）
 
 | artifactId | 版本 | 作用 |
 |---|---|---|
@@ -44,6 +44,7 @@
 | `lx-module-demo` | 1.0.0-SNAPSHOT | 可选模块关闭演示（默认关闭） |
 | `lx-module-file` | 1.0.0-SNAPSHOT | 文件中心、上传、图片衍生图 |
 | `lx-module-cms` | 1.0.0-SNAPSHOT | 内容管理（站点 / 栏目 / 文章 / 标签，v1.1） |
+| `lx-module-member` | 1.0.0-SNAPSHOT | 会员体系（注册 / 登录 / 找回密码 / 个人中心 / 后台管理，v1.2） |
 | `lx-module-generator` | 1.0.0-SNAPSHOT | 代码生成器（导入表 / 预览 / ZIP） |
 | `lx-module-job` | 1.0.0-SNAPSHOT | 定时任务（Spring Task + 数据库锁） |
 | `lx-module-system` | 1.0.0-SNAPSHOT | 登录、用户、角色、菜单、部门、岗位、字典、参数、公告、日志、监控 |
@@ -187,7 +188,7 @@
 | `checker-qual` | 3.19.0 | 可空性注解（传递依赖，运行时无感） |
 | `error_prone_annotations` | 2.10.0 | Error Prone 注解（传递依赖） |
 
-**合计：13 + 18 + 8 + 10 + 11 + 6 + 11 + 10 + 7 + 6 + 2 = 102 个 jar。**
+**合计：15 + 18 + 8 + 10 + 11 + 6 + 11 + 10 + 7 + 6 + 2 = 104 个 jar。**
 与 `BOOT-INF/lib/*.jar` 的实际数量一致（`BOOT-INF/lib/` 目录条目本身不算 jar）。
 
 > 自查命令（Windows PowerShell）：

@@ -711,3 +711,29 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 
 **下一步**：v1.1 CMS 内容生命周期收口，进入 v1.2 会员体系；
 门户工程、模板列表与内容级多语言按 v1.3 计划推进。
+
+### 12.14 P1：v1.2 会员第一刀（✅ 已完成，2026-11-22）
+
+**完成内容**：
+
+- 新增模块 `lx-modules/lx-module-member`，在 `lx-dependencies` / `lx-modules` /
+  `lx-boot` 增加依赖，`application.yml` 增加 `lx.module.modules.member.enabled`；
+- 新增迁移 `V25__member_schema.sql`：`mem_level`（3 条种子）、`mem_user`、
+  `mem_password_reset`；参数 11~18（`mem.*`）；菜单 4000 段与超管授权；
+- 新增独立安全域 `StpMemberUtil`（`member` 域）与 `MemberSaTokenConfigure`
+  （Token 名 `lx-member-token`、7 天有效期、2 小时不活跃失效、`/api/app/**` 拦截）；
+- 会员注册（验证码、协议、默认等级）、登录 / 登出（用户名 / 手机号 / 邮箱）、
+  失败计数落库与锁定、找回密码（验证码只存哈希、一次性、过期作废）、
+  个人中心（资料 / 头像 / 改密）；
+- 后台会员管理：分页搜索、新增、编辑、启停、重置密码、逻辑删除；
+  删除后用户名 / 手机号 / 邮箱可重新注册；
+- 前端新增 `api/member.js` 与 `views/member/user/index.vue`，菜单与文案中英同步；
+- 会员参数全在参数设置页，删除参数回退代码默认值。
+
+**验收**：会员单测 26 项；全仓 **182 项 / 31 类**，JDK 8 / 11 均通过；
+真实接口 **46/46**；浏览器 **12/12**；关闭态 **7/7**；`npm run build` 通过；V25 已落库。
+
+详见 `docs/30-member-embed-plan.md`、`docs/20-cms-embed-plan.md` §19、
+`lx-modules/lx-module-member/README.md`。
+
+**下一步**：会员等级升级 / 积分规则、评论收藏、第三方登录绑定。

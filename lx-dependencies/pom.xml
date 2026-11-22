@@ -123,6 +123,11 @@
             </dependency>
             <dependency>
                 <groupId>com.lingxiao</groupId>
+                <artifactId>lx-module-member</artifactId>
+                <version>${lingxiao.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.lingxiao</groupId>
                 <artifactId>lx-module-demo</artifactId>
                 <version>${lingxiao.version}</version>
             </dependency>

@@ -155,6 +155,9 @@ remark       varchar(500) default null        comment '备注'
 | `mem_purchase` | 内容购买 |
 | `mem_password_reset` | 找回密码令牌 |
 
+> v1.2 第一刀只实装 `mem_user` / `mem_level` / `mem_password_reset` 三张表
+> （迁移 `V25__member_schema.sql`）；其余为规划表，按切片逐步落地。
+
 ### 2.6 工作流 `wf_` + Flowable `ACT_`
 
 | 表 | 说明 |

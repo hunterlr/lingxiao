@@ -1,4 +1,5 @@
 import { useAuthStore } from '@/store/auth'
+import { useAppStore } from '@/store/app'
 import i18n from '@/i18n'
 import { appName } from '@/utils/brand'
 import { installDynamicRoutes, resetDynamicRoutes } from './dynamic'
@@ -36,9 +37,11 @@ export function setupGuard(router) {
 
     if (!auth.loaded) {
       try {
-        await auth.loadUser()
+        const app = useAppStore()
+        // 用户信息与模块开关并行；模块接口失败会静默返回 null，不阻塞登录
+        await Promise.all([auth.loadUser(), app.loadModules(true)])
         resetDynamicRoutes()
-        installDynamicRoutes(auth.menus)
+        installDynamicRoutes(auth.menus, app.moduleCodes)
         return { path: to.fullPath, replace: true }
       } catch (e) {
         // 1002 已由 axios 拦截器整页跳登录；这里兜住其余异常，避免白屏

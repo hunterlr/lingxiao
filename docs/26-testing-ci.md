@@ -2,7 +2,7 @@
 
 > 本文回答两个问题：**哪些逻辑必须用单测锁住？没有数据库的机器上怎么自动验证？**
 >
-> 结论：v1.0 先做“纯逻辑 + 安全回归”的 99 个单测（20 个测试类），
+> 结论：v1.0 先做“纯逻辑 + 安全回归”的 112 个单测（23 个测试类），
 > 完全不依赖 MySQL / Redis，`mvn test` 一条命令跑完；
 > 再用 GitHub Actions 覆盖 JDK 8/11/17 与前端构建。
 
@@ -68,7 +68,7 @@ mvn -B -ntp -DskipTests package
 
 ---
 
-## 3. 当前测试清单（99 项 / 20 个类）
+## 3. 当前测试清单（112 项 / 23 个类）
 
 | 模块 | 测试类 | 项数 | 锁住什么 |
 |---|---|---|---|
@@ -92,8 +92,11 @@ mvn -B -ntp -DskipTests package
 | `lx-module-generator` | `JavaTypeResolverTest` | 5 | MySQL / PG / 达梦常见类型映射，未知类型回退 String |
 | `lx-module-generator` | `TextUtilsTest` | 8 | 注释折叠、Javadoc 截断、JS / HTML / Java / SQL 四类转义 |
 | `lx-boot` | `AppProfileTest` | 4 | 品牌名 trim、中英文名互相兜底、版本空值转空串 |
+| `lx-framework` | `ModuleRegistryTest` | 5 | 基座模块永远启用、显式关闭 / 未配置按关闭、空 `module_code` 兼容、列表排序、列表与 `isEnabled` 一致 |
+| `lx-framework` | `ModuleMigrationLocationsTest` | 3 | system / file 固定参与、启用模块排序、目录不存在时跳过 |
+| `lx-module-system` | `StpInterfaceImplTest` | 5 | 非 platform 域为空、超管全权限、关闭模块权限过滤、无注册表全放行、空权限码 |
 
-合计：**Tests run: 99, Failures: 0, Errors: 0, Skipped: 0**（2026-11-21，JDK 8 跑通；66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
+合计：**Tests run: 112, Failures: 0, Errors: 0, Skipped: 0**（2026-11-22，JDK 8 跑通；99 项基线于 2026-11-21 在 JDK 8 跑通，66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
 
 ---
 

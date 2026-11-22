@@ -150,9 +150,10 @@ export const modules = {
 }
 ```
 
-- 构建期用 `VITE_MODULES=cms,member` 决定打包哪些模块。
-- 运行期用后端 `/api/admin/modules` 返回的启用列表决定注册哪些路由。
-- 关闭模块：前端无路由、无菜单、无按钮权限；直接访问 URL 404。
+- 构建期用 `VITE_MODULES=cms,member` 决定打包哪些模块（v1.1 暂不做构建裁剪）。
+- 运行期用后端 `/api/admin/modules` 返回的启用列表决定注册哪些路由
+  （已落地：`store/app.js#loadModules` + `router/dynamic.js` 二次校验）。
+- 关闭模块：前端无路由、无菜单、无按钮权限；直接访问 URL 落 404。
 - 共享组件：文件选择器、富文本、字典下拉、用户选择器，由基座提供，CMS 不重复造。
 
 ### 4.2 门户
@@ -192,9 +193,11 @@ export const modules = {
 
 1. `lx-boot` 加 `lx-module-cms` 依赖（或构建 Profile）。
 2. `application.yml` 设 `lx.module.cms.enabled=true`。
-3. 执行 `db/migration/mysql/cms` 的 Flyway。
-4. 导入 `menu/cms-menu.sql` 与权限码。
-5. 后台构建带 `VITE_MODULES=cms`，重启后菜单出现。
+3. 重启：Flyway 自动把 `classpath:db/migration/cms` 加入扫描并执行迁移
+   （目录不存在则跳过；基座 `system` / `file` 永远参与）。
+4. 迁移脚本里按 `menu_key` 幂等导入 CMS 菜单与权限码，`module_code='cms'`。
+5. 后端启动后 `/api/admin/modules` 返回 `cms=true`，`/api/admin/auth/menus`
+   自动下发 CMS 菜单；前端按菜单注册路由，不需要改 `dynamic.js`。
 6. 需要门户时部署 `lx-ui-portal`，配置 `/api/portal` 地址。
 
 ### 6.2 关闭
@@ -319,3 +322,57 @@ platform:cms:tag:list|create|update|delete
 - CMS 自己建一套文件表 / 用户表。
 - 用独立项目逃避模块化：边界没定清就拆进程，复制一套权限、文件、i18n。
 - 用模块开关假装产品隔离：能单独卖的 ERP / 商城塞进同一 jar。
+
+---
+
+## 13. 基座前置能力（已落地，2026-11-22）
+
+CMS 开工前先把“关掉模块还会漏菜单 / 漏迁移 / 漏权限”的最后一公里补完。
+本轮只动基座，不引入任何 `cms_*` 代码。
+
+### 13.1 落地内容
+
+| 能力 | 实现 | 行为 |
+|---|---|---|
+| 模块启用判定 | `lx-common-core` 的 `ModuleProvider` + `lx-framework` 的 `ModuleRegistry` | `system` / `file` 永远启用；其它模块必须显式 `enabled=true`；未配置按关闭 |
+| 菜单过滤 | `AuthService#getMenus` | 按 `sys_menu.module_code` 过滤；目录子节点全被过滤后，空目录一起隐藏 |
+| 权限过滤 | `AuthService#resolvePermissions`、`StpInterfaceImpl` | 关闭模块的权限码不再下发，避免“菜单没了、权限还在” |
+| 迁移目录 | `ModuleMigrationLocations` + `FlywayConfigurationCustomizer` | 只扫描已启用且目录存在的模块；`system` / `file` 固定参与 |
+| 模块接口 | `GET /api/admin/modules` | 返回基座 + 配置模块的 `code / name / enabled / description` |
+| 前端路由 | `store/app.js#loadModules` + `router/dynamic.js` | 启动时拉模块列表，按 `enabled` 二次校验菜单路由；接口失败时不做过滤，以后端菜单为准 |
+| 菜单归属 | `V18__menu_module_code.sql` | 定时任务 → `job`，代码生成 → `generator`，不再挂在 `system` 下 |
+
+### 13.2 关闭 / 开启的实测结果
+
+以 `job` 模块为例（`--lx.module.modules.job.enabled=false`）：
+
+| 检查项 | 结果 |
+|---|---|
+| 启动 | 成功；Flyway 只扫描 system / file / generator |
+| 迁移校验 | `Successfully validated 18 migrations`（已执行的 V11 被 `ignore-missing-migrations` 放过） |
+| `/api/admin/monitor/job/**` | 404 |
+| 超管菜单 | 无“定时任务”；“系统工具”仍保留文件中心 / 代码生成 / 接口文档 |
+| 普通角色权限 | 即使角色授权了 job 菜单，`/auth/info` 也不再返回 `platform:monitor:job:*` |
+| 前端菜单 / 路由 | 侧边栏无“定时任务”；直接访问 `/tool/job` 落 404 |
+| 重新开启 | 菜单与接口恢复，数据与迁移记录不丢 |
+
+### 13.3 两个必须接受的取舍
+
+1. **Flyway 打开 `out-of-order`**
+   模块可能在基座升级后才启用，它的迁移版本号会小于当前最大版本。
+   不打开的话，`job` 的 V11 在 V18 之后启用会被 Flyway 拒绝。
+   代价是迁移不再严格按版本顺序执行，模块迁移必须保持“只动自己的表”。
+
+2. **Flyway 打开 `ignore-missing-migrations`**
+   模块关闭后，它已执行的迁移在 classpath 里“消失”，默认校验会失败。
+   这是 Flyway Community 可用的旧开关（`ignore-migration-patterns` 是 Teams 能力）。
+   代价是“本地误删迁移文件”也不会报错，需要靠代码评审和发布包核对兜底。
+
+### 13.4 明确不做
+
+- **运行期热插拔**：模块开关仍是启动期生效，改完必须重启；
+- **前端构建裁剪**：`VITE_MODULES` 后置，v1.1 先保证运行期路由正确；
+- **菜单管理页过滤**：菜单管理仍展示全部菜单（含关闭模块），方便管理员预配置；
+  侧边栏与权限接口才做过滤；
+- **模块依赖解析**：`module.yaml` 的 `requires` / `optional` 仍未读取，
+  v1.1 先靠人工保证“CMS 依赖 system + file”。

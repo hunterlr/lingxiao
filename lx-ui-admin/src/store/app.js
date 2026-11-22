@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { getAppProfile } from '@/api/app'
+import { listModules } from '@/api/module'
 import {
   DEFAULT_THEME,
   applyTheme,
@@ -44,12 +45,22 @@ export const useAppStore = defineStore('app', {
     systemDark: systemPrefersDark(),
     themeDrawerVisible: false,
     // 品牌名 / 版本：真源在后端 lx.app.*，这里只是启动时拉到的副本
-    profile: { name: '', nameEn: '', version: '' }
+    profile: { name: '', nameEn: '', version: '' },
+    // 模块开关：后端 /api/admin/modules 的副本，决定可选模块路由是否注册
+    modules: [],
+    // null = 还没拿到（接口失败），此时不做前端过滤，完全以后端菜单为准
+    moduleCodes: null
   }),
 
   getters: {
     /** 当前最终是不是暗色（auto 时看系统） */
-    isDark: (state) => resolveDark(state.theme.mode, state.systemDark)
+    isDark: (state) => resolveDark(state.theme.mode, state.systemDark),
+
+    /** 指定模块是否启用；未知时按启用处理，避免误伤基座菜单。 */
+    isModuleEnabled: (state) => (code) => {
+      if (!code || !state.moduleCodes) return true
+      return state.moduleCodes.includes(code)
+    }
   },
 
   actions: {
@@ -71,6 +82,31 @@ export const useAppStore = defineStore('app', {
       } catch (e) {
         // 品牌是装饰信息：不提示、不重试，语言包兜底
       }
+    },
+
+    /**
+     * 拉一次模块开关（登录后调用）。
+     *
+     * <p>返回启用模块编码数组；失败返回 null，调用方据此决定“不做前端过滤”。
+     * 后端已经按模块开关裁剪过菜单，这里只是第二道校验，防止旧缓存 /
+     * 手工构造的菜单把关闭模块的页面注册进路由。</p>
+     *
+     * @param {boolean} force true = 忽略本次会话的缓存重新拉取
+     */
+    async loadModules(force = false) {
+      if (!force && this.moduleCodes) {
+        return this.moduleCodes
+      }
+      try {
+        const data = await listModules()
+        this.modules = data || []
+        this.moduleCodes = this.modules.filter((item) => item.enabled).map((item) => item.code)
+      } catch (e) {
+        // 探测失败：保留 null，路由不做模块过滤；菜单本身仍是后端裁过的
+        this.modules = []
+        this.moduleCodes = null
+      }
+      return this.moduleCodes
     },
 
     toggleSidebar() {

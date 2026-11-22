@@ -10,6 +10,10 @@ import router from './index'
  * <p>路径直接使用后端给的绝对路径（{@code /system/user}），
  * 全部作为 Layout 的子路由注册；侧边栏层级由菜单树独立渲染，
  * 两者解耦，菜单移动位置不用改路由结构。</p>
+ *
+ * <p>模块过滤：后端已经按 {@code lx.module.*.enabled} 裁过菜单，这里再按
+ * {@code /api/admin/modules} 返回的启用列表校验一次。{@code enabledModules}
+ * 传 {@code null} 表示探测失败，此时不做过滤，避免把整个后台路由清空。</p>
  */
 
 const viewModules = import.meta.glob('../views/**/*.vue')
@@ -39,8 +43,11 @@ function collectPageMenus(menus, result = []) {
   return result
 }
 
-export function installDynamicRoutes(menus) {
-  const pages = collectPageMenus(menus)
+export function installDynamicRoutes(menus, enabledModules = null) {
+  const allow = Array.isArray(enabledModules) ? new Set(enabledModules) : null
+  const pages = collectPageMenus(menus).filter(
+    (menu) => !allow || !menu.moduleCode || allow.has(menu.moduleCode)
+  )
   for (const menu of pages) {
     if (!menu.path) continue
     const name = `menu-${menu.id}`
@@ -55,6 +62,7 @@ export function installDynamicRoutes(menus) {
         icon: menu.icon,
         perms: menu.perms,
         menuId: menu.id,
+        moduleCode: menu.moduleCode,
         component: menu.component,
         dynamic: true,
         placeholder: !menu.component || !viewModules[`../views/${menu.component}.vue`]

@@ -25,6 +25,7 @@
 | 多语言 L1 | ✅ 完成 | 中英界面键集合 903 / 903 对齐；错误码、菜单、参数、字典全走语言包（见第 41 / 45 节） |
 | 品牌 / 版本收口 | ✅ 完成 | 唯一真源 `lx.app.*` + 根 pom 版本；公开接口 `/api/admin/app/profile`（见第 46 节） |
 | 发布包演练 | ✅ 完成 | `deploy/package.ps1` 打包，空白库 + prod profile + 静态代理跑通登录 / 上传（见第 47 节） |
+| 模块插拔最后一公里 | ✅ 完成 | 菜单 / 权限 / 迁移按模块开关过滤；V18 修正菜单归属；112 项单测（见第 48 节） |
 | 系统管理 CRUD | ✅ 完成 | 8 个控制器、25 个按钮权限、74 项接口验证全部通过（见第 13 节） |
 | 前端 `lx-ui-admin` | ✅ 完成 | 17 个页面、动态路由、22 项 UI 冒烟全通过、验证码开启下真人登录成功（见第 20 / 29 / 30 节） |
 
@@ -4507,3 +4508,107 @@ drill-check.mjs                   4/4
 | 发布包里的 `application-prod.yml` 是否可直接上线 | 是示例配置，敏感项全部走环境变量；上线前按 `deploy/README.md` 核对 |
 | 回滚怎么做 | 保留上一版目录与数据库备份；Flyway 只前进，回滚用备份库 + 旧包，不写逆向迁移 |
 | 真实 Nginx 验证 | 仍建议在一台有 Nginx 的 Linux 机器上用 `deploy/nginx/lingxiao.conf` 再走一遍 |
+
+---
+
+## 48. 第二十八轮：模块插拔最后一公里（v1.1 CMS 前置）
+
+### 48.1 为什么先做这一轮
+
+`docs/20-cms-embed-plan.md` 定的是“加依赖 + 开开关 + 重启 = 可用”。但 v1.0 还有三个洞：
+
+1. `sys_menu.module_code` 列从 V1 就有，定时任务 / 代码生成却一直挂在 `system` 下，
+   关闭模块后菜单仍然下发；
+2. Flyway `locations` 写死四个目录，模块关闭仍会扫描它的迁移；
+3. `/api/admin/modules` 接口早就存在，前端从未调用，路由只认菜单。
+
+不补这三处，CMS 一关闭就会露馅。本轮只动基座，不写任何 `cms_*` 代码。
+
+### 48.2 改动清单
+
+| 文件 | 改动 |
+|---|---|
+| `lx-common-core/.../module/ModuleProvider.java` | 新增：模块启用状态 SPI，避免系统模块反向依赖 `lx-framework` |
+| `lx-framework/.../module/ModuleRegistry.java` | 实现 SPI；`system` / `file` 永远启用，未配置模块按关闭 |
+| `lx-framework/.../module/ModuleMigrationLocations.java` | 新增：按开关拼装 Flyway 目录，目录不存在自动跳过 |
+| `lx-framework/.../config/LxFrameworkAutoConfiguration.java` | 注册 `FlywayConfigurationCustomizer` |
+| `lx-framework/pom.xml` | 加 `flyway-core`（optional）+ `spring-boot-starter-test`（test） |
+| `lx-module-system/.../service/AuthService.java` | 菜单按模块过滤；空目录剪枝；权限码同样过滤 |
+| `lx-module-system/.../security/StpInterfaceImpl.java` | 权限码按模块过滤 |
+| `lx-module-system/.../mapper/SysMenuMapper.java` | `selectPermsByUserId` 多返回 `module_code` |
+| `lx-module-system/.../dto/MenuPermRow.java` | 新增：权限码 + 模块的最小投影 |
+| `lx-api/.../dto/MenuVO.java` | 新增 `moduleCode`，前端可做二次校验 |
+| `lx-module-system/.../db/migration/system/V18__menu_module_code.sql` | 定时任务 → `job`，代码生成 → `generator` |
+| `lx-boot/src/main/resources/application.yml` | 去掉写死 `locations`；加 `out-of-order` 与 `ignore-missing-migrations` |
+| `lx-ui-admin/src/api/module.js` | 新增：`GET /api/admin/modules` 封装 |
+| `lx-ui-admin/src/store/app.js` | 新增 `modules` / `moduleCodes` 与 `loadModules()` |
+| `lx-ui-admin/src/router/guard.js` | 登录后并行拉用户信息与模块开关 |
+| `lx-ui-admin/src/router/dynamic.js` | 按启用模块二次过滤路由，`meta.moduleCode` 落库 |
+
+### 48.3 判定规则
+
+| `module_code` | 结果 |
+|---|---|
+| `system` / `file` | 永远启用，即使配置里漏写或写 `false` |
+| 配置了 `lx.module.modules.<code>.enabled=true` | 启用 |
+| 配置了但 `false` | 关闭 |
+| 没有配置（如移除依赖后的 `cms`） | 关闭，库里残留菜单不再下发 |
+| 空 / null | 启用，兼容没有模块归属的旧数据 |
+
+菜单过滤后还要**剪掉空目录**：`系统工具` 属于 `system`，子节点全被过滤时
+目录本身也不能留，否则侧边栏会出现一个点不开的空白分组。
+
+### 48.4 Flyway 的两个开关
+
+```yaml
+spring:
+  flyway:
+    out-of-order: true
+    ignore-missing-migrations: true
+```
+
+- `out-of-order`：模块可能在基座升级后才启用，它的迁移版本号会小于当前最大版本
+  （例如 V11 在 V18 之后启用）；不打开会被 Flyway 拒绝。
+- `ignore-missing-migrations`：模块关闭后，它已执行的迁移在 classpath 里“消失”，
+  默认校验会失败；打开后保留历史记录、跳过缺失校验。
+
+**踩坑**：一开始写的是 `ignore-migration-patterns: "*:missing"`，启动直接报
+`FlywayTeamsUpgradeRequiredException: ignoreMigrationPatterns is not supported by
+Flyway Community Edition`。`ignore-migration-patterns` 是 Teams 能力，
+Community 只能用旧的 `ignoreMissingMigrations`。
+
+### 48.5 验证
+
+**A. 单测**：`mvn test` → **112 项 / 23 个类**，新增：
+
+- `ModuleRegistryTest` 5 项：基座永远启用、关闭 / 未配置、空 `module_code`、列表排序、列表与 `isEnabled` 一致；
+- `ModuleMigrationLocationsTest` 3 项：固定目录、启用排序、目录不存在跳过；
+- `StpInterfaceImplTest` 5 项：域隔离、超管、关闭模块过滤、无注册表、空权限码。
+
+**B. 迁移**：启动日志 `Migrating schema lingxiao to version "18 - menu module code"`，
+`flyway_schema_history` 最新为 V18；菜单归属变为 `system 47 / file 3 / job 8 / generator 6`。
+
+**C. 关闭 job 模块**（`--lx.module.modules.job.enabled=false`）：
+
+| 检查项 | 结果 |
+|---|---|
+| Flyway | 只扫描 system / file / generator；`Successfully validated 18 migrations` |
+| `/api/admin/modules` | `job=false`，其余为 true |
+| 超管菜单 | 无 `tool:job` / `monitor:job:*`；“系统工具”仍有文件 / 生成器 / 接口文档 |
+| 普通角色 | 临时用户只授权 `system:user` + `tool:job` + `tool:gen`，`/auth/info` 只返回前两者的权限，job 被过滤 |
+| 接口 | `/api/admin/monitor/job/list` → 404；`/api/admin/tool/gen/list` → 200 |
+| 前端 | 侧边栏无“定时任务”；直接访问 `/tool/job` 落 404；`/tool/gen` 正常 |
+
+**D. 重新开启**：菜单与接口恢复，V18 不重复执行，数据完整。
+
+**E. 回归**：`smoke.mjs` 22/22、console error 0；`npm run build` 通过。
+
+### 48.6 取舍与遗留
+
+| 问题 | 结论 |
+|---|---|
+| 运行期热插拔 | 不做；模块开关仍是启动期生效，改完必须重启 |
+| 菜单管理页是否过滤 | 不过滤；管理员需要看到关闭模块的菜单并预配置，侧边栏 / 权限接口才过滤 |
+| `module.yaml` 依赖解析 | 未做；`requires` / `optional` 仍靠人工保证，v1.1 先约定 CMS 依赖 system + file |
+| 前端构建裁剪 | `VITE_MODULES` 后置；v1.1 先保证运行期路由正确 |
+| 在线用户 `KEYS` | 与本轮无关，仍是切 Redis 前的小优化（见 `docs/13` §12.6 的缓存计划） |

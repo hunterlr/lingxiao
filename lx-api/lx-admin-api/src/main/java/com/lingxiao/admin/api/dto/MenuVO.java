@@ -43,5 +43,13 @@ public class MenuVO {
     /** 0 显示 / 1 隐藏 */
     private String visible;
 
+    /**
+     * 所属模块（system / file / cms ...）。
+     *
+     * <p>后端已经按模块开关过滤过菜单，这个字段是给前端做二次校验与
+     * 模块级路由分组的；为空表示没有模块归属。</p>
+     */
+    private String moduleCode;
+
     private List<MenuVO> children = new ArrayList<>();
 }

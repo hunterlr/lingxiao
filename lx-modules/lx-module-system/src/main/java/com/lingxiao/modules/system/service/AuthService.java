@@ -13,9 +13,11 @@ import com.lingxiao.common.core.config.ConfigProvider;
 import com.lingxiao.common.core.constant.CommonConstants;
 import com.lingxiao.common.core.enums.ErrorCode;
 import com.lingxiao.common.core.exception.ServiceException;
+import com.lingxiao.common.core.module.ModuleProvider;
 import com.lingxiao.common.security.util.LoginHelper;
 import com.lingxiao.common.security.util.StpPlatformUtil;
 import com.lingxiao.common.web.util.ServletUtils;
+import com.lingxiao.modules.system.dto.MenuPermRow;
 import com.lingxiao.modules.system.entity.SysLoginLog;
 import com.lingxiao.modules.system.entity.SysMenu;
 import com.lingxiao.modules.system.entity.SysUser;
@@ -24,6 +26,7 @@ import com.lingxiao.modules.system.mapper.SysMenuMapper;
 import com.lingxiao.modules.system.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +34,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +58,12 @@ public class AuthService {
     private final PasswordPolicy passwordPolicy;
     private final SessionPolicy sessionPolicy;
     private final ConfigProvider configProvider;
+
+    /**
+     * 模块开关。用 {@link ObjectProvider} 而不是直接注入：
+     * 单独启动系统模块（没有 lx-framework）时拿不到实现，此时按“全部启用”处理。
+     */
+    private final ObjectProvider<ModuleProvider> moduleProvider;
 
     /** 连续失败几次后锁定；参数缺失或非法时按 5 次 */
     private static final int DEFAULT_MAX_RETRY = 5;
@@ -286,14 +296,58 @@ public class AuthService {
         } else {
             menus = menuMapper.selectMenusByUserId(userId);
         }
-        return buildTree(menus);
+        return pruneEmptyDirectories(buildTree(filterByModule(menus)));
+    }
+
+    /** 关闭的模块不下发菜单；目录（M）即使属于基座，也会在子节点被过滤后清掉。 */
+    private List<SysMenu> filterByModule(List<SysMenu> menus) {
+        List<SysMenu> visible = new ArrayList<>(menus.size());
+        for (SysMenu menu : menus) {
+            if (isModuleEnabled(menu.getModuleCode())) {
+                visible.add(menu);
+            }
+        }
+        return visible;
+    }
+
+    private boolean isModuleEnabled(String moduleCode) {
+        ModuleProvider provider = moduleProvider.getIfAvailable();
+        // 没有模块注册表（单独启动系统模块）时不做过滤，避免误伤全部菜单
+        return provider == null || provider.isEnabled(moduleCode);
+    }
+
+    /**
+     * 去掉没有子节点的目录。
+     *
+     * <p>场景：{@code 系统工具} 目录属于 system，里面的“定时任务 / 代码生成”属于
+     * 可选模块。模块关闭后子节点被过滤，只剩一个点不开的空目录，必须一起隐藏。</p>
+     */
+    private List<MenuVO> pruneEmptyDirectories(List<MenuVO> nodes) {
+        Iterator<MenuVO> iterator = nodes.iterator();
+        while (iterator.hasNext()) {
+            MenuVO node = iterator.next();
+            if (node.getChildren() != null && !node.getChildren().isEmpty()) {
+                pruneEmptyDirectories(node.getChildren());
+            }
+            if ("M".equals(node.getType()) && (node.getChildren() == null || node.getChildren().isEmpty())) {
+                iterator.remove();
+            }
+        }
+        return nodes;
     }
 
     private List<String> resolvePermissions(Long userId) {
         if (CommonConstants.SUPER_ADMIN_ID.equals(userId)) {
             return Collections.singletonList("*:*:*");
         }
-        return menuMapper.selectPermsByUserId(userId);
+        List<MenuPermRow> rows = menuMapper.selectPermsByUserId(userId);
+        List<String> perms = new ArrayList<>(rows.size());
+        for (MenuPermRow row : rows) {
+            if (row.getPerms() != null && isModuleEnabled(row.getModuleCode())) {
+                perms.add(row.getPerms());
+            }
+        }
+        return perms;
     }
 
     /**
@@ -335,6 +389,7 @@ public class AuthService {
         vo.setIcon(menu.getIcon());
         vo.setOrderNum(menu.getOrderNum());
         vo.setVisible(menu.getVisible());
+        vo.setModuleCode(menu.getModuleCode());
         return vo;
     }
 

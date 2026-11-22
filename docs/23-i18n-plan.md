@@ -477,7 +477,7 @@ v1.0 先把中文写死没关系；要做的时候按本文 L1 走，4~5 天能�
 
 合计 **84 项**（原 66 + 新增 18），`mvn test` 不依赖 MySQL / Redis。
 2026-11-19 数据范围「2 自定义」再新增 8 项（`DataScopeServiceTest` 6 + `SysRoleServiceTest` 2）；
-2026-11-21 会话策略新增 `SessionPolicyTest` 3 项、品牌 / 版本收口新增 `AppProfileTest` 4 项，当前为 **99 项 / 20 个类**。
+2026-11-22 模块插拔收口新增 `ModuleRegistryTest` 5 项、`ModuleMigrationLocationsTest` 3 项、`StpInterfaceImplTest` 5 项，当前为 **112 项 / 23 个类**（2026-11-21 为 99 项 / 20 个类）。
 
 ### 10.4 第二轮（前端）：已完成（2026-11-17）
 

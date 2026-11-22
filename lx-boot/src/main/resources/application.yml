@@ -26,10 +26,18 @@ spring:
       connection-timeout: 30000
   flyway:
     enabled: true
-    # 按模块分目录：system 先建，file / job / generator 后建；版本号全局递增（当前到 V17）
-    locations: classpath:db/migration/system,classpath:db/migration/file,classpath:db/migration/job,classpath:db/migration/generator
+    # 迁移目录由 lx-framework 的 FlywayConfigurationCustomizer 按模块开关拼装：
+    # system / file 永远参与；job / generator / cms 等只有 enabled=true 且目录存在时才扫描。
+    # 所以这里不再写死 locations，避免“模块关了还在建表”。
     baseline-on-migrate: true
     clean-disabled: true
+    # 模块关闭后，它已执行过的迁移在本地 classpath 里“消失”，Flyway 校验默认会失败。
+    # ignore-missing-migrations 允许保留历史记录并跳过缺失校验；表结构与数据都不动。
+    # 注意：不能用 ignore-migration-patterns，那是 Flyway Teams 才有的能力。
+    ignore-missing-migrations: true
+    # 模块可能在基座升级后才启用，它的迁移版本号会小于当前已执行的最大版本。
+    # 允许乱序执行，否则新启用模块的 V12 之类会被 Flyway 拒绝。
+    out-of-order: true
   servlet:
     multipart:
       max-file-size: 10MB

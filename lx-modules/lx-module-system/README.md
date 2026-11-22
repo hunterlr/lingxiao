@@ -33,10 +33,11 @@ com.lingxiao.modules.system
 │               SysLoginLog、SysOperLog
 ├─ mapper/       对应 16 个 Mapper（关联表用纯注解，不继承 BaseMapper）
 ├─ dto/          TreeSelect、PasswordResetRequest、OnlineUserVO、KickoutRequest、
-│               KickoutResultVO、ServerInfoVO、CacheInfoVO
+│               KickoutResultVO、ServerInfoVO、CacheInfoVO、MenuPermRow
 ├─ config/       PasswordConfig（BCrypt）
 └─ resources/db/migration/system/   V1 建表、V2 种子、V4 按钮权限、V8 日志清空权限、
-                                   V9 参数控件、V10 在线强退权限、V14 登录安全、V15 自定义数据范围、V16 会话策略、V17 参数名乱码修复
+                                   V9 参数控件、V10 在线强退权限、V14 登录安全、V15 自定义数据范围、
+                                   V16 会话策略、V17 参数名乱码修复、V18 菜单模块归属
                                    （V11 定时任务相关结构由 lx-module-job 提供）
 ```
 

@@ -57,7 +57,7 @@ $z.Dispose()
 | `lx-common/` `lx-framework/` `lx-modules/` `lx-api/` `lx-boot/` | ✅ | 后端源码、Flyway 脚本、`application.yml` |
 | `lx-ui-admin/`（不含 `node_modules/` `dist/`） | ✅ | 前端源码、`package-lock.json`、`.env.development` |
 | `docs/` `deploy/` `README.md` `.github/` | ✅ | 文档、部署脚本、CI |
-| 各模块 `src/test/` | ✅ | 99 项单测 |
+| 各模块 `src/test/` | ✅ | 112 项单测 |
 | `deploy/sql/lingxiao-1.0.0.sql` | ✅ | 50 KB 数据库快照，clone 后可直接导入（见 3.3 方式 B） |
 | `lx-ui-admin/public/ueditor-plus/` | ❌ | `prebuild` 从 npm 包生成，不入库 |
 | `target/` `dist/` `release/` | ❌ | 构建产物，重新生成 |
@@ -161,7 +161,8 @@ mysql -uroot -p < deploy/sql/init-db.sql
 
 **方式 A（推荐给正式环境）：什么都不用导，交给 Flyway。**
 
-> 应用启动时 Flyway 自动执行 V1~V17（system / file / job / generator 四个目录）。
+> 应用启动时 Flyway 按模块开关自动执行 `db/migration/*` 下的迁移（当前 V1~V18）。
+> 基座 `system` / `file` 永远参与；`job` / `generator` 等模块只有开启时才扫描自己的目录。
 > 全新库第一次启动会看到一串 `Migrating schema ...` 日志，属于正常现象。
 
 **方式 B（想要“开箱即用”的现成数据）：导入快照。**
@@ -177,7 +178,7 @@ mysql -h127.0.0.1 -P3306 -ulingxiao -p lingxiao < deploy/sql/lingxiao-1.0.0.sql
 | 内容 | 数量 / 说明 |
 |---|---|
 | 表 | 24 张（23 张业务表 + `flyway_schema_history`） |
-| Flyway 记录 | 17 条（V1~V17，启动时只做校验，不会再建表） |
+| Flyway 记录 | 17 条（V1~V17；首次启动会补执行 V18 菜单模块归属修正） |
 | 菜单 / 角色授权 | 64 条菜单 + 64 条角色菜单 |
 | 参数 / 字典 / 任务 / 公告 | 10 / 3+7 / 1 / 1 |
 | 账号 | `admin` / `admin123` |
@@ -309,7 +310,7 @@ VITE_PORT=5173
 - 后端 v1.0 基座：登录鉴权、8 组系统管理、文件中心、监控、定时任务、代码生成器、模块开关；
 - 前端 18 个业务页面 + 动态路由 + 主题切换 + 个人中心；
 - 登录安全（失败锁定、密码策略）、发布包与部署脚本；
-- 99 项 JUnit 单测 + GitHub Actions 最小 CI；
+- 112 项 JUnit 单测 + GitHub Actions 最小 CI；
 - 文档 01~27。
 
 下一轮候选（按优先级）：

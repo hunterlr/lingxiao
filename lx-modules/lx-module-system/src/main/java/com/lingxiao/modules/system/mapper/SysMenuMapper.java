@@ -1,6 +1,7 @@
 package com.lingxiao.modules.system.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.lingxiao.modules.system.dto.MenuPermRow;
 import com.lingxiao.modules.system.entity.SysMenu;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -31,15 +32,18 @@ public interface SysMenuMapper extends BaseMapper<SysMenu> {
     List<SysMenu> selectMenusByUserId(@Param("userId") Long userId);
 
     /**
-     * 查询用户拥有的权限码。
+     * 查询用户拥有的权限码及其所属模块。
+     *
+     * <p>多带一列 {@code module_code} 是为了在模块关闭时过滤权限；
+     * 返回 {@link com.lingxiao.modules.system.dto.MenuPermRow} 而不是字符串。</p>
      */
-    @Select("SELECT DISTINCT m.perms FROM sys_menu m "
+    @Select("SELECT DISTINCT m.perms, m.module_code FROM sys_menu m "
             + "INNER JOIN sys_role_menu rm ON m.menu_id = rm.menu_id "
             + "INNER JOIN sys_user_role ur ON rm.role_id = ur.role_id "
             + "WHERE ur.user_id = #{userId} "
             + "  AND m.perms IS NOT NULL AND m.perms <> '' "
             + "  AND m.status = '0' AND m.del_flag = '0'")
-    List<String> selectPermsByUserId(@Param("userId") Long userId);
+    List<MenuPermRow> selectPermsByUserId(@Param("userId") Long userId);
 
     /**
      * 查询用户的角色标识。

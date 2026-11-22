@@ -49,5 +49,21 @@
             <artifactId>lombok</artifactId>
             <scope>provided</scope>
         </dependency>
+        <!--
+          只为编译 FlywayConfigurationCustomizer（按模块开关裁剪迁移目录）。
+          optional=true：运行期由 lx-boot 的 flyway-core 提供，不会传递到其它模块。
+        -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+            <version>${flyway.version}</version>
+            <optional>true</optional>
+        </dependency>
+        <!-- 单元测试：模块开关判定 / Flyway 目录拼装，test scope 不进运行时包 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

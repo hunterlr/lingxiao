@@ -179,6 +179,13 @@ public class ContentPublishedListener { ... }
 
 ## 4. 模块契约（SPI）
 
+> **落地状态（2026-11-22）**：v1.0/v1.1 只实现了“启用状态 SPI”，即
+> `lx-common-core` 的 `ModuleProvider`（`isEnabled(code)` / `list()`），
+> 由 `lx-framework` 的 `ModuleRegistry` 实现；模块 Bean 仍由各自的
+> `@ConditionalOnProperty` 控制。下面带 `dependsOn` / `migrationLocations`
+> 的完整 `LxModule` 描述符是演进方向，等出现“模块独立版本号 / 独立 history”
+> 的真实需求再引入，不要为了对称先造一层。
+
 ### 4.1 模块描述符
 
 ```java
@@ -303,6 +310,14 @@ lx:
 ---
 
 ## 6. 数据迁移（Flyway）
+
+> **落地状态（2026-11-22）**：当前用**单 history 表**（`flyway_schema_history`）+
+> 启动期按模块开关裁剪 `locations`，实现见 `lx-framework` 的
+> `ModuleMigrationLocations` 与 `FlywayConfigurationCustomizer`。
+> 配合 `out-of-order: true`（模块后启用可补跑旧版本号）和
+> `ignore-missing-migrations: true`（模块关闭后不因缺失脚本校验失败）。
+> 下面“每模块独立 history”的方案是演进方向，触发条件是：需要按模块单独回滚 /
+> 单独发版，或租户独立库按模块初始化。
 
 ### 6.1 独立 history 表
 

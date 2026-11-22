@@ -6,7 +6,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -23,15 +22,13 @@ import static org.mockito.Mockito.verify;
 @DisplayName("RoutingMemberResetCodeSender 验证码通道")
 class RoutingMemberResetCodeSenderTest {
 
-    private MemberSmsSender smsSender;
-    private MemberEmailSender emailSender;
+    private MemberChannelConfigService channelConfigService;
     private RoutingMemberResetCodeSender sender;
 
     @BeforeEach
     void setUp() {
-        smsSender = mock(MemberSmsSender.class);
-        emailSender = mock(MemberEmailSender.class);
-        sender = new RoutingMemberResetCodeSender(smsSender, emailSender);
+        channelConfigService = mock(MemberChannelConfigService.class);
+        sender = new RoutingMemberResetCodeSender(channelConfigService);
     }
 
     private static MemUser user() {
@@ -50,8 +47,10 @@ class RoutingMemberResetCodeSenderTest {
 
         sender.send(user, "13800000000", "123456", 10);
 
-        verify(smsSender).sendResetCode(user, "13800000000", "123456", 10);
-        verify(emailSender, never()).sendResetCode(any(), anyString(), anyString(), anyInt());
+        verify(channelConfigService).send(user, MemberChannelConfigService.TYPE_SMS,
+                "13800000000", "123456", 10);
+        verify(channelConfigService, never()).send(eq(user), eq(MemberChannelConfigService.TYPE_EMAIL),
+                anyString(), anyString(), anyInt());
     }
 
     @Test
@@ -61,8 +60,10 @@ class RoutingMemberResetCodeSenderTest {
 
         sender.send(user, "ALICE@example.com", "123456", 10);
 
-        verify(emailSender).sendResetCode(user, "alice@example.com", "123456", 10);
-        verify(smsSender, never()).sendResetCode(any(), anyString(), anyString(), anyInt());
+        verify(channelConfigService).send(user, MemberChannelConfigService.TYPE_EMAIL,
+                "alice@example.com", "123456", 10);
+        verify(channelConfigService, never()).send(eq(user), eq(MemberChannelConfigService.TYPE_SMS),
+                anyString(), anyString(), anyInt());
     }
 
     @Test
@@ -72,7 +73,8 @@ class RoutingMemberResetCodeSenderTest {
 
         sender.send(user, "alice", "123456", 10);
 
-        verify(smsSender).sendResetCode(eq(user), eq("13800000000"), eq("123456"), eq(10));
+        verify(channelConfigService).send(user, MemberChannelConfigService.TYPE_SMS,
+                "13800000000", "123456", 10);
     }
 
     @Test
@@ -83,7 +85,8 @@ class RoutingMemberResetCodeSenderTest {
 
         sender.send(user, "alice", "123456", 10);
 
-        verify(emailSender).sendResetCode(user, "alice@example.com", "123456", 10);
+        verify(channelConfigService).send(user, MemberChannelConfigService.TYPE_EMAIL,
+                "alice@example.com", "123456", 10);
     }
 
     @Test
@@ -94,7 +97,6 @@ class RoutingMemberResetCodeSenderTest {
         user.setEmail(null);
 
         assertThatCode(() -> sender.send(user, "alice", "123456", 10)).doesNotThrowAnyException();
-        verify(smsSender, never()).sendResetCode(any(), anyString(), anyString(), anyInt());
-        verify(emailSender, never()).sendResetCode(any(), anyString(), anyString(), anyInt());
+        verify(channelConfigService, never()).send(eq(user), anyString(), anyString(), anyString(), anyInt());
     }
 }

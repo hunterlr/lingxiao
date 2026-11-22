@@ -195,20 +195,21 @@ DELETE /api/admin/member/{memberId}
 | 4 | 第三方登录绑定（`mem_oauth`） | 待排期 |
 | 5 | 会员角色与细粒度权限 | 待排期 |
 
-**第二刀后仍未做**：真实短信 / 邮件服务商实现（当前默认 `lx.member.channel.mode=dev`
-只写日志，生产需实现 `MemberSmsSender` / `MemberEmailSender`）、等级自动升级、
-积分规则、内容级多语言。
+**第二刀后仍未做**：真实短信 / 邮件服务商实现（通道默认 `mode=dev` 只写日志，
+后台「会员管理 → 渠道配置」可运行期切换，但生产仍需先实现
+`MemberSmsSender` / `MemberEmailSender`）、等级自动升级、积分规则、内容级多语言。
 
 ---
 
 ## 9. 验收基线
 
-- 单测：会员模块共 40 项 —— `MemberUserServiceTest` 19 项、
+- 单测：会员模块共 49 项 —— `MemberUserServiceTest` 19 项、
   `MemberPasswordPolicyTest` 5 项、`MemberCaptchaServiceTest` 7 项、
-  `MemberRateLimitServiceTest` 4 项、`RoutingMemberResetCodeSenderTest` 5 项。
-- 全仓：**196 项 / 33 类**，JDK 8 下失败 0 错误 0。
-- 接口：`.local/member-check.mjs` **57 项全部通过**（域隔离、注册登录、找回密码、
-  短信 / 邮件开发通道、锁定、启停、删除、菜单下发、验证码开关、
+  `MemberRateLimitServiceTest` 4 项、`RoutingMemberResetCodeSenderTest` 5 项、
+  `MemberChannelConfigServiceTest` 9 项。
+- 全仓：**205 项 / 34 类**，JDK 8 下失败 0 错误 0。
+- 接口：`.local/member-check.mjs` **69 项全部通过**（域隔离、注册登录、找回密码、
+  短信 / 邮件开发通道、渠道配置、锁定、启停、删除、菜单下发、验证码开关、
   注册 / 登录 / 找回 / 重置限流）。
 - 浏览器：`.local/uitest/member.mjs` 12 项全部通过（列表、筛选、编辑、启停、
   重置密码、删除、无前端报错）。
@@ -235,12 +236,12 @@ DELETE /api/admin/member/{memberId}
 | 限流 | `MemberRateLimitService` | 内存固定窗口，按动作 + 账号 + IP 计数，超限 1006 |
 | 验证码 | `MemberCaptchaService` | 同一 key 允许输错 N 次，达到上限立即作废 |
 | 通道接口 | `MemberSmsSender` / `MemberEmailSender` | 短信、邮件真实通道 SPI |
-| 开发实现 | `DevMemberSmsSender` / `DevMemberEmailSender` | 只写应用日志，保留可解析的验证码行 |
-| 装配 | `MemberChannelConfiguration` | `lx.member.channel.mode=dev` 默认装配开发实现 |
+| 服务商 | `DevMemberSmsSender` / `DevMemberEmailSender` | 只写应用日志，保留可解析的验证码行 |
+| 装配 | `MemberChannelConfiguration` | 始终装配开发实现，作为 `mode=dev` 与生产实现缺失时的兜底 |
 | 路由 | `RoutingMemberResetCodeSender` | 手机号走短信、邮箱走邮件、用户名优先手机号 |
 | 业务 | `MemberUserService` | 注册 / 登录 / 找回 / 重置入口统一先限流 |
 | 单测 | `MemberRateLimitServiceTest` / `RoutingMemberResetCodeSenderTest` | 窗口边界、Key 隔离、通道路由 |
-| 配置 | `application.yml` | `lx.member.channel.mode: dev` |
+| 渠道配置 | `MemberChannelConfigService` + `V27__member_channel_config.sql` | 后台独立页面维护 dev / prod、启停、服务商与密钥 |
 
 ### 10.2 关键决策
 
@@ -260,18 +261,22 @@ DELETE /api/admin/member/{memberId}
    不需要改注册、找回或后台管理逻辑。
 6. **开发通道可验收。**
    开发实现按原格式输出 `memberId / username / code / expireMinutes`，
-   本地脚本可直接从日志取验证码；生产必须切 `mode=prod` 并装配真实实现。
+   本地脚本可直接从日志取验证码；生产必须在后台切 `mode=prod` 并确认真实实现已装配。
 7. **参数缺失回退默认值。**
    新增 7 个参数全部走 `ConfigProvider`，删除参数不会导致空指针或登录失败。
+8. **通道配置独立成页。**
+   短信 / 邮件不适合混在通用参数设置里；V27 新建 `mem_channel_config`，
+   后台「会员管理 → 渠道配置」运行期维护启停、dev / prod、服务商与密钥，
+   并提供测试发送。切换 prod 前校验真实 Bean，缺失时拒绝保存。
 
 ### 10.3 验证结果
 
 | 项 | 结果 |
 |---|---|
 | 编译 / 打包 | `mvn -q -DskipTests package` 通过 |
-| Flyway | `V26 - member security hardening` 成功；参数 19~25 已落库 |
-| 单测 | 会员 40 项；全仓 **196 项 / 33 类**，失败 0 错误 0 |
-| 接口验收 | `.local/member-check.mjs` **57/57**；新增短信 / 邮件通道、注册 / 登录 / 找回 / 重置限流 |
+| Flyway | `V26 - member security hardening` 成功；参数 19~25 已落库；`V27 - member channel config` 成功 |
+| 单测 | 会员 49 项；全仓 **205 项 / 34 类**，失败 0 错误 0 |
+| 接口验收 | `.local/member-check.mjs` **69/69**；新增短信 / 邮件通道、渠道配置、注册 / 登录 / 找回 / 重置限流 |
 | 验证码次数 | 单测覆盖：前两次错误可重试，第 3 次作废，之后正确码也不能用 |
 | 平台隔离 | 后台会话、会员菜单、CMS 不受影响 |
 
@@ -285,3 +290,22 @@ node .local\member-check.mjs
 # 全仓单测
 mvn -q test
 ```
+
+### 10.5 渠道配置页面（2026-11-22 追加）
+
+短信 / 邮件不再依赖 yml 开关，改为后台独立页面「会员管理 → 渠道配置」
+（`/member/channel`），运行期修改立即生效。
+
+- **表**：`mem_channel_config`（V27），短信 / 邮件各一行；字段
+  `mode / provider / endpoint / access_key / access_secret / sign_name /
+  template_code / sender / status`。
+- **接口**：`GET /api/admin/member/channel`、
+  `PUT /api/admin/member/channel/{configId}`、
+  `POST /api/admin/member/channel/{configId}/test`。
+- **权限**：`platform:member:channel:query|edit|test`，菜单 4020~4022。
+- **密钥**：`accessSecret` 只写不读，响应不回显；保存时留空表示沿用原值。
+- **测试发送**：dev 模式回显验证码并写应用日志；prod 模式只返回提交结果。
+  通道停用或手机号 / 邮箱格式错误会明确报错。
+- **生产保护**：切到 `prod` 前检查部署方是否已提供
+  `MemberSmsSender` / `MemberEmailSender` Bean；缺失时拒绝保存，避免找回密码静默失效。
+- **默认值**：两个通道均为 `mode=dev`、`status=0`（启用），与第一刀行为一致。

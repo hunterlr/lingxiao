@@ -168,11 +168,9 @@ lx:
         enabled: true
         name: 前台会员
         description: 注册 / 登录 / 个人中心 / 后台会员管理；关闭后 /api/app/** 与 /api/admin/member 不加载
-  # 会员消息通道：dev = 验证码只写日志（默认）；prod = 由部署方提供短信 / 邮件实现
-  # 生产上线前必须改成 prod 并装配 MemberSmsSender / MemberEmailSender，否则启动失败
-  member:
-    channel:
-      mode: dev
+  # 会员消息通道（短信 / 邮件）配置在后台「会员管理 → 渠道配置」维护：
+  # dev = 验证码只写日志（默认）；prod = 使用部署方提供的 MemberSmsSender /
+  # MemberEmailSender 实现。运行期切换，不需要改 yml 或重启。
   # 定时任务运行参数（与业务参数分开：这些是基础设施，不放 sys_config）
   job:
     # 调度线程池大小：同一时刻最多并行跑几个任务

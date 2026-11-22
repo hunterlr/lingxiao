@@ -887,11 +887,11 @@ node .local\member-check.mjs
 | 验证码 | `MemberCaptchaService` | 同一 key 允许输错 N 次，达到上限立即作废 |
 | 通道接口 | `MemberSmsSender` / `MemberEmailSender` | 短信、邮件真实通道 SPI |
 | 开发实现 | `DevMemberSmsSender` / `DevMemberEmailSender` | 只写日志，保留 `memberId / username / code` 行 |
-| 装配 | `MemberChannelConfiguration` | `lx.member.channel.mode=dev` 默认装配开发实现 |
+| 装配 | `MemberChannelConfiguration` | 始终装配开发实现，作为 dev 兜底 |
 | 路由 | `RoutingMemberResetCodeSender` | 手机号走短信、邮箱走邮件、用户名优先手机号 |
 | 业务 | `MemberUserService` | 注册 / 登录 / 找回 / 重置入口统一先限流 |
 | 单测 | `MemberRateLimitServiceTest` / `RoutingMemberResetCodeSenderTest` | 窗口边界、Key 隔离、通道路由 |
-| 配置 | `application.yml` | `lx.member.channel.mode: dev` |
+| 渠道配置 | `V27__member_channel_config.sql` + `MemberChannelConfigService` | 独立页面维护 dev / prod、启停、服务商与密钥 |
 
 ### 20.2 关键决策
 
@@ -903,22 +903,26 @@ node .local\member-check.mjs
 5. **通道接口解耦。** 业务层只依赖 `MemberResetCodeSender`；生产实现
    `MemberSmsSender` / `MemberEmailSender` 即可，不改业务逻辑。
 6. **开发通道可验收。** 日志保留 `memberId / username / code / expireMinutes`，
-   本地脚本直接读取；生产必须切 `mode=prod`。
+   本地脚本直接读取；生产在后台切 `mode=prod` 并确认真实实现已装配。
+7. **通道配置独立成页。** 不混在通用参数设置；V27 新建 `mem_channel_config`，
+   后台「会员管理 → 渠道配置」运行期维护启停、dev / prod、服务商与密钥，
+   支持测试发送；缺少生产 Bean 时拒绝切 prod。
 
 ### 20.3 验证结果
 
 | 项 | 结果 |
 |---|---|
 | 编译 / 打包 | `mvn -q -DskipTests package` 通过 |
-| Flyway | `V26 - member security hardening` 成功；参数 19~25 已落库 |
-| 单测 | 会员 40 项；全仓 **196 项 / 33 类**，失败 0 错误 0 |
-| 接口验收 | `.local/member-check.mjs` **57/57**：新增短信 / 邮件开发通道、注册 / 登录 / 找回 / 重置限流 |
+| Flyway | `V26 - member security hardening` 成功；参数 19~25 已落库；`V27 - member channel config` 成功 |
+| 单测 | 会员 49 项；全仓 **205 项 / 34 类**，失败 0 错误 0 |
+| 接口验收 | `.local/member-check.mjs` **69/69**：新增短信 / 邮件开发通道、渠道配置、注册 / 登录 / 找回 / 重置限流 |
 | 验证码次数 | 单测覆盖：前两次错误可重试，第 3 次作废，之后正确码也不能用 |
 | 平台隔离 | 后台会话、会员菜单、CMS 不受影响 |
 
 ### 20.4 当前限制
 
-- 真实短信 / 邮件服务商未接入：默认 `mode=dev` 只写日志，生产必须实现接口。
+- 真实短信 / 邮件服务商未接入：默认 `mode=dev` 只写日志；后台可切 `prod`，
+  但上线前必须先实现 `MemberSmsSender` / `MemberEmailSender`。
 - 限流为单机内存窗口，多实例部署各节点独立计数；后续可换 Redis / 网关限流。
 - 等级升级、积分规则、评论 / 收藏 / 点赞、第三方登录、会员权限码仍未做。
 
@@ -932,3 +936,15 @@ node .local\member-check.mjs
 # 全仓单测
 mvn -q test
 ```
+
+### 20.6 渠道配置页面
+
+位置「会员管理 → 渠道配置」（`/member/channel`），权限码
+`platform:member:channel:query|edit|test`，菜单 4020~4022。
+
+- 表 `mem_channel_config`：短信 / 邮件各一行，默认 `mode=dev`、启用。
+- `GET /api/admin/member/channel`、`PUT /api/admin/member/channel/{id}`、
+  `POST /api/admin/member/channel/{id}/test`。
+- `accessSecret` 只写不读，留空表示不修改。
+- 测试发送 dev 回显验证码，prod 不回显；停用或格式错误明确报错。
+- 切 `prod` 前校验真实 Bean，缺失返回 1001 且不落库。

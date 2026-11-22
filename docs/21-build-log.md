@@ -5610,3 +5610,91 @@ Flyway                            V26 - member security hardening 成功
 | 多实例限流 | 内存窗口各节点独立计数，后续可换 Redis / 网关限流 |
 | 等级与积分 | 等级表与字段已就绪，升级任务、积分规则、权益未做 |
 | 互动 / 第三方 / 权限 | 与第一刀遗留一致 |
+
+---
+
+## 57. 会员渠道配置独立页面（2026-11-22）
+
+### 57.1 背景
+
+第二刀把短信 / 邮件做成 SPI + 开发日志实现，但模式只由
+`application.yml` 的 `lx.member.channel.mode` 控制，后台既看不到也改不了。
+运营提出：通道配置字段多、含密钥，还涉及启停和测试发送，不适合挤进
+「系统管理 → 参数设置」——那里已经有大量业务参数。
+
+本轮把通道配置迁到独立表 + 独立后台页面，运行期可切换、可测试。
+
+### 57.2 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `V27__member_channel_config.sql` | `mem_channel_config` 表、短信 / 邮件种子、菜单 4020~4022 |
+| 实体 | `MemChannelConfig` | mode / provider / endpoint / accessKey / accessSecret / signName / templateCode / sender / status |
+| Mapper | `MemChannelConfigMapper` | 按 `channel_type` 查询 |
+| 服务 | `MemberChannelConfigService` | 列表、更新、dev / prod 选择、测试发送 |
+| DTO | `MemberChannelUpdateRequest` / `MemberChannelTestRequest` / `MemberChannelTestResult` | 后台请求与测试结果 |
+| 控制器 | `MemberChannelAdminController` | `/api/admin/member/channel/**` |
+| 路由 | `RoutingMemberResetCodeSender` | 改为依赖 `MemberChannelConfigService` |
+| 装配 | `MemberChannelConfiguration` | 开发 Bean 始终注册，作为 dev 兜底 |
+| 前端 | `views/member/channel/index.vue` + `api/member.js` | 列表、编辑、测试发送；中英文文案 |
+| 配置 | `application.yml` | 删除 `lx.member.channel.mode`，改由数据库配置 |
+
+### 57.3 关键决策
+
+1. **独立表而不是 `sys_config`。** 通道有启停、模式、服务商、密钥等多个字段，
+   还要支持测试发送；放参数列表里既拥挤又容易误改。
+2. **运行期读取，不缓存。** 每次发送按 `channel_type` 查一次配置，
+   后台改完立即生效，不需要重启；配置量固定为两行，查询成本可忽略。
+3. **生产实现缺失时拒绝切 `prod`。** 保存前检查是否注册了非开发实现，
+   缺失返回 1001；否则切完后找回密码会全部失败。
+4. **密钥只写不读。** `accessSecret` 标注 `WRITE_ONLY`，列表和详情不回显；
+   编辑时留空表示沿用原值，避免前端把已有密钥清空。
+5. **测试发送分模式。** dev 回显验证码并写应用日志，便于运营确认；
+   prod 不回显，只返回提交结果。
+6. **停用语义分场景。** 找回密码遇到停用通道只告警、不抛异常，
+   避免用错误差异探测账号；后台测试发送则明确报错。
+7. **开发 Bean 始终存在。** 不再由 yml 决定是否装配，`mode=dev` 与
+   生产实现缺失时都有兜底，模块启动不依赖外部通道。
+
+### 57.4 验证
+
+```text
+mvn -q test                       205 项 / 34 类，失败 0 错误 0
+会员模块单测                       49 项（新增 MemberChannelConfigServiceTest 9 项）
+mvn -q -DskipTests package        通过
+npm run build                     前端构建通过
+check-i18n-keys.mjs               zh=1155 en=1155，missing=none
+member-check.mjs                  69/69
+Flyway                            V27 - member channel config 成功
+```
+
+接口脚本新增覆盖：
+
+```text
+渠道列表返回短信 / 邮件两行，默认 mode=dev，且不回显 accessSecret
+短信 / 邮件测试发送均返回 6 位验证码，日志包含两次验证码
+缺少生产实现时 PUT mode=prod 返回 1001
+修改签名后重新读取已持久化
+停用后测试发送返回 1001，恢复启用成功
+```
+
+### 57.5 踩坑
+
+| 问题 | 处理 |
+|---|---|
+| `BaseEntity` 只有审计字段，没有 `remark` | `MemChannelConfig` 自己声明 `remark` |
+| `GET /api/admin/member/channel` 与 `GET /api/admin/member/{memberId}` 并存 | Spring 优先匹配字面量路径 `/channel`，实测正常 |
+| `accessSecret` 设为 `WRITE_ONLY` 后编辑弹窗拿不到旧值 | 前端留空表示不修改，后端仅在非空时覆盖 |
+| 单测要区分 dev / prod 实现 | 注入 sender 列表，按 `instanceof DevMemberSmsSender` 过滤；测试里 mock 具体类 |
+| 菜单已下发但页面是占位页 | 新增菜单必须同步创建 `views/member/channel/index.vue` |
+| 渠道模式改到数据库后 yml 仍有旧开关 | 删除 `lx.member.channel.mode`，避免两个事实来源 |
+
+### 57.6 遗留
+
+| 项 | 说明 |
+|---|---|
+| 真实服务商 | 仍需实现 `MemberSmsSender` / `MemberEmailSender` 并注册 Bean，之后后台才能切 prod |
+| 密钥存储 | 当前明文落库；生产建议接入 KMS / 环境变量或加密列 |
+| 发送审计 | 目前只写应用日志，后续可增加发送记录表与失败重试 |
+| 多实例限流 | 仍为内存窗口，后续可换 Redis / 网关限流 |
+| 会员业务 | 等级升级、积分、互动、第三方登录、权限码仍未做 |

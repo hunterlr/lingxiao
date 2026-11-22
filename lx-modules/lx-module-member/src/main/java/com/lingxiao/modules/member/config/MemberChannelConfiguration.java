@@ -11,9 +11,10 @@ import org.springframework.context.annotation.Configuration;
 /**
  * 会员消息通道装配。
  *
- * <p>默认 {@code lx.member.channel.mode=dev}，只装配写日志的开发实现；
- * 生产环境实现 {@link MemberSmsSender} / {@link MemberEmailSender} 后把
- * mode 改成非 dev，本配置不再提供开发 Bean，由生产方式接管。</p>
+ * <p>开发实现始终注册，作为 {@code mode=dev} 以及生产实现缺失时的兜底；
+ * 具体使用哪一组由后台「会员管理 → 渠道配置」中的 {@code mode} 运行期决定，
+ * 不再依赖 yml 开关。生产环境实现 {@link MemberSmsSender} /
+ * {@link MemberEmailSender} 并注册为 Bean 后，后台即可切换到 {@code prod}。</p>
  *
  * <p>模块关闭时整个配置不装配，与其它会员 Bean 的开关语义保持一致。</p>
  */
@@ -22,13 +23,11 @@ import org.springframework.context.annotation.Configuration;
 public class MemberChannelConfiguration {
 
     @Bean
-    @ConditionalOnProperty(name = "lx.member.channel.mode", havingValue = "dev", matchIfMissing = true)
     public MemberSmsSender devMemberSmsSender() {
         return new DevMemberSmsSender();
     }
 
     @Bean
-    @ConditionalOnProperty(name = "lx.member.channel.mode", havingValue = "dev", matchIfMissing = true)
     public MemberEmailSender devMemberEmailSender() {
         return new DevMemberEmailSender();
     }

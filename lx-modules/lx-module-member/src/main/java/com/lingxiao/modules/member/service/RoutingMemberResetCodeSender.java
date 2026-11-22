@@ -17,8 +17,8 @@ import org.springframework.util.StringUtils;
  *   <li>两者都没有时只记告警，不抛异常，避免暴露账号是否存在。</li>
  * </ol>
  *
- * <p>真实通道由 {@link MemberSmsSender} / {@link MemberEmailSender} 实现，
- * 业务层只依赖本类，不关心短信服务商或邮件服务器。</p>
+ * <p>具体用开发实现还是生产实现由 {@link MemberChannelConfigService} 按后台
+ * 渠道配置决定；业务层只依赖本类，不关心短信服务商或邮件服务器。</p>
  */
 @Slf4j
 @Component
@@ -26,8 +26,7 @@ import org.springframework.util.StringUtils;
 @ConditionalOnProperty(name = "lx.module.modules.member.enabled", havingValue = "true")
 public class RoutingMemberResetCodeSender implements MemberResetCodeSender {
 
-    private final MemberSmsSender smsSender;
-    private final MemberEmailSender emailSender;
+    private final MemberChannelConfigService channelConfigService;
 
     @Override
     public void send(MemUser user, String account, String code, int expireMinutes) {
@@ -36,19 +35,19 @@ public class RoutingMemberResetCodeSender implements MemberResetCodeSender {
         String usedAccount = trimToNull(account);
 
         if (email != null && usedAccount != null && email.equalsIgnoreCase(usedAccount)) {
-            emailSender.sendResetCode(user, email, code, expireMinutes);
+            channelConfigService.send(user, MemberChannelConfigService.TYPE_EMAIL, email, code, expireMinutes);
             return;
         }
         if (mobile != null && usedAccount != null && mobile.equals(usedAccount)) {
-            smsSender.sendResetCode(user, mobile, code, expireMinutes);
+            channelConfigService.send(user, MemberChannelConfigService.TYPE_SMS, mobile, code, expireMinutes);
             return;
         }
         if (mobile != null) {
-            smsSender.sendResetCode(user, mobile, code, expireMinutes);
+            channelConfigService.send(user, MemberChannelConfigService.TYPE_SMS, mobile, code, expireMinutes);
             return;
         }
         if (email != null) {
-            emailSender.sendResetCode(user, email, code, expireMinutes);
+            channelConfigService.send(user, MemberChannelConfigService.TYPE_EMAIL, email, code, expireMinutes);
             return;
         }
         log.warn("会员没有可用的手机号或邮箱，找回密码验证码未下发: memberId={}, username={}",

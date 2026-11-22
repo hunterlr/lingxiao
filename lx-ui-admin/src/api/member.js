@@ -41,3 +41,17 @@ export function resetMemberPassword(memberId, newPassword) {
 export function deleteMember(memberId) {
   return http.delete(`/admin/member/${memberId}`)
 }
+
+/* ==================== 会员消息通道 ==================== */
+
+export function listMemberChannels() {
+  return http.get('/admin/member/channel')
+}
+
+export function updateMemberChannel(configId, data) {
+  return http.put(`/admin/member/channel/${configId}`, data)
+}
+
+export function testMemberChannel(configId, target) {
+  return http.post(`/admin/member/channel/${configId}/test`, { target })
+}

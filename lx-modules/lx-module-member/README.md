@@ -23,8 +23,9 @@
 
 **明确未做（后续切片）**：
 
-- 真实短信 / 邮件服务商实现：当前默认 `lx.member.channel.mode=dev` 只写日志，
-  生产上线前必须实现 `MemberSmsSender` / `MemberEmailSender` 并切换到 `prod`；
+- 真实短信 / 邮件服务商实现：通道默认 `mode=dev` 只写日志，
+  后台可运行期切到 `prod`，但上线前必须先实现
+  `MemberSmsSender` / `MemberEmailSender`；
 - 会员等级升级任务 / 积分规则 / 成长值衰减（表与字段已预留）；
 - 评论、收藏、点赞、消息通知；
 - 第三方登录绑定（`mem_oauth` 预留）；
@@ -94,19 +95,28 @@ PUT    /api/admin/member/{memberId}/password
 DELETE /api/admin/member/{memberId}
 ```
 
+### 后台渠道配置（平台域 + `platform:member:channel:*`）
+
+```text
+GET  /api/admin/member/channel
+PUT  /api/admin/member/channel/{configId}
+POST /api/admin/member/channel/{configId}/test
+```
+
 ## 包结构
 
 ```text
 com.lingxiao.modules.member
 ├─ config/
 │  ├─ MemberSaTokenConfigure   独立 Token 配置 + /api/app/** 拦截器与白名单
-│  └─ MemberChannelConfiguration 短信 / 邮件开发实现装配（mode=dev）
+│  └─ MemberChannelConfiguration 短信 / 邮件开发实现装配（作为 dev 兜底）
 ├─ controller/
 │  ├─ MemberAuthController     注册 / 登录 / 登出 / 验证码 / 找回密码
 │  ├─ MemberProfileController  个人中心资料与改密
-│  └─ MemberAdminController    后台会员列表与维护
+│  ├─ MemberAdminController    后台会员列表与维护
+│  └─ MemberChannelAdminController 后台渠道配置与测试发送
 ├─ dto/                        请求 / 响应对象（含后台与会员端两套重置密码请求）
-├─ entity/                     MemUser / MemLevel / MemPasswordReset
+├─ entity/                     MemUser / MemLevel / MemPasswordReset / MemChannelConfig
 ├─ mapper/                     MyBatis-Plus Mapper
 ├─ security/
 │  ├─ MemberLoginHelper        会员 Session 读写（与平台 LoginHelper 分离）
@@ -120,13 +130,15 @@ com.lingxiao.modules.member
 │  ├─ MemberTokenIssuer        Token 签发与多端登录策略
 │  ├─ MemberResetCodeSender    找回密码验证码下发入口（路由器）
 │  ├─ RoutingMemberResetCodeSender 按账号选择短信 / 邮件通道
+│  ├─ MemberChannelConfigService 渠道配置读写、dev / prod 选择、测试发送
 │  ├─ MemberSmsSender          短信通道 SPI
 │  ├─ MemberEmailSender        邮件通道 SPI
 │  ├─ DevMemberSmsSender       开发短信通道（只写日志）
 │  └─ DevMemberEmailSender     开发邮件通道（只写日志）
 └─ resources/db/migration/member/
    ├─ V25__member_schema.sql    mem_* 表、参数 11~18、菜单 4000 段与授权
-   └─ V26__member_security_hardening.sql 参数 19~25（限流与验证码尝试次数）
+   ├─ V26__member_security_hardening.sql 参数 19~25（限流与验证码尝试次数）
+   └─ V27__member_channel_config.sql     渠道配置表、菜单 4020 段与授权
 ```
 
 ## 参数
@@ -173,8 +185,22 @@ com.lingxiao.modules.member
 - **验证码次数**：同一图形验证码验证通过即删除；输错达到上限也删除，
   防止同一个 key 被无限尝试。
 - **消息通道**：业务层只调用 `MemberResetCodeSender`，由
-  `RoutingMemberResetCodeSender` 按账号选短信 / 邮件。默认
-  `lx.member.channel.mode=dev` 装配日志实现；生产实现
-  `MemberSmsSender` / `MemberEmailSender` 后切换为 `prod`。
+  `RoutingMemberResetCodeSender` 按账号选短信 / 邮件。通道模式在后台
+  「会员管理 → 渠道配置」维护：`dev` 使用日志实现，`prod` 使用部署方提供的
+  `MemberSmsSender` / `MemberEmailSender`；切换 `prod` 前会校验 Bean 是否存在。
 - **不暴露账号是否存在**：找回密码申请接口对未知账号仍静默成功；
   没有手机号 / 邮箱的会员只记告警，不向前端报错。
+
+## 渠道配置（独立页面）
+
+不在「系统管理 → 参数设置」里，位置是「会员管理 → 渠道配置」（`/member/channel`）。
+
+- 表 `mem_channel_config`（V27）：短信 / 邮件各一行；
+  `mode / provider / endpoint / access_key / access_secret / sign_name /
+  template_code / sender / status`。
+- 接口 `GET/PUT/POST /api/admin/member/channel/**`，权限码
+  `platform:member:channel:query|edit|test`。
+- `accessSecret` 只写不读；编辑时留空表示不修改。
+- 「测试发送」：dev 模式回显验证码并写应用日志，prod 模式只返回提交结果；
+  通道停用、手机号 / 邮箱格式错误会明确报错。
+- 默认两个通道都是 `mode=dev`、启用状态，与搜索 / 找回密码行为一致。

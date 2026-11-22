@@ -26,4 +26,15 @@ public class MemberOAuthTicketVO implements Serializable {
 
     /** true 表示本次是绑定操作，未签发新会话 */
     private boolean bound;
+
+    /**
+     * true 表示第三方返回的已验证邮箱 / 手机号命中已有会员。
+     *
+     * <p>此时不签发会话，客户端应提示用户先用原账号登录，再调用
+     * {@code /api/app/auth/oauth/bind-ticket} 完成绑定。</p>
+     */
+    private boolean bindRequired;
+
+    /** 待绑定凭证；{@code bindRequired=true} 时返回，两分钟有效且只能用一次 */
+    private String bindTicket;
 }

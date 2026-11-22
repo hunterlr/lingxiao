@@ -51,6 +51,11 @@
             <groupId>com.lingxiao</groupId>
             <artifactId>lx-common-log</artifactId>
         </dependency>
+        <!-- 第三方头像转存：文件模块常驻启用，只通过 FileService 写文件中心 -->
+        <dependency>
+            <groupId>com.lingxiao</groupId>
+            <artifactId>lx-module-file</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -438,4 +438,68 @@ class MemberUserServiceTest {
         verify(rateLimitService).check("member:reset:id:alice", 5, 10);
         verify(rateLimitService).check("member:reset:ip:unknown", 50, 10);
     }
+
+    @Test
+    @DisplayName("登录标识分流：邮箱 / 手机号 / 用户名只查对应字段")
+    @SuppressWarnings("unchecked")
+    void loginSplitsAccountType() {
+        when(userMapper.selectList(any())).thenReturn(Collections.emptyList());
+
+        MemberLoginRequest email = loginRequest();
+        email.setAccount("Alice@Example.com");
+        assertThatThrownBy(() -> service.login(email)).isInstanceOf(ServiceException.class);
+
+        MemberLoginRequest mobile = loginRequest();
+        mobile.setAccount("13800138000");
+        assertThatThrownBy(() -> service.login(mobile)).isInstanceOf(ServiceException.class);
+
+        MemberLoginRequest username = loginRequest();
+        username.setAccount("alice");
+        assertThatThrownBy(() -> service.login(username)).isInstanceOf(ServiceException.class);
+
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.Wrapper<MemUser>> captor =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.Wrapper.class);
+        verify(userMapper, org.mockito.Mockito.times(3)).selectList(captor.capture());
+        assertThat(captor.getAllValues().get(0).getSqlSegment()).contains("email =");
+        assertThat(captor.getAllValues().get(1).getSqlSegment()).contains("mobile =");
+        assertThat(captor.getAllValues().get(2).getSqlSegment()).contains("username =");
+    }
+
+    @Test
+    @DisplayName("第三方自动建号未设置密码：返回 2006，不累计失败次数")
+    void loginRejectsPasswordNotSet() {
+        MemUser user = user();
+        user.setPasswordSet("0");
+        when(userMapper.selectList(any())).thenReturn(Collections.singletonList(user));
+
+        assertThatThrownBy(() -> service.login(loginRequest()))
+                .isInstanceOf(ServiceException.class)
+                .satisfies(e -> {
+                    ServiceException error = (ServiceException) e;
+                    assertThat(error.getCode()).isEqualTo(ErrorCode.PASSWORD_NOT_SET.getCode());
+                    assertThat(error.getMessageKey()).isEqualTo("error.2006.passwordNotSet");
+                });
+        verify(userMapper, never()).update(isNull(), any());
+        verify(tokenIssuer, never()).issue(any(MemUser.class), anyString());
+    }
+
+    @Test
+    @DisplayName("注册用户名不能包含 @ 或全部为数字，避免永远无法用用户名登录")
+    void registerRejectsAmbiguousUsername() {
+        MemberRegisterRequest emailLike = registerRequest();
+        emailLike.setUsername("a@b.com");
+        assertThatThrownBy(() -> service.register(emailLike))
+                .isInstanceOf(ServiceException.class)
+                .satisfies(e -> assertThat(((ServiceException) e).getMessageKey())
+                        .isEqualTo("error.1001.member.usernameFormat"));
+
+        MemberRegisterRequest mobileLike = registerRequest();
+        mobileLike.setUsername("13800138000");
+        assertThatThrownBy(() -> service.register(mobileLike))
+                .isInstanceOf(ServiceException.class)
+                .satisfies(e -> assertThat(((ServiceException) e).getMessageKey())
+                        .isEqualTo("error.1001.member.usernameFormat"));
+
+        verify(userMapper, never()).insert(any(MemUser.class));
+    }
 }

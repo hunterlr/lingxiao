@@ -33,6 +33,7 @@ public enum ErrorCode {
     CAPTCHA_INVALID(2003, "验证码错误或已过期"),
     ACCOUNT_LOCKED(2004, "账号已被锁定，请稍后再试"),
     OLD_PASSWORD_ERROR(2005, "原密码不正确"),
+    PASSWORD_NOT_SET(2006, "账号尚未设置登录密码"),
 
     FILE_UPLOAD_FAILED(3001, "文件上传失败"),
     FILE_TYPE_NOT_ALLOWED(3002, "文件类型不允许"),

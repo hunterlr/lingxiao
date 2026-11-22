@@ -19,6 +19,7 @@
       <p class="auth-sub">还没有账号？<NuxtLink to="/register">立即注册</NuxtLink></p>
 
       <p v-if="notice" class="form-alert info" role="status">{{ notice }}</p>
+      <p v-if="bindNotice" class="form-alert info" role="status">{{ bindNotice }}</p>
       <p v-if="memberDisabled" class="form-alert error" role="alert">
         {{ disabledMessage }}
       </p>
@@ -102,7 +103,7 @@ import type { MemberCaptcha } from '~/types/member'
 import { MemberApiError, memberErrorMessage, oauthErrorMessage } from '~/composables/useMemberAuth'
 
 const route = useRoute()
-const { login, token, profile, ensureProfile, fetchCaptcha } = useMemberAuth()
+const { login, token, profile, ensureProfile, fetchCaptcha, bindOAuthTicket } = useMemberAuth()
 
 const form = reactive({ account: '', password: '', captchaCode: '' })
 const captcha = ref<MemberCaptcha | null>(null)
@@ -129,6 +130,43 @@ function redirectTarget(): string {
   const value = route.query.redirect
   const text = typeof value === 'string' ? value : ''
   return text.startsWith('/') && !text.startsWith('//') ? text : '/account'
+}
+
+/**
+ * 第三方账号命中已有会员时的待绑定凭证。
+ *
+ * <p>后端不下发会话，只把 ticket 拼到登录页；用户必须先用原账号登录，
+ * 登录成功后再调用 bind-ticket 完成绑定。</p>
+ */
+const bindTicket = computed(() => {
+  const value = route.query.oauthBindTicket
+  return typeof value === 'string' && value ? value : ''
+})
+const bindProvider = computed(() => {
+  const value = route.query.provider
+  return typeof value === 'string' ? value : ''
+})
+const bindNotice = computed(() =>
+  bindTicket.value && !token.value
+    ? '该第三方账号关联的邮箱或手机号已注册会员。请先用原账号登录，登录后会自动完成绑定。'
+    : ''
+)
+
+/** 登录态就绪后尝试完成绑定；失败返回 false，由调用方决定提示方式。 */
+async function tryBindPendingTicket(): Promise<boolean> {
+  if (!bindTicket.value) return false
+  try {
+    await bindOAuthTicket(bindTicket.value)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function accountAfterBind(bound: boolean): string {
+  return bound
+    ? `/account?oauthBound=${encodeURIComponent(bindProvider.value)}`
+    : '/account?oauthBindError=1'
 }
 
 async function refreshCaptcha() {
@@ -168,6 +206,12 @@ async function onSubmit() {
       captchaKey: captcha.value?.enabled ? captcha.value.key || undefined : undefined,
       captchaCode: captcha.value?.enabled ? form.captchaCode.trim() : undefined
     })
+    if (bindTicket.value) {
+      // 先用原账号登录成功，再完成第三方绑定；失败也不影响本次登录
+      const bound = await tryBindPendingTicket()
+      await navigateTo(accountAfterBind(bound), { replace: true })
+      return
+    }
     await navigateTo(redirectTarget(), { replace: true })
   } catch (error) {
     if (error instanceof MemberApiError && error.code === 1003) {
@@ -184,7 +228,13 @@ async function onSubmit() {
 
 await ensureProfile(true)
 if (token.value && profile.value) {
-  await navigateTo(redirectTarget(), { replace: true })
+  if (bindTicket.value) {
+    // 已经登录：直接完成绑定，不用再走登录表单
+    const bound = await tryBindPendingTicket()
+    await navigateTo(accountAfterBind(bound), { replace: true })
+  } else {
+    await navigateTo(redirectTarget(), { replace: true })
+  }
 }
 
 useSeoMeta({ title: '会员登录', robots: 'noindex' })

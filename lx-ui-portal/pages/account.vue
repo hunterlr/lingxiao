@@ -7,6 +7,7 @@
           :src="avatarUrl"
           :alt="displayName"
           class="profile-avatar"
+          referrerpolicy="no-referrer"
         />
         <span v-else class="profile-avatar profile-avatar-text" aria-hidden="true">{{ initial }}</span>
         <div>
@@ -153,7 +154,7 @@
             <label for="profile-avatar">头像</label>
             <div class="avatar-field">
               <span class="avatar-preview">
-                <img v-if="previewAvatar" :src="previewAvatar" alt="头像预览" />
+                <img v-if="previewAvatar" :src="previewAvatar" alt="头像预览" referrerpolicy="no-referrer" />
                 <span v-else aria-hidden="true">{{ initial }}</span>
               </span>
               <div class="avatar-input">
@@ -194,6 +195,7 @@
         </p>
 
         <p v-if="oauthNotice" class="form-alert info" role="status">{{ oauthNotice }}</p>
+        <p v-if="oauthBindError" class="form-alert error" role="alert">{{ oauthBindError }}</p>
         <p v-if="bindingsError" class="form-alert error" role="alert">{{ bindingsError }}</p>
         <p v-else-if="bindingsLoading" class="form-hint">正在加载绑定信息…</p>
         <p v-else-if="!bindings.length" class="form-hint">还没有绑定第三方账号。</p>
@@ -226,58 +228,108 @@
       </section>
 
       <section class="account-panel">
-        <h2 class="panel-title">修改密码</h2>
-        <p class="panel-description">修改成功后该账号的全部旧会话会立即失效，需要使用新密码重新登录。</p>
+        <template v-if="passwordSet">
+          <h2 class="panel-title">修改密码</h2>
+          <p class="panel-description">修改成功后该账号的全部旧会话会立即失效，需要使用新密码重新登录。</p>
 
-        <p v-if="passwordError" class="form-alert error" role="alert">{{ passwordError }}</p>
+          <p v-if="passwordError" class="form-alert error" role="alert">{{ passwordError }}</p>
+          <p v-if="passwordSuccess" class="form-alert info" role="status">{{ passwordSuccess }}</p>
 
-        <form @submit.prevent="onChangePassword">
-          <div class="form-field">
-            <label for="password-old">原密码</label>
-            <input
-              id="password-old"
-              v-model="passwordForm.oldPassword"
-              name="oldPassword"
-              type="password"
-              autocomplete="current-password"
-              maxlength="64"
-              required
-            />
-          </div>
-          <div class="form-row">
+          <form @submit.prevent="onChangePassword">
             <div class="form-field">
-              <label for="password-new">新密码</label>
+              <label for="password-old">原密码</label>
               <input
-                id="password-new"
-                v-model="passwordForm.newPassword"
-                name="newPassword"
+                id="password-old"
+                v-model="passwordForm.oldPassword"
+                name="oldPassword"
                 type="password"
-                autocomplete="new-password"
-                minlength="6"
+                autocomplete="current-password"
                 maxlength="64"
                 required
               />
             </div>
-            <div class="form-field">
-              <label for="password-confirm">确认新密码</label>
-              <input
-                id="password-confirm"
-                v-model="passwordForm.confirmPassword"
-                name="confirmPassword"
-                type="password"
-                autocomplete="new-password"
-                minlength="6"
-                maxlength="64"
-                required
-              />
+            <div class="form-row">
+              <div class="form-field">
+                <label for="password-new">新密码</label>
+                <input
+                  id="password-new"
+                  v-model="passwordForm.newPassword"
+                  name="newPassword"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="6"
+                  maxlength="64"
+                  required
+                />
+              </div>
+              <div class="form-field">
+                <label for="password-confirm">确认新密码</label>
+                <input
+                  id="password-confirm"
+                  v-model="passwordForm.confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="6"
+                  maxlength="64"
+                  required
+                />
+              </div>
             </div>
-          </div>
-          <div class="form-actions">
-            <button type="submit" class="button" :disabled="savingPassword">
-              {{ savingPassword ? '提交中…' : '修改密码' }}
-            </button>
-          </div>
-        </form>
+            <div class="form-actions">
+              <button type="submit" class="button" :disabled="savingPassword">
+                {{ savingPassword ? '提交中…' : '修改密码' }}
+              </button>
+            </div>
+          </form>
+        </template>
+
+        <template v-else>
+          <h2 class="panel-title">设置登录密码</h2>
+          <p class="panel-description">
+            当前账号通过第三方登录创建，还没有设置密码。设置后可以同时用账号 + 密码登录，
+            解绑第三方账号时也不会把自己锁在门外。
+          </p>
+
+          <p v-if="passwordError" class="form-alert error" role="alert">{{ passwordError }}</p>
+          <p v-if="passwordSuccess" class="form-alert info" role="status">{{ passwordSuccess }}</p>
+
+          <form @submit.prevent="onSetPassword">
+            <div class="form-row">
+              <div class="form-field">
+                <label for="password-new">新密码</label>
+                <input
+                  id="password-new"
+                  v-model="passwordForm.newPassword"
+                  name="newPassword"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="6"
+                  maxlength="64"
+                  required
+                />
+              </div>
+              <div class="form-field">
+                <label for="password-confirm">确认新密码</label>
+                <input
+                  id="password-confirm"
+                  v-model="passwordForm.confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="6"
+                  maxlength="64"
+                  required
+                />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="button" :disabled="savingPassword">
+                {{ savingPassword ? '提交中…' : '设置密码' }}
+              </button>
+            </div>
+          </form>
+        </template>
       </section>
     </div>
   </div>
@@ -295,6 +347,7 @@ const {
   ensureProfile,
   updateProfile,
   changePassword,
+  setPassword,
   logout,
   fetchFavorites,
   setFavorite,
@@ -313,6 +366,9 @@ const loggingOut = ref(false)
 const profileError = ref('')
 const profileSuccess = ref('')
 const passwordError = ref('')
+const passwordSuccess = ref('')
+/** 只有第三方建号（password_set=0）才显示“设置密码”；老账号默认视为已设置。 */
+const passwordSet = computed(() => profile.value?.passwordSet !== '0')
 
 interface FavoriteRow {
   item: MemberFavoriteItem
@@ -341,6 +397,12 @@ const oauthNotice = computed(() => {
   const code = route.query.oauthError
   return typeof code === 'string' && code ? oauthErrorMessage(code) : ''
 })
+/** 登录后自动绑定失败（凭证过期 / 账号不一致），提示用户在这里手动重试。 */
+const oauthBindError = computed(() =>
+  typeof route.query.oauthBindError === 'string' && route.query.oauthBindError
+    ? '第三方账号自动绑定失败或凭证已过期，请在下方点击对应平台重新绑定。'
+    : ''
+)
 
 const displayName = computed(() => profile.value?.nickname || profile.value?.username || '会员')
 const avatarUrl = computed(() => mediaUrl(profile.value?.avatar, 'thumb'))
@@ -522,6 +584,41 @@ async function onChangePassword() {
       passwordError.value = '登录状态已失效，请重新登录后再修改'
     } else {
       passwordError.value = memberErrorMessage(error, '修改失败，请稍后重试')
+    }
+  } finally {
+    savingPassword.value = false
+  }
+}
+
+/**
+ * 第三方建号首次设置密码。
+ *
+ * <p>不注销当前会话：设置成功后继续留在个人中心，页面自动切换成“修改密码”。</p>
+ */
+async function onSetPassword() {
+  passwordError.value = ''
+  passwordSuccess.value = ''
+  if (passwordForm.newPassword.length < 6) {
+    passwordError.value = '新密码至少 6 位'
+    return
+  }
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    passwordError.value = '两次输入的新密码不一致'
+    return
+  }
+
+  savingPassword.value = true
+  try {
+    await setPassword({ newPassword: passwordForm.newPassword })
+    passwordForm.oldPassword = ''
+    passwordForm.newPassword = ''
+    passwordForm.confirmPassword = ''
+    passwordSuccess.value = '登录密码已设置，现在可以用账号 + 密码登录。'
+  } catch (error) {
+    if (error instanceof MemberApiError && error.code === 1002) {
+      passwordError.value = '登录状态已失效，请重新登录后再设置'
+    } else {
+      passwordError.value = memberErrorMessage(error, '设置失败，请稍后重试')
     }
   } finally {
     savingPassword.value = false

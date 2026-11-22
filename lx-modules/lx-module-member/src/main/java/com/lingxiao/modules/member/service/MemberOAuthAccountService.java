@@ -17,6 +17,7 @@ import com.lingxiao.modules.member.security.MemberPasswordEncoder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -34,8 +35,12 @@ import java.util.UUID;
  * <p>只写 {@code mem_user} 与 {@code mem_user_social}，不触碰任何 {@code sys_*}
  * 表；第三方登录永远不会获得后台权限。</p>
  *
- * <p>自动建号只复制昵称与合法头像 URL，不复制邮箱 / 手机号：第三方返回的
- * 邮箱未必已验证，直接占用会挡住会员后续自己注册同一邮箱。</p>
+ * <p><b>账号唯一性：</b>只使用平台明确标记为“已验证”的邮箱 / 手机号参与匹配与
+ * 落库，未验证的废值直接丢弃。第三方没有可用联系方式时留空，不抢占唯一键。</p>
+ *
+ * <p><b>同邮箱 / 手机号：</b>不做静默合并。命中已有会员时不自动登录，返回
+ * {@link MemberOAuthLoginOutcome#requiresBinding(MemUser)}，由门户要求用户先登录
+ * 原账号再完成绑定，避免第三方冒用邮箱接管账号。</p>
  */
 @Slf4j
 @Service
@@ -46,6 +51,12 @@ public class MemberOAuthAccountService {
     private static final int USERNAME_MAX = 64;
     private static final int NICKNAME_MAX = 64;
     private static final int AVATAR_MAX = 255;
+    private static final int EMAIL_MAX = 128;
+    private static final int MOBILE_MAX = 32;
+    private static final int INSERT_ATTEMPTS = 3;
+    private static final String PASSWORD_SET_NO = "0";
+    private static final String VERIFIED_YES = "1";
+    private static final String VERIFIED_NO = "0";
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final MemUserMapper userMapper;
@@ -53,14 +64,16 @@ public class MemberOAuthAccountService {
     private final MemberLevelService levelService;
     private final MemberPasswordEncoder passwordEncoder;
     private final MemberOAuthConfigService configService;
+    private final MemberAvatarLocalizer avatarLocalizer;
 
     /**
      * 登录或自动建号。
      *
      * @param autoRegister 关闭时，未绑定的第三方账号直接报“请先登录后绑定”
+     * @return 已登录会员，或需要先绑定原账号的决策结果
      */
     @Transactional(rollbackFor = Exception.class)
-    public MemUser loginOrRegister(OAuthUserInfo info, boolean autoRegister) {
+    public MemberOAuthLoginOutcome loginOrRegister(OAuthUserInfo info, boolean autoRegister) {
         MemUserSocial social = findByOpenId(info.getProvider(), info.getOpenId());
         if (social != null) {
             MemUser user = userMapper.selectById(social.getMemberId());
@@ -73,17 +86,29 @@ public class MemberOAuthAccountService {
                     throw new ServiceException(ErrorCode.ACCOUNT_DISABLED);
                 }
                 touch(social, info);
-                return user;
+                return MemberOAuthLoginOutcome.loggedIn(user);
             }
         }
 
         if (!autoRegister) {
             throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.member.oauthNotBound");
         }
-        MemUser user = createMember(info);
+
+        MemUser existing = findByVerifiedContact(info);
+        if (existing != null) {
+            log.info("第三方登录命中已有会员，要求先绑定: provider={}, targetMemberId={}",
+                    info.getProvider(), existing.getMemberId());
+            return MemberOAuthLoginOutcome.requiresBinding(existing);
+        }
+
+        MemberOAuthLoginOutcome created = createMember(info);
+        if (created.requiresBinding()) {
+            return created;
+        }
+        MemUser user = created.getMember();
         insertSocial(user.getMemberId(), info);
         log.info("第三方登录自动创建会员: provider={}, memberId={}", info.getProvider(), user.getMemberId());
-        return user;
+        return created;
     }
 
     /** 已登录会员绑定新平台；同一平台只允许一个绑定。 */
@@ -125,8 +150,22 @@ public class MemberOAuthAccountService {
         return result;
     }
 
-    /** 解绑；记录不存在也视为成功，避免重复点击报错。 */
+    /**
+     * 解绑。
+     *
+     * <p>记录不存在也视为成功，避免重复点击报错。若会员从未设置密码，且这是
+     * 最后一种登录方式，禁止解绑，否则用户会把自己锁在门外。</p>
+     */
     public void unbind(Long memberId, String provider) {
+        MemUser user = requireActiveMember(memberId);
+        if (PASSWORD_SET_NO.equals(user.getPasswordSet())) {
+            Long count = socialMapper.selectCount(new LambdaQueryWrapper<MemUserSocial>()
+                    .eq(MemUserSocial::getMemberId, memberId));
+            if (count != null && count <= 1) {
+                throw ServiceException.keyed(ErrorCode.BAD_REQUEST,
+                        "error.1001.member.oauthLastLoginMethod");
+            }
+        }
         socialMapper.delete(new LambdaQueryWrapper<MemUserSocial>()
                 .eq(MemUserSocial::getMemberId, memberId)
                 .eq(MemUserSocial::getProvider, provider));
@@ -151,27 +190,80 @@ public class MemberOAuthAccountService {
         return rows.isEmpty() ? null : rows.get(0);
     }
 
-    private MemUser createMember(OAuthUserInfo info) {
+    /**
+     * 只用平台明确标记已验证的联系方式匹配已有会员；未验证的一律忽略。
+     * 邮箱优先于手机号，两者命中不同会员时以邮箱为准（极少见，交给后台合并）。
+     */
+    private MemUser findByVerifiedContact(OAuthUserInfo info) {
+        String email = verifiedEmail(info);
+        if (email != null) {
+            MemUser user = first(userMapper.selectList(new LambdaQueryWrapper<MemUser>()
+                    .eq(MemUser::getEmail, email)));
+            if (user != null) {
+                return user;
+            }
+        }
+        String mobile = verifiedMobile(info);
+        if (mobile != null) {
+            return first(userMapper.selectList(new LambdaQueryWrapper<MemUser>()
+                    .eq(MemUser::getMobile, mobile)));
+        }
+        return null;
+    }
+
+    private MemberOAuthLoginOutcome createMember(OAuthUserInfo info) {
         MemLevel level = levelService.defaultLevel();
-        LocalDateTime now = LocalDateTime.now();
-        MemUser user = new MemUser();
-        user.setTenantId(0L);
-        user.setUsername(generateUsername(info));
-        user.setNickname(normalizeNickname(info));
-        // 第三方账号没有可用密码；随机值只用于占位，登录路径不会比对它
-        user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
-        user.setAvatar(normalizeAvatar(info.getAvatar()));
-        user.setSex("2");
-        user.setLevelId(level.getLevelId());
-        user.setPoints(0);
-        user.setGrowth(0);
-        user.setStatus(CommonConstants.STATUS_NORMAL);
-        user.setRegisterChannel("oauth");
-        user.setRegisterIp(ServletUtils.getClientIp());
-        user.setLoginFailCount(0);
-        user.setLastActiveTime(now);
-        userMapper.insert(user);
-        return user;
+        String email = verifiedEmail(info);
+        String mobile = verifiedMobile(info);
+        String avatarFileRef = resolveAvatar(info);
+
+        DuplicateKeyException lastConflict = null;
+        for (int attempt = 0; attempt < INSERT_ATTEMPTS; attempt++) {
+            LocalDateTime now = LocalDateTime.now();
+            MemUser user = new MemUser();
+            user.setTenantId(0L);
+            user.setUsername(generateUsername(info, attempt));
+            user.setNickname(normalizeNickname(info));
+            // 第三方账号没有可用密码；随机值只用于占位，登录路径不会比对它
+            user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+            user.setPasswordSet(PASSWORD_SET_NO);
+            user.setEmail(email);
+            user.setMobile(mobile);
+            user.setAvatar(avatarFileRef);
+            user.setSex("2");
+            user.setLevelId(level.getLevelId());
+            user.setPoints(0);
+            user.setGrowth(0);
+            user.setStatus(CommonConstants.STATUS_NORMAL);
+            user.setRegisterChannel("oauth");
+            user.setRegisterIp(ServletUtils.getClientIp());
+            user.setLoginFailCount(0);
+            user.setLastActiveTime(now);
+            try {
+                userMapper.insert(user);
+                return MemberOAuthLoginOutcome.loggedIn(user);
+            } catch (DuplicateKeyException e) {
+                lastConflict = e;
+                String message = e.getMessage() == null ? "" : e.getMessage();
+                if (message.contains("uk_mem_user_username")) {
+                    // 用户名并发撞车：换一个随机后缀重试
+                    log.info("第三方建号用户名冲突，重试: provider={}", info.getProvider());
+                    continue;
+                }
+                if (message.contains("uk_mem_user_email") || message.contains("uk_mem_user_mobile")) {
+                    // 联系方式在查询后被别人占用：不建号，转绑定流程
+                    MemUser existing = findByVerifiedContact(info);
+                    if (existing != null) {
+                        log.info("第三方建号时联系方式并发冲突，转绑定: provider={}", info.getProvider());
+                        return MemberOAuthLoginOutcome.requiresBinding(existing);
+                    }
+                }
+                throw e;
+            }
+        }
+        throw lastConflict == null
+                ? ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.member.usernameFormat")
+                : lastConflict;
     }
 
     private void insertSocial(Long memberId, OAuthUserInfo info) {
@@ -184,6 +276,10 @@ public class MemberOAuthAccountService {
         social.setUnionId(info.getUnionId());
         social.setNickname(normalizeText(info.getNickname(), NICKNAME_MAX));
         social.setAvatar(normalizeAvatar(info.getAvatar()));
+        social.setEmail(verifiedEmail(info));
+        social.setMobile(verifiedMobile(info));
+        social.setEmailVerified(verifiedEmail(info) == null ? VERIFIED_NO : VERIFIED_YES);
+        social.setMobileVerified(verifiedMobile(info) == null ? VERIFIED_NO : VERIFIED_YES);
         social.setRawData(info.getRawData());
         social.setLastLoginTime(now);
         social.setCreateTime(now);
@@ -196,18 +292,38 @@ public class MemberOAuthAccountService {
                 .set(MemUserSocial::getUnionId, info.getUnionId())
                 .set(MemUserSocial::getNickname, normalizeText(info.getNickname(), NICKNAME_MAX))
                 .set(MemUserSocial::getAvatar, normalizeAvatar(info.getAvatar()))
+                .set(MemUserSocial::getEmail, verifiedEmail(info))
+                .set(MemUserSocial::getMobile, verifiedMobile(info))
+                .set(MemUserSocial::getEmailVerified, verifiedEmail(info) == null ? VERIFIED_NO : VERIFIED_YES)
+                .set(MemUserSocial::getMobileVerified, verifiedMobile(info) == null ? VERIFIED_NO : VERIFIED_YES)
                 .set(MemUserSocial::getRawData, info.getRawData())
                 .set(MemUserSocial::getLastLoginTime, LocalDateTime.now())
                 .set(MemUserSocial::getUpdateTime, LocalDateTime.now()));
     }
 
     /**
+     * 头像落地：下载转存文件中心，成功存 fileId；失败退回原外链，
+     * 门户用 {@code referrerpolicy=no-referrer} 兜底历史外链。
+     */
+    private String resolveAvatar(OAuthUserInfo info) {
+        String url = normalizeAvatar(info.getAvatar());
+        if (url == null) {
+            return null;
+        }
+        String fileId = avatarLocalizer.localize(info.getProvider(), url);
+        if (fileId != null) {
+            return fileId;
+        }
+        return url;
+    }
+
+    /**
      * 生成站内用户名。
      *
      * <p>优先用“平台前缀 + openId 尾段”，人一眼能看出账号来源；冲突时加随机后缀。
-     * 生成结果一定满足登录接口的账号长度限制。</p>
+     * {@code attempt>0} 表示上一次插入撞了唯一键，进一步加随机段。</p>
      */
-    private String generateUsername(OAuthUserInfo info) {
+    private String generateUsername(OAuthUserInfo info, int attempt) {
         String prefix = info.getProvider() == null ? "oauth"
                 : info.getProvider().replaceAll("[^a-zA-Z0-9]", "").toLowerCase(Locale.ROOT);
         if (prefix.isEmpty()) {
@@ -222,14 +338,14 @@ public class MemberOAuthAccountService {
             tail = String.format("%06d", RANDOM.nextInt(1_000_000));
         }
         String base = truncate(prefix + "_" + tail, USERNAME_MAX - 5);
-        if (!usernameExists(base)) {
-            return base;
-        }
+        String candidate = attempt == 0 && !usernameExists(base)
+                ? base
+                : truncate(base + "_" + String.format("%04d", RANDOM.nextInt(10_000)), USERNAME_MAX);
         for (int i = 0; i < 20; i++) {
-            String candidate = base + "_" + String.format("%04d", RANDOM.nextInt(10_000));
             if (!usernameExists(candidate)) {
                 return candidate;
             }
+            candidate = truncate(base + "_" + String.format("%04d", RANDOM.nextInt(10_000)), USERNAME_MAX);
         }
         return truncate(prefix + "_" + UUID.randomUUID().toString().replace("-", ""), USERNAME_MAX);
     }
@@ -262,6 +378,32 @@ public class MemberOAuthAccountService {
             return value;
         }
         return null;
+    }
+
+    private String verifiedEmail(OAuthUserInfo info) {
+        if (!info.isEmailVerified() || !StringUtils.hasText(info.getEmail())) {
+            return null;
+        }
+        String value = info.getEmail().trim().toLowerCase(Locale.ROOT);
+        if (value.length() > EMAIL_MAX || value.indexOf('@') <= 0) {
+            return null;
+        }
+        return value;
+    }
+
+    private String verifiedMobile(OAuthUserInfo info) {
+        if (!info.isMobileVerified() || !StringUtils.hasText(info.getMobile())) {
+            return null;
+        }
+        String value = info.getMobile().trim().replace(" ", "");
+        if (value.length() > MOBILE_MAX || !value.matches("^\\+?\\d{5,20}$")) {
+            return null;
+        }
+        return value;
+    }
+
+    private MemUser first(List<MemUser> users) {
+        return users == null || users.isEmpty() ? null : users.get(0);
     }
 
     private String normalizeText(String value, int max) {

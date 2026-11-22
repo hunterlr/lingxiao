@@ -44,10 +44,18 @@ public class MemUser extends BaseEntity {
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
-    /** 手机号，租户内应用层唯一；是否必填由参数 mem.register.mobileRequired 控制 */
+    /**
+     * 是否已设置登录密码：0 未设置（第三方自动建号）/ 1 已设置。
+     *
+     * <p>第三方建号时密码字段写随机占位值，不能当成“用户知道密码”；
+     * 未设置密码的账号走密码登录时提示先通过已绑定平台登录并设置密码。</p>
+     */
+    private String passwordSet;
+
+    /** 手机号，租户内唯一（数据库生成列 + 唯一键）；是否必填由参数 mem.register.mobileRequired 控制 */
     private String mobile;
 
-    /** 邮箱，租户内应用层唯一；是否必填由参数 mem.register.emailRequired 控制 */
+    /** 邮箱，租户内唯一（数据库生成列 + 唯一键）；是否必填由参数 mem.register.emailRequired 控制 */
     private String email;
 
     /** 头像 fileId 或 http(s) 外链；不建 mem_file */

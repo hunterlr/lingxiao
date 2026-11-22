@@ -15,6 +15,7 @@ import com.lingxiao.modules.member.dto.MemberInfoVO;
 import com.lingxiao.modules.member.dto.MemberLoginRequest;
 import com.lingxiao.modules.member.dto.MemberLoginResponse;
 import com.lingxiao.modules.member.dto.MemberPasswordChangeRequest;
+import com.lingxiao.modules.member.dto.MemberPasswordSetRequest;
 import com.lingxiao.modules.member.dto.MemberProfileUpdateRequest;
 import com.lingxiao.modules.member.dto.MemberRegisterRequest;
 import com.lingxiao.modules.member.dto.MemberResetPasswordRequest;
@@ -29,6 +30,7 @@ import com.lingxiao.modules.member.security.MemberPasswordEncoder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -41,6 +43,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * 会员账号服务。
@@ -73,6 +76,13 @@ public class MemberUserService {
     private static final Set<String> SEX_VALUES = new HashSet<>(Arrays.asList("0", "1", "2"));
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    /** 密码标记：第三方自动建号写随机占位密码，用户并不知道它 */
+    private static final String PASSWORD_SET_YES = "1";
+    private static final String PASSWORD_SET_NO = "0";
+
+    /** 登录标识形态：只允许纯数字 / 可带一个前导 +，长度 5~20 */
+    private static final Pattern MOBILE_ACCOUNT = Pattern.compile("^\\+?\\d{5,20}$");
+
     private final MemUserMapper userMapper;
     private final MemPasswordResetMapper passwordResetMapper;
     private final MemberLevelService levelService;
@@ -100,8 +110,9 @@ public class MemberUserService {
         }
 
         String username = requireText(request.getUsername(), "valid.username.required");
-        String mobile = trimToNull(request.getMobile());
-        String email = trimToNull(request.getEmail());
+        validateUsername(username);
+        String mobile = normalizeMobile(request.getMobile());
+        String email = normalizeEmail(request.getEmail());
         if (mobileRequired() && mobile == null) {
             throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.member.mobileRequired");
         }
@@ -118,6 +129,7 @@ public class MemberUserService {
         user.setUsername(username);
         user.setNickname(StringUtils.hasText(request.getNickname()) ? request.getNickname().trim() : username);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setPasswordSet(PASSWORD_SET_YES);
         user.setMobile(mobile);
         user.setEmail(email);
         user.setSex("2");
@@ -129,7 +141,7 @@ public class MemberUserService {
         user.setRegisterIp(ServletUtils.getClientIp());
         user.setLoginFailCount(0);
         user.setLastActiveTime(now);
-        userMapper.insert(user);
+        insertUser(user);
         log.info("会员注册成功: memberId={}, username={}", user.getMemberId(), username);
         return tokenIssuer.issue(user, level.getLevelName());
     }
@@ -137,8 +149,9 @@ public class MemberUserService {
     /**
      * 登录：验证码 → 锁定判断 → 查账号 → 校验密码 → 状态 → 记录 → 发 Token。
      *
-     * <p>{@code account} 支持用户名 / 手机号 / 邮箱，按这个顺序查找，
-     * 找到第一个即停止；不会出现“用户名命中 A、手机号命中 B”时选错人的情况。</p>
+     * <p>{@code account} 按输入形态只查一个字段：含 {@code @} 视为邮箱，
+     * 纯数字 / 带前导 {@code +} 视为手机号，其它视为用户名。这样即使一个值
+     * 同时像两种标识，也不会出现“用户名命中 A、邮箱命中 B”时选错人的情况。</p>
      */
     public MemberLoginResponse login(MemberLoginRequest request) {
         limitLogin(request.getAccount());
@@ -150,6 +163,12 @@ public class MemberUserService {
         if (user != null && user.getLockTime() != null && user.getLockTime().isAfter(now)) {
             long remaining = Math.max(1, Duration.between(now, user.getLockTime()).toMinutes() + 1);
             throw new ServiceException(ErrorCode.ACCOUNT_LOCKED, "error.2004.locked", remaining);
+        }
+
+        // 第三方自动建号的密码是随机占位值，用户并不知道；先给出明确指引，
+        // 不把它当成“密码错误”去累计失败次数，避免把账号锁死。
+        if (user != null && PASSWORD_SET_NO.equals(user.getPasswordSet())) {
+            throw ServiceException.keyed(ErrorCode.PASSWORD_NOT_SET, "error.2006.passwordNotSet");
         }
 
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
@@ -189,6 +208,7 @@ public class MemberUserService {
         vo.setUsername(user.getUsername());
         vo.setNickname(user.getNickname());
         vo.setAvatar(user.getAvatar());
+        vo.setPasswordSet(user.getPasswordSet());
         vo.setMobile(user.getMobile());
         vo.setEmail(user.getEmail());
         vo.setSex(user.getSex());
@@ -235,6 +255,9 @@ public class MemberUserService {
      */
     public void changePassword(MemberPasswordChangeRequest request) {
         MemUser user = currentUser();
+        if (PASSWORD_SET_NO.equals(user.getPasswordSet())) {
+            throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.member.passwordSetRequired");
+        }
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
             throw new ServiceException(ErrorCode.OLD_PASSWORD_ERROR);
         }
@@ -248,6 +271,28 @@ public class MemberUserService {
                 .set(MemUser::getPassword, passwordEncoder.encode(request.getNewPassword())));
         tokenIssuer.logoutAll(user.getMemberId());
         log.info("会员自助修改密码: memberId={}", user.getMemberId());
+    }
+
+    /**
+     * 第三方建号首次设置密码。
+     *
+     * <p>只允许 {@code password_set='0'} 的账号调用；已设置密码的账号必须走
+     * “修改密码”并校验原密码。设置成功后保留当前会话，用户不用重新登录。</p>
+     */
+    public void setPassword(MemberPasswordSetRequest request) {
+        MemUser user = currentUser();
+        if (!PASSWORD_SET_NO.equals(user.getPasswordSet())) {
+            throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.member.passwordAlreadySet");
+        }
+        passwordPolicy.validate(request.getNewPassword());
+        userMapper.update(null, new LambdaUpdateWrapper<MemUser>()
+                .eq(MemUser::getMemberId, user.getMemberId())
+                .set(MemUser::getPassword, passwordEncoder.encode(request.getNewPassword()))
+                .set(MemUser::getPasswordSet, PASSWORD_SET_YES)
+                .set(MemUser::getLoginFailCount, 0)
+                .set(MemUser::getLockTime, null)
+                .set(MemUser::getLastActiveTime, LocalDateTime.now()));
+        log.info("会员首次设置登录密码: memberId={}", user.getMemberId());
     }
 
     /**
@@ -316,6 +361,7 @@ public class MemberUserService {
         userMapper.update(null, new LambdaUpdateWrapper<MemUser>()
                 .eq(MemUser::getMemberId, user.getMemberId())
                 .set(MemUser::getPassword, passwordEncoder.encode(request.getNewPassword()))
+                .set(MemUser::getPasswordSet, PASSWORD_SET_YES)
                 .set(MemUser::getLoginFailCount, 0)
                 .set(MemUser::getLockTime, null));
         passwordResetMapper.update(null, new LambdaUpdateWrapper<MemPasswordReset>()
@@ -356,8 +402,9 @@ public class MemberUserService {
 
     public Long create(MemberCreateRequest request) {
         String username = requireText(request.getUsername(), "valid.username.required");
-        String mobile = trimToNull(request.getMobile());
-        String email = trimToNull(request.getEmail());
+        validateUsername(username);
+        String mobile = normalizeMobile(request.getMobile());
+        String email = normalizeEmail(request.getEmail());
         ensureUnique(username, mobile, email, null);
         passwordPolicy.validate(request.getPassword());
         MemLevel level = request.getLevelId() == null
@@ -370,6 +417,7 @@ public class MemberUserService {
         user.setUsername(username);
         user.setNickname(StringUtils.hasText(request.getNickname()) ? request.getNickname().trim() : username);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setPasswordSet(PASSWORD_SET_YES);
         user.setMobile(mobile);
         user.setEmail(email);
         user.setAvatar(trimToNull(request.getAvatar()));
@@ -384,7 +432,7 @@ public class MemberUserService {
         user.setRemark(trimToNull(request.getRemark()));
         user.setCreateBy(operatorId());
         user.setLastActiveTime(now);
-        userMapper.insert(user);
+        insertUser(user);
         log.info("后台新增会员: memberId={}, username={}, operator={}",
                 user.getMemberId(), username, operatorId());
         return user.getMemberId();
@@ -396,25 +444,29 @@ public class MemberUserService {
         if (nickname.isEmpty()) {
             throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.nickname");
         }
-        String mobile = trimToNull(request.getMobile());
-        String email = trimToNull(request.getEmail());
+        String mobile = normalizeMobile(request.getMobile());
+        String email = normalizeEmail(request.getEmail());
         ensureUnique(existing.getUsername(), mobile, email, memberId);
         MemLevel level = request.getLevelId() == null
                 ? levelService.requireEnabled(existing.getLevelId())
                 : levelService.requireEnabled(request.getLevelId());
         String status = normalizeStatus(request.getStatus(), existing.getStatus());
 
-        userMapper.update(null, new LambdaUpdateWrapper<MemUser>()
-                .eq(MemUser::getMemberId, memberId)
-                .set(MemUser::getNickname, nickname)
-                .set(MemUser::getMobile, mobile)
-                .set(MemUser::getEmail, email)
-                .set(MemUser::getAvatar, trimToNull(request.getAvatar()))
-                .set(MemUser::getSex, normalizeSex(request.getSex(), existing.getSex()))
-                .set(MemUser::getLevelId, level.getLevelId())
-                .set(MemUser::getStatus, status)
-                .set(MemUser::getRemark, trimToNull(request.getRemark()))
-                .set(MemUser::getUpdateBy, operatorId()));
+        try {
+            userMapper.update(null, new LambdaUpdateWrapper<MemUser>()
+                    .eq(MemUser::getMemberId, memberId)
+                    .set(MemUser::getNickname, nickname)
+                    .set(MemUser::getMobile, mobile)
+                    .set(MemUser::getEmail, email)
+                    .set(MemUser::getAvatar, trimToNull(request.getAvatar()))
+                    .set(MemUser::getSex, normalizeSex(request.getSex(), existing.getSex()))
+                    .set(MemUser::getLevelId, level.getLevelId())
+                    .set(MemUser::getStatus, status)
+                    .set(MemUser::getRemark, trimToNull(request.getRemark()))
+                    .set(MemUser::getUpdateBy, operatorId()));
+        } catch (DuplicateKeyException e) {
+            throw duplicateKeyError(e);
+        }
 
         // 停用后旧 Token 必须立即失效，否则会员在 Token 过期前还能继续访问
         if (!CommonConstants.STATUS_NORMAL.equals(status)) {
@@ -448,6 +500,7 @@ public class MemberUserService {
         userMapper.update(null, new LambdaUpdateWrapper<MemUser>()
                 .eq(MemUser::getMemberId, memberId)
                 .set(MemUser::getPassword, passwordEncoder.encode(newPassword))
+                .set(MemUser::getPasswordSet, PASSWORD_SET_YES)
                 .set(MemUser::getLoginFailCount, 0)
                 .set(MemUser::getLockTime, null)
                 .set(MemUser::getUpdateBy, operatorId()));
@@ -499,24 +552,32 @@ public class MemberUserService {
         return user;
     }
 
-    /** 用户名 → 手机号 → 邮箱，命中即停；空值不参与查询。 */
+    /**
+     * 按输入形态只查一个字段：
+     * <ul>
+     *   <li>含 {@code @}：邮箱；</li>
+     *   <li>纯数字 / 带一个前导 {@code +}：手机号；</li>
+     *   <li>其它：用户名。</li>
+     * </ul>
+     *
+     * <p>用户名在注册时已被限制为不能包含 {@code @}、也不能是纯数字，
+     * 因此三种形态不会互相重叠，避免一个值同时命中两个账号。</p>
+     */
     private MemUser findByAccount(String account) {
         String value = account == null ? "" : account.trim();
         if (value.isEmpty()) {
             return null;
         }
-        MemUser user = first(userMapper.selectList(new LambdaQueryWrapper<MemUser>()
-                .eq(MemUser::getUsername, value)));
-        if (user != null) {
-            return user;
+        if (value.indexOf('@') >= 0) {
+            return first(userMapper.selectList(new LambdaQueryWrapper<MemUser>()
+                    .eq(MemUser::getEmail, value.toLowerCase(Locale.ROOT))));
         }
-        user = first(userMapper.selectList(new LambdaQueryWrapper<MemUser>()
-                .eq(MemUser::getMobile, value)));
-        if (user != null) {
-            return user;
+        if (MOBILE_ACCOUNT.matcher(value).matches()) {
+            return first(userMapper.selectList(new LambdaQueryWrapper<MemUser>()
+                    .eq(MemUser::getMobile, value)));
         }
         return first(userMapper.selectList(new LambdaQueryWrapper<MemUser>()
-                .eq(MemUser::getEmail, value)));
+                .eq(MemUser::getUsername, value)));
     }
 
     private MemUser first(List<MemUser> users) {
@@ -526,9 +587,9 @@ public class MemberUserService {
     /**
      * 用户名 / 手机号 / 邮箱唯一性。
      *
-     * <p>数据库不建唯一键：逻辑删除后仍要允许同名重新注册，而带
-     * {@code del_flag} 的唯一键会在“两条已删除记录”上互相冲突。
-     * 这里用应用层校验 + 普通索引，单实例写入场景足够。</p>
+     * <p>数据库 V33 已加生成列 + 唯一键，这里是写入前的友好提示；
+     * 并发注册仍可能撞库，{@link #insertUser(MemUser)} 会把
+     * {@link DuplicateKeyException} 翻成同样的字段错误。</p>
      */
     private void ensureUnique(String username, String mobile, String email, Long excludeId) {
         if (countBy(MemUser::getUsername, username, excludeId) > 0) {
@@ -540,6 +601,48 @@ public class MemberUserService {
         if (email != null && countBy(MemUser::getEmail, email, excludeId) > 0) {
             throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.member.emailExists");
         }
+    }
+
+    private void insertUser(MemUser user) {
+        try {
+            userMapper.insert(user);
+        } catch (DuplicateKeyException e) {
+            throw duplicateKeyError(e);
+        }
+    }
+
+    /** 把数据库唯一键冲突翻成具体字段，避免前端只看到 5000 / 通用失败。 */
+    private ServiceException duplicateKeyError(DuplicateKeyException e) {
+        String message = e.getMessage() == null ? "" : e.getMessage();
+        if (message.contains("uk_mem_user_mobile")) {
+            return ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.member.mobileExists");
+        }
+        if (message.contains("uk_mem_user_email")) {
+            return ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.member.emailExists");
+        }
+        return ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.member.usernameExists");
+    }
+
+    /**
+     * 用户名不能包含 {@code @} 或全部为数字。
+     *
+     * <p>登录时按形态分流：含 {@code @} 只查邮箱、纯数字只查手机号。
+     * 如果允许这类用户名注册，同名账号可能永远无法用用户名登录。</p>
+     */
+    private void validateUsername(String username) {
+        if (username.indexOf('@') >= 0 || MOBILE_ACCOUNT.matcher(username).matches()) {
+            throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.member.usernameFormat");
+        }
+    }
+
+    /** 邮箱统一小写去空格；数据库唯一键按 collation 不区分大小写，这里先归一化。 */
+    private String normalizeEmail(String value) {
+        String text = trimToNull(value);
+        return text == null ? null : text.toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeMobile(String value) {
+        return trimToNull(value);
     }
 
     private long countBy(com.baomidou.mybatisplus.core.toolkit.support.SFunction<MemUser, ?> column,

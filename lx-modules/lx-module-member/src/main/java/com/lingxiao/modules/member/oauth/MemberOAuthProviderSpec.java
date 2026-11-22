@@ -117,6 +117,14 @@ public class MemberOAuthProviderSpec {
 
     private String emailPath;
 
+    /** 邮箱是否已验证的字段路径，例如 email_verified / verified_email */
+    private String emailVerifiedPath;
+
+    private String mobilePath;
+
+    /** 手机号是否已验证的字段路径 */
+    private String mobileVerifiedPath;
+
     /** 头像需要拼接时使用，占位符 {id} / {avatar} */
     private String avatarUrlTemplate;
 

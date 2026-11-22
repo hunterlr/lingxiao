@@ -7,6 +7,7 @@ import com.lingxiao.modules.member.dto.MemberOAuthAuthorizeVO;
 import com.lingxiao.modules.member.dto.MemberOAuthBindingVO;
 import com.lingxiao.modules.member.dto.MemberOAuthTicketVO;
 import com.lingxiao.modules.member.entity.MemUser;
+import com.lingxiao.modules.member.oauth.MemberOAuthBindTicket;
 import com.lingxiao.modules.member.oauth.MemberOAuthProvider;
 import com.lingxiao.modules.member.oauth.MemberOAuthProviderConfig;
 import com.lingxiao.modules.member.oauth.MemberOAuthProviderRegistry;
@@ -137,7 +138,16 @@ public class MemberOAuthService {
             return vo;
         }
 
-        MemUser user = accountService.loginOrRegister(info, configService.isAutoRegister());
+        MemberOAuthLoginOutcome outcome = accountService.loginOrRegister(info, configService.isAutoRegister());
+        if (outcome.requiresBinding()) {
+            vo.setBindRequired(true);
+            vo.setBindTicket(createBindTicket(provider, outcome.getExistingMember().getMemberId(), info));
+            log.info("小程序第三方登录命中已有会员，要求先绑定: provider={}, targetMemberId={}",
+                    provider, outcome.getExistingMember().getMemberId());
+            return vo;
+        }
+
+        MemUser user = outcome.getMember();
         vo.setTicket(stateStore.createTicket(provider, user.getMemberId()));
         log.info("小程序第三方登录成功: provider={}, memberId={}", provider, user.getMemberId());
         return vo;
@@ -177,7 +187,17 @@ public class MemberOAuthService {
                         + "/account?oauthBound=" + json.encode(provider);
             }
 
-            MemUser user = accountService.loginOrRegister(info, configService.isAutoRegister());
+            MemberOAuthLoginOutcome outcome = accountService.loginOrRegister(info, configService.isAutoRegister());
+            if (outcome.requiresBinding()) {
+                String bindTicket = createBindTicket(provider, outcome.getExistingMember().getMemberId(), info);
+                log.info("第三方登录命中已有会员，要求先登录原账号绑定: provider={}, targetMemberId={}",
+                        provider, outcome.getExistingMember().getMemberId());
+                return configService.portalBaseUrl()
+                        + "/login?oauthBindTicket=" + json.encode(bindTicket)
+                        + "&provider=" + json.encode(provider)
+                        + "&redirect=" + json.encode(safeRedirect(state.getRedirect()));
+            }
+            MemUser user = outcome.getMember();
             String ticket = stateStore.createTicket(provider, user.getMemberId());
             log.info("第三方登录成功: provider={}, memberId={}", provider, user.getMemberId());
             return configService.portalBaseUrl()
@@ -213,6 +233,31 @@ public class MemberOAuthService {
         return tokenIssuer.issue(user, levelName);
     }
 
+    /**
+     * 用一次性 bindTicket 完成绑定。
+     *
+     * <p>必须携带会员 Token，且当前会员必须等于 ticket 里记录的目标会员；
+     * 这样第三方账号无法把绑定落到别人的账号上。</p>
+     */
+    public void bindWithTicket(String ticket) {
+        if (!configService.isGlobalEnabled()) {
+            throw ServiceException.keyed(ErrorCode.FORBIDDEN, "error.1003.member.oauthDisabled");
+        }
+        Long memberId = requireMemberId();
+        MemberOAuthBindTicket parsed = stateStore.consumeBindTicket(ticket);
+        if (parsed == null) {
+            throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.member.oauthBindTicketInvalid");
+        }
+        // 平台在用户登录期间被后台停用：不再接受新的绑定
+        configService.requireEnabled(parsed.getProvider());
+        if (parsed.getTargetMemberId() == null || !parsed.getTargetMemberId().equals(memberId)) {
+            throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.member.oauthBindTargetMismatch");
+        }
+        accountService.bind(memberId, parsed.getInfo());
+        log.info("会员通过 bindTicket 完成第三方绑定: provider={}, memberId={}",
+                parsed.getProvider(), memberId);
+    }
+
     public List<MemberOAuthBindingVO> bindings() {
         Long memberId = requireMemberId();
         return accountService.bindings(memberId);
@@ -229,6 +274,19 @@ public class MemberOAuthService {
             throw new ServiceException(ErrorCode.UNAUTHORIZED);
         }
         return memberId;
+    }
+
+    /** 把“回调拿到的第三方信息 + 命中的会员”打包成一次性绑定凭证。 */
+    private String createBindTicket(String provider, Long targetMemberId, OAuthUserInfo info) {
+        MemberOAuthBindTicket ticket = new MemberOAuthBindTicket();
+        ticket.setProvider(provider);
+        ticket.setTargetMemberId(targetMemberId);
+        ticket.setInfo(info);
+        String value = stateStore.createBindTicket(ticket);
+        if (value == null) {
+            throw new ServiceException(ErrorCode.FAIL, "无法保存绑定凭证，请稍后重试");
+        }
+        return value;
     }
 
     private String errorUrl(String target, String provider, String errorCode) {

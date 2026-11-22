@@ -157,6 +157,12 @@ remark       varchar(500) default null        comment '备注'
 
 > v1.2 第一刀只实装 `mem_user` / `mem_level` / `mem_password_reset` 三张表
 > （迁移 `V25__member_schema.sql`）；其余为规划表，按切片逐步落地。
+>
+> 实际落地的会员表先后增加了 `mem_channel_config`、`mem_oauth_provider`、
+> `mem_user_social`、`mem_favorite`、`mem_like`、`mem_comment`、`mem_merge_log`
+> 等（V27 ~ V33）。其中 `V33__member_account_uniqueness.sql` 用生成列
+> `username_key / mobile_key / email_key` 加唯一键，仅约束未删除行；
+> 这与下面设计稿里的 `UNIQUE (tenant_id, username)` 写法不同，以迁移文件为准。
 
 ### 2.6 工作流 `wf_` + Flowable `ACT_`
 

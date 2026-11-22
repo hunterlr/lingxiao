@@ -4,6 +4,7 @@ import com.lingxiao.common.core.domain.R;
 import com.lingxiao.modules.member.dto.MemberLoginResponse;
 import com.lingxiao.modules.member.dto.MemberOAuthAuthorizeVO;
 import com.lingxiao.modules.member.dto.MemberOAuthBindingVO;
+import com.lingxiao.modules.member.dto.MemberOAuthBindTicketRequest;
 import com.lingxiao.modules.member.dto.MemberOAuthExchangeRequest;
 import com.lingxiao.modules.member.dto.MemberOAuthMiniLoginRequest;
 import com.lingxiao.modules.member.dto.MemberOAuthProvidersVO;
@@ -94,6 +95,18 @@ public class MemberOAuthController {
     public R<MemberOAuthTicketVO> miniLogin(@Valid @RequestBody MemberOAuthMiniLoginRequest request) {
         return R.ok(oauthService.miniLogin(
                 request.getProvider(), request.getCode(), request.getMode(), request.getRedirect()));
+    }
+
+    /**
+     * 完成“命中已有会员”后的绑定。
+     *
+     * <p>必须带会员 Token（StpMember 拦截器保护 {@code /api/app/**} 下的认证接口），
+     * ticket 两分钟有效且只能用一次；当前会员必须等于回调时命中的会员。</p>
+     */
+    @PostMapping("/bind-ticket")
+    public R<Void> bindTicket(@Valid @RequestBody MemberOAuthBindTicketRequest request) {
+        oauthService.bindWithTicket(request.getTicket());
+        return R.ok();
     }
 
     /** 当前会员已绑定的第三方账号。 */

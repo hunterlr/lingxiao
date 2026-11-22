@@ -35,8 +35,20 @@ public class MemUserSocial {
     /** 首次授权时的昵称快照，仅用于兜底展示 */
     private String nickname;
 
-    /** 首次授权时的头像快照 */
+    /** 首次授权时的头像快照；原始外链，仅排障用 */
     private String avatar;
+
+    /** 平台返回并确认已验证的邮箱；未验证时留空，不参与账号匹配 */
+    private String email;
+
+    /** 平台返回并确认已验证的手机号；未验证时留空，不参与账号匹配 */
+    private String mobile;
+
+    /** 邮箱是否由平台确认已验证：0 否 / 1 是 */
+    private String emailVerified;
+
+    /** 手机号是否由平台确认已验证：0 否 / 1 是 */
+    private String mobileVerified;
 
     /** 最近一次用户信息 JSON，仅排障用，接口不下发 */
     private String rawData;

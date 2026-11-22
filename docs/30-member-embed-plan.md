@@ -684,10 +684,13 @@ mvn -q -pl lx-modules/lx-module-member -am test -Dtest=MemberCommentServiceTest 
    不触碰 `sys_user` / `sys_user_role`；会员 Token 与后台 Token 互不识别。
 2. **未绑定且关闭自动建号时明确报错。** 返回 `1001 not_bound`，提示先登录再绑定，
    不会静默创建一个空账号。
-3. **自动建号不复制邮箱 / 手机号。** 第三方邮箱未必已验证，直接占用会挡住会员
-   后续自行注册；只复制昵称与 http(s) 头像。
-4. **头像只接受 http/https 或数字 fileId。** 第三方返回 `javascript:` / `data:`
-   等一律丢弃；登录时不覆盖会员自己改过的头像。
+3. **自动建号只复制“平台确认已验证”的邮箱 / 手机号（2026-11-23 补齐）。**
+   未验证的联系方式不落库，避免占用唯一键挡住会员自行注册；微信 / QQ 通常
+   不返回已验证手机号，因此不参与匹配。
+4. **头像同时接受 http/https 或数字 fileId，并优先本地化（2026-11-23 补齐）。**
+   第三方头像先下载转存文件中心，存 `fileId`；`mem_user_social.avatar` 保留
+   原始外链仅排障。下载失败回退外链，门户 `<img>` 统一加
+   `referrerpolicy="no-referrer"`。登录时不覆盖会员自己改过的头像。
 5. **state / ticket 一次性。** 回调重放、伪造 state、过期 ticket 都有对应错误码；
    门户按短码翻译，不展示上游错误原文。
 6. **总开关 + 单平台开关双层控制。** 总开关关闭时门户不展示任何入口，接口返回
@@ -726,6 +729,138 @@ mvn -o -pl lx-modules/lx-module-member -am test `
 |---|---|
 | 真实平台联调 | 适配器与端点已就绪，需在各平台后台登记回调地址并填真实凭据 |
 | 小程序端页面 | 后端 `mini-login` 已就绪，小程序页面由小程序工程实现 |
-| 第三方头像转存 | 当前保留外链；后续可下载到文件中心换 `fileId` |
-| 账号合并 | 同一邮箱的密码账号与第三方账号暂不自动合并，避免误绑 |
-| 解绑前校验 | 当前允许直接解绑；若会员没有密码，后续需强制先设置密码 |
+| 第三方头像转存 | 已补齐，见 §15.2 `MemberAvatarLocalizer` |
+| 账号合并 | 已补齐后台合并工具，见 §15.4；不自动合并 |
+| 解绑前校验 | 已补齐：无密码且解绑后无其它登录方式时禁止解绑 |
+
+---
+
+## 15. v1.2 第五刀：头像本地化、唯一性、绑定与合并（2026-11-23）
+
+在第四刀“27 平台第三方登录”基础上补齐四件事：第三方头像落本地、
+账号唯一约束与登录标识分流、同邮箱 / 手机号的验证后绑定流程、后台账号合并工具。
+仍然坚持“会员域与后台域物理隔离”：不触碰 `sys_user`，会员 Token 与后台 Token
+互不识别。
+
+### 15.1 迁移与数据模型
+
+| 迁移 | 内容 |
+|---|---|
+| `V33__member_account_uniqueness.sql` | `mem_user.password_set`、用户名 / 手机号 / 邮箱生成列 + 唯一键、`mem_user_social` 联系方式快照与 `(tenant_id, member_id, provider)` 唯一键、`mem_merge_log`、合并按钮权限 4017 |
+
+- 唯一键用生成列排除逻辑删除行：
+  `username_key = IF(del_flag='0', username, NULL)`，手机号 / 邮箱再加非空判断。
+  MySQL 唯一索引允许多个 `NULL`，所以删除后的用户名可以重新注册。
+- `password_set`：`0` 未设置密码（第三方自动建号）/ `1` 已设置；老数据按
+  `register_channel` 回填。
+- `mem_merge_log`：谁把哪个旧账号并入哪个目标账号、迁移 / 跳过了多少条数据、
+  操作备注与时间，只追加不修改。
+
+### 15.2 头像本地化
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 文件中心 | `FileService.uploadBytes(...)` | 从 `upload(MultipartFile)` 抽出字节入库能力，供头像/后台任务复用 |
+| 会员 | `MemberAvatarLocalizer` | 下载第三方头像并转存文件中心，写 `fileId` |
+| 依赖 | `lx-module-member/pom.xml` | 新增 `lx-module-file`，用 `ObjectProvider<FileService>` 允许文件模块关闭 |
+
+安全边界：
+
+- 只允许 `http(s)`，禁止内网 / 回环 / 链路本地 / 私网 / 带 userInfo 的地址；
+  重定向同样逐跳校验，最多 3 次；
+- 连接 / 读取各 3 秒，最大 2 MB；
+- 只接受 JPEG / PNG / WebP，按文件头识别，拒绝 SVG / HTML；
+- 下载或转存失败只记日志并回退原始外链，不影响第三方登录主流程；
+- 门户 `<img>` 统一加 `referrerpolicy="no-referrer"` 兜底历史外链。
+
+### 15.3 唯一性与登录标识分流
+
+- `(tenant_id, username)`、`(tenant_id, mobile)`、`(tenant_id, email)` 三组
+  唯一键由数据库兜底；写入前仍做友好校验，并把 `DuplicateKeyException`
+  翻成具体字段错误（用户名 / 手机号 / 邮箱已存在）。
+- 登录按输入形态只查一个字段：含 `@` 只查邮箱；纯数字 / 带前导 `+` 只查手机号；
+  其它只查用户名。
+- 用户名注册时禁止包含 `@` 或全部为数字，避免出现“这个账号永远无法用用户名登录”。
+- 第三方自动建号若拿到已验证联系方式则写入并占用唯一键，否则留空；
+  未设密码账号密码登录返回 `2006`，并引导先设置密码。
+- `PUT /api/app/profile/password/set` 只允许 `password_set='0'` 的账号调用；
+  已设置密码必须走“修改密码”并校验原密码。
+
+### 15.4 同邮箱 / 手机号的绑定与合并
+
+第三方登录命中已有会员时**不静默自动登录**，而是返回一次性 `bindTicket`：
+
+```text
+第三方回调 → 已验证邮箱 / 手机号命中已有会员
+          → 302 /login?oauthBindTicket=...
+门户      → 用户先登录原账号
+          → POST /api/app/auth/oauth/bind-ticket { ticket }
+          → 校验当前会员 == ticket.targetMemberId → 写入绑定
+```
+
+- `bindTicket` 2 分钟有效且只能用一次，存 provider / openId / targetMemberId /
+  `OAuthUserInfo`；
+- 同一第三方 openId 已绑定其它会员时明确报错；
+- 解绑前若会员没有密码且这是最后登录方式，禁止解绑，避免把自己锁在门外；
+- 历史重复账号不自动合并。后台提供受权限保护、事务化、可审计的合并工具：
+
+| 接口 | 权限 | 说明 |
+|---|---|---|
+| `GET /api/admin/member/merge/preview` | `platform:member:user:merge` | 只读统计收藏 / 点赞 / 评论 / 绑定的迁移与去重数量 |
+| `POST /api/admin/member/merge` | `platform:member:user:merge` | 事务内迁移并停用旧账号 |
+
+合并语义：
+
+- 目标账号必须是启用状态，且不能与旧账号相同；
+- 收藏 / 点赞按 `(member_id, article_id)` 去重，重叠部分跳过；
+- 评论直接改归属；
+- 第三方绑定按平台去重，目标已绑定的平台保留目标账号、删除旧账号那条；
+- 完成后旧账号 `status='1'`、备注写明合并去向，`logoutAll` 踢掉全部会话；
+- 写 `mem_merge_log`，计数与操作人可追溯；不物理删除旧账号。
+
+### 15.5 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `V33__member_account_uniqueness.sql` | 唯一键、密码标记、合并审计、菜单 4017 |
+| 会员服务 | `MemberUserService` | 登录分流、唯一性、`passwordSet`、首次设置密码 |
+| 头像 | `MemberAvatarLocalizer` | 下载 / 类型 / 大小 / SSRF / 重定向限制 |
+| 文件服务 | `FileService.uploadBytes` | 字节上传与统一存储 |
+| 第三方 | `MemberOAuthAccountService` / `MemberOAuthService` | 已验证联系方式匹配、bindTicket、解绑保护 |
+| 合并 | `MemberMergeService` | 预览、事务迁移、去重、停用、踢会话、审计 |
+| 后台接口 | `MemberAdminController` | `/api/admin/member/merge/**` |
+| 后台页面 | `views/member/user/index.vue` | 合并入口、目标账号搜索、预览表、确认 |
+| 门户 | `login.vue` / `account.vue` / `useMemberAuth.ts` | bindTicket 自动绑定、设置密码、`referrerpolicy` |
+| 单测 | `MemberMergeServiceTest` / `MemberOAuthAccountServiceTest` / `MemberAvatarLocalizerTest` / `MemberUserServiceTest` / `MemberOAuthStateStoreTest` | 新增 17 项 |
+
+### 15.6 验证结果（2026-11-23）
+
+| 项 | 结果 |
+|---|---|
+| Flyway | V33 成功，数据库到 v33；27 个平台、菜单 4017、唯一键与 `mem_merge_log` 已落库 |
+| 全仓单测 | **244 项**，失败 0 错误 0 |
+| 合并接口 | `.local/member-merge-check.mjs` **24/24**：预览计数、去重迁移、旧账号停用、会话失效、审计落库 |
+| 密码流程 | `.local/member-password-set-check.mjs` **10/10**：2006、首次设置、旧密码失效、重复设置被拒 |
+| 后台构建 | `npm run build` 通过 |
+| 门户构建 | `npm run build` 通过 |
+| 浏览器 | 关闭时门户隐藏第三方按钮；开启 GitHub 后登录页出现按钮、账户页出现“绑定其它第三方账号”；`password_set=0` 显示设置密码区块；回调票据无效显示明确错误页，无白屏 |
+
+### 15.7 复验命令
+
+```powershell
+# 后端 8080（关闭验证码），门户 3000
+java -jar lx-boot\target\lingxiao.jar --lx.captcha.enabled=false
+node .local\member-merge-check.mjs
+node .local\member-password-set-check.mjs
+
+# 全仓单测
+mvn -o test
+```
+
+### 15.8 遗留
+
+| 项 | 说明 |
+|---|---|
+| 真实第三方联调 | 需要真实 AppID / Secret 与平台回调白名单；本地只用假凭据验证按钮与授权地址 |
+| 合并撤销 | `mem_merge_log` 留了审计，但不提供一键回滚；需要时按日志人工恢复 |
+| 通知手机号 / 邮箱绑定 | 目前只允许已存在的联系方式匹配，未开放门户内换绑验证 |

@@ -63,6 +63,21 @@ public class OAuthJson {
         return current;
     }
 
+    /** 读取布尔字段；兼容 true / "true" / 1 / "1" / yes。 */
+    public boolean bool(Map<String, Object> root, String path) {
+        Object value = read(root, path);
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value == null) {
+            return false;
+        }
+        String text = String.valueOf(value).trim();
+        return "true".equalsIgnoreCase(text)
+                || "1".equals(text)
+                || "yes".equalsIgnoreCase(text);
+    }
+
     @SuppressWarnings("unchecked")
     private Object readToken(Object current, String token) {
         if (current == null || !StringUtils.hasText(token)) {

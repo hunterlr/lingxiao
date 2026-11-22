@@ -1,5 +1,6 @@
 package com.lingxiao.modules.member.oauth;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("MemberOAuthStateStore 第三方登录临时凭证")
 class MemberOAuthStateStoreTest {
 
-    private final MemberOAuthStateStore store = new MemberOAuthStateStore();
+    private final MemberOAuthStateStore store = new MemberOAuthStateStore(new ObjectMapper());
 
     @Test
     @DisplayName("state 可完整回读，且只能消费一次")
@@ -70,6 +71,34 @@ class MemberOAuthStateStoreTest {
     }
 
     @Test
+    @DisplayName("bindTicket 保存完整第三方信息，且只能消费一次")
+    void bindTicketIsSingleUse() {
+        OAuthUserInfo info = new OAuthUserInfo();
+        info.setProvider("github");
+        info.setOpenId("open-123");
+        info.setNickname("octocat");
+        info.setEmail("a@b.com");
+        info.setEmailVerified(true);
+
+        MemberOAuthBindTicket ticket = new MemberOAuthBindTicket();
+        ticket.setProvider("github");
+        ticket.setTargetMemberId(789L);
+        ticket.setInfo(info);
+
+        String key = store.createBindTicket(ticket);
+        assertThat(key).isNotBlank();
+
+        MemberOAuthBindTicket parsed = store.consumeBindTicket(key);
+        assertThat(parsed).isNotNull();
+        assertThat(parsed.getProvider()).isEqualTo("github");
+        assertThat(parsed.getTargetMemberId()).isEqualTo(789L);
+        assertThat(parsed.getInfo().getOpenId()).isEqualTo("open-123");
+        assertThat(parsed.getInfo().isEmailVerified()).isTrue();
+
+        assertThat(store.consumeBindTicket(key)).isNull();
+    }
+
+    @Test
     @DisplayName("空 key / 伪造 key 返回 null，不抛异常")
     void invalidKeyIsIgnored() {
         assertThat(store.consumeState(null)).isNull();
@@ -77,5 +106,7 @@ class MemberOAuthStateStoreTest {
         assertThat(store.consumeState("not-exists")).isNull();
         assertThat(store.consumeTicket(null)).isNull();
         assertThat(store.consumeTicket("not-exists")).isNull();
+        assertThat(store.consumeBindTicket(null)).isNull();
+        assertThat(store.consumeBindTicket("not-exists")).isNull();
     }
 }

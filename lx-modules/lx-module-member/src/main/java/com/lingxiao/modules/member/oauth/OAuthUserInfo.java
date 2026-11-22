@@ -21,10 +21,19 @@ public class OAuthUserInfo {
 
     private String nickname;
 
-    /** 头像 URL；只接受 http(s)，不下载转存 */
+    /** 头像 URL；只接受 http(s)，由 {@code MemberAvatarLocalizer} 下载转存 */
     private String avatar;
 
     private String email;
+
+    /** 平台返回并确认已验证的手机号；没有就留空 */
+    private String mobile;
+
+    /** 邮箱是否由平台明确标记为已验证 */
+    private boolean emailVerified;
+
+    /** 手机号是否由平台明确标记为已验证 */
+    private boolean mobileVerified;
 
     /** 最近一次用户信息 JSON，截断后入库，仅排障用 */
     private String rawData;

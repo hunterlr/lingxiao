@@ -317,6 +317,7 @@ useHead(() => {
                 v-if="mediaUrl(item.avatar, 'thumb')"
                 :src="mediaUrl(item.avatar, 'thumb')!"
                 :alt="item.nickname || '会员'"
+                referrerpolicy="no-referrer"
               />
               <span v-else aria-hidden="true">{{ (item.nickname || '会').slice(0, 1) }}</span>
             </span>

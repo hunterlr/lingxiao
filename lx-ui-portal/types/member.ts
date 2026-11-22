@@ -27,6 +27,8 @@ export interface MemberProfile {
   avatar?: string | null
   mobile?: string | null
   email?: string | null
+  /** 0 未设置密码（第三方建号）/ 1 已设置 */
+  passwordSet?: string | null
   /** 0 男 / 1 女 / 2 未知 */
   sex?: string | null
   levelId?: string | number | null
@@ -77,6 +79,11 @@ export interface MemberPasswordForm {
 export interface MemberResetPasswordForm {
   account: string
   code: string
+  newPassword: string
+}
+
+/** 第三方建号首次设置密码；已设置密码的账号走修改密码。 */
+export interface MemberSetPasswordForm {
   newPassword: string
 }
 

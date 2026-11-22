@@ -171,6 +171,7 @@ public class MemberOAuthProviderRegistry {
                 .userInfoUrl("https://openidconnect.googleapis.com/v1/userinfo")
                 .defaultScope("openid email profile")
                 .idPath("sub").nicknamePath("name").avatarPath("picture").emailPath("email")
+                .emailVerifiedPath("email_verified")
                 .build());
         list.add(MemberOAuthProviderSpec.builder()
                 .code("microsoft").displayName("Microsoft").group(GROUP_GLOBAL)
@@ -179,6 +180,7 @@ public class MemberOAuthProviderRegistry {
                 .userInfoUrl("https://graph.microsoft.com/oidc/userinfo")
                 .defaultScope("openid profile email")
                 .idPath("sub").nicknamePath("name").avatarPath("picture").emailPath("email")
+                .emailVerifiedPath("email_verified")
                 .build());
         list.add(spec("apple", "Apple", GROUP_GLOBAL,
                 "https://appleid.apple.com/auth/authorize", "", "", "name email", 150));
@@ -209,6 +211,7 @@ public class MemberOAuthProviderRegistry {
                 .userInfoUrl("https://api.linkedin.com/v2/userinfo")
                 .defaultScope("openid profile email")
                 .idPath("sub").nicknamePath("name").avatarPath("picture").emailPath("email")
+                .emailVerifiedPath("email_verified")
                 .build());
         list.add(MemberOAuthProviderSpec.builder()
                 .code("discord").displayName("Discord").group(GROUP_GLOBAL)
@@ -261,6 +264,7 @@ public class MemberOAuthProviderRegistry {
                 .defaultScope("openid profile email")
                 .tokenBasicAuth(true)
                 .idPath("sub").nicknamePath("name").avatarPath("picture").emailPath("email")
+                .emailVerifiedPath("email_verified")
                 .build());
         list.add(MemberOAuthProviderSpec.builder()
                 .code("reddit").displayName("Reddit").group(GROUP_GLOBAL)
@@ -279,6 +283,7 @@ public class MemberOAuthProviderRegistry {
                 .userInfoUrl("https://slack.com/api/openid.connect.userInfo")
                 .defaultScope("openid profile email")
                 .idPath("sub").nicknamePath("name").avatarPath("picture").emailPath("email")
+                .emailVerifiedPath("email_verified")
                 .build());
         list.add(MemberOAuthProviderSpec.builder()
                 .code("twitch").displayName("Twitch").group(GROUP_GLOBAL)

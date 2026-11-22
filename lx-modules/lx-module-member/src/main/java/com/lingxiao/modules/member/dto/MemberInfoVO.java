@@ -24,6 +24,9 @@ public class MemberInfoVO implements Serializable {
 
     private String avatar;
 
+    /** 0 未设置密码（第三方建号）/ 1 已设置 */
+    private String passwordSet;
+
     private String mobile;
 
     private String email;

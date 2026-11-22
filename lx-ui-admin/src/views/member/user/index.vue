@@ -89,6 +89,9 @@
               <el-button v-hasPerm="'platform:member:user:resetPwd'" link type="warning" @click="handleResetPassword(row)">
                 {{ t('page.member.resetPwd') }}
               </el-button>
+              <el-button v-hasPerm="'platform:member:user:merge'" link type="primary" @click="openMerge(row)">
+                {{ t('page.member.merge') }}
+              </el-button>
               <el-button v-hasPerm="'platform:member:user:remove'" link type="danger" @click="handleDelete(row)">
                 {{ t('common.delete') }}
               </el-button>
@@ -179,11 +182,68 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="mergeVisible"
+      :title="t('page.member.mergeTitle')"
+      width="720px"
+      append-to-body
+      destroy-on-close
+      @closed="resetMerge"
+    >
+      <el-alert type="warning" :closable="false" show-icon :title="t('page.member.mergeHint')" />
+
+      <el-form label-width="120px" style="margin-top: 16px">
+        <el-form-item :label="t('page.member.mergeSource')">
+          <el-input :model-value="mergeSourceLabel" disabled />
+        </el-form-item>
+        <el-form-item :label="t('page.member.mergeTarget')">
+          <el-select
+            v-model="mergeForm.targetMemberId"
+            filterable
+            remote
+            clearable
+            :remote-method="searchMergeTargets"
+            :loading="mergeOptionsLoading"
+            :placeholder="t('page.member.mergeTargetPlaceholder')"
+            style="width: 100%"
+            @change="mergePreview = null"
+          >
+            <el-option
+              v-for="item in mergeOptions"
+              :key="item.memberId"
+              :label="`${item.username}（${item.nickname || '-'}）`"
+              :value="String(item.memberId)"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('common.remark')">
+          <el-input v-model="mergeForm.remark" type="textarea" :rows="2" maxlength="200" show-word-limit />
+        </el-form-item>
+      </el-form>
+
+      <el-table v-if="mergePreview" :data="mergePreviewRows" border size="small">
+        <el-table-column prop="label" :label="t('page.member.mergeItem')" min-width="160" />
+        <el-table-column prop="source" :label="t('page.member.mergeSourceCount')" width="110" align="center" />
+        <el-table-column prop="target" :label="t('page.member.mergeTargetCount')" width="110" align="center" />
+        <el-table-column prop="skipped" :label="t('page.member.mergeSkipped')" width="140" align="center" />
+      </el-table>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="mergeVisible = false">{{ t('common.cancel') }}</el-button>
+          <el-button :loading="mergePreviewLoading" @click="runMergePreview">{{ t('page.member.mergePreview') }}</el-button>
+          <el-button type="primary" :loading="merging" :disabled="!mergePreview" @click="submitMerge">
+            {{ t('page.member.mergeConfirmButton') }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
@@ -195,6 +255,8 @@ import {
   deleteMember,
   listLevelOptions,
   listMembers,
+  mergeMember,
+  previewMemberMerge,
   resetMemberPassword,
   updateMember
 } from '@/api/member'
@@ -411,6 +473,137 @@ async function handleDelete(row) {
   await deleteMember(row.memberId)
   ElMessage.success(t('common.deleteSuccess'))
   await loadList()
+}
+
+/* ==================== 合并账号 ==================== */
+const mergeVisible = ref(false)
+const mergeOptionsLoading = ref(false)
+const mergePreviewLoading = ref(false)
+const merging = ref(false)
+const mergeOptions = ref([])
+const mergePreview = ref(null)
+const mergeSourceRow = ref(null)
+const mergeForm = reactive({ sourceMemberId: '', targetMemberId: '', remark: '' })
+
+const mergeSourceLabel = computed(() => {
+  const row = mergeSourceRow.value
+  return row ? `${row.username}（${row.nickname || '-'}）` : ''
+})
+
+/** 预览结果按行展示；合并时重叠条目会跳过。 */
+const mergePreviewRows = computed(() => {
+  const data = mergePreview.value
+  if (!data) return []
+  return [
+    {
+      label: t('page.member.mergeFavorites'),
+      source: data.favoriteSource,
+      target: data.favoriteTarget,
+      skipped: data.favoriteOverlap
+    },
+    {
+      label: t('page.member.mergeLikes'),
+      source: data.likeSource,
+      target: data.likeTarget,
+      skipped: data.likeOverlap
+    },
+    {
+      label: t('page.member.mergeComments'),
+      source: data.commentSource,
+      target: '-',
+      skipped: 0
+    },
+    {
+      label: t('page.member.mergeSocial'),
+      source: data.socialSource,
+      target: data.socialTarget,
+      skipped: data.socialOverlap
+    }
+  ]
+})
+
+function openMerge(row) {
+  mergePreview.value = null
+  mergeSourceRow.value = row
+  mergeForm.sourceMemberId = String(row.memberId)
+  mergeForm.targetMemberId = ''
+  mergeForm.remark = ''
+  mergeOptions.value = []
+  mergeVisible.value = true
+  searchMergeTargets('')
+}
+
+function resetMerge() {
+  mergePreview.value = null
+  mergeSourceRow.value = null
+  mergeForm.sourceMemberId = ''
+  mergeForm.targetMemberId = ''
+  mergeForm.remark = ''
+  mergeOptions.value = []
+}
+
+/** 目标账号只允许选启用的会员，且不能与旧账号相同。 */
+async function searchMergeTargets(keyword) {
+  mergeOptionsLoading.value = true
+  try {
+    const data = await listMembers({
+      pageNum: 1,
+      pageSize: 20,
+      keyword: keyword || undefined,
+      status: '0'
+    })
+    mergeOptions.value = (data.records || []).filter(
+      (item) => String(item.memberId) !== String(mergeForm.sourceMemberId)
+    )
+  } finally {
+    mergeOptionsLoading.value = false
+  }
+}
+
+async function runMergePreview() {
+  if (!mergeForm.targetMemberId) {
+    ElMessage.warning(t('page.member.mergeTargetRequired'))
+    return
+  }
+  mergePreviewLoading.value = true
+  try {
+    mergePreview.value = await previewMemberMerge(
+      mergeForm.sourceMemberId,
+      mergeForm.targetMemberId
+    )
+  } finally {
+    mergePreviewLoading.value = false
+  }
+}
+
+async function submitMerge() {
+  const preview = mergePreview.value
+  if (!preview) return
+  try {
+    await ElMessageBox.confirm(
+      t('page.member.mergeConfirm', {
+        source: preview.sourceUsername,
+        target: preview.targetUsername
+      }),
+      t('page.member.mergeTitle'),
+      { type: 'warning', confirmButtonText: t('common.confirm'), cancelButtonText: t('common.cancel') }
+    )
+  } catch (e) {
+    return
+  }
+  merging.value = true
+  try {
+    await mergeMember({
+      sourceMemberId: mergeForm.sourceMemberId,
+      targetMemberId: mergeForm.targetMemberId,
+      remark: mergeForm.remark || null
+    })
+    ElMessage.success(t('page.member.mergeSuccess'))
+    mergeVisible.value = false
+    await loadList()
+  } finally {
+    merging.value = false
+  }
 }
 </script>
 

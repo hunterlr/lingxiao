@@ -12,7 +12,8 @@ import type {
   MemberProfileForm,
   MemberRegisterForm,
   MemberResetPasswordForm,
-  MemberSession
+  MemberSession,
+  MemberSetPasswordForm
 } from '~/types/member'
 import type { PageResult } from '~/types/portal'
 
@@ -249,6 +250,20 @@ export function useMemberAuth() {
     clearSession()
   }
 
+  /**
+   * 第三方建号首次设置密码。
+   *
+   * <p>只允许 {@code passwordSet='0'} 的账号调用；成功后保留当前会话，
+   * 因此不清空本地 Token，只把资料标记刷新为已设置。</p>
+   */
+  async function setPassword(form: MemberSetPasswordForm): Promise<void> {
+    await request<void>('/profile/password/set', {
+      method: 'PUT',
+      body: { ...form }
+    })
+    if (profile.value) profile.value = { ...profile.value, passwordSet: '1' }
+  }
+
   function fetchCaptcha(scene: 'login' | 'register' | 'reset'): Promise<MemberCaptcha> {
     return request<MemberCaptcha>('/auth/captcha', { query: { scene } })
   }
@@ -299,6 +314,19 @@ export function useMemberAuth() {
 
   function fetchOAuthBindings(): Promise<MemberOAuthBinding[]> {
     return request<MemberOAuthBinding[]>('/auth/oauth/bindings')
+  }
+
+  /**
+   * 完成“第三方账号命中已有会员”后的绑定。
+   *
+   * <p>必须已用原账号登录；ticket 两分钟有效且只能用一次。绑定成功后
+   * 当前会员新增一种登录方式，不改变会话。</p>
+   */
+  function bindOAuthTicket(ticket: string): Promise<void> {
+    return request<void>('/auth/oauth/bind-ticket', {
+      method: 'POST',
+      body: { ticket }
+    })
   }
 
   function unbindOAuth(provider: string): Promise<void> {
@@ -367,6 +395,7 @@ export function useMemberAuth() {
     ensureProfile,
     updateProfile,
     changePassword,
+    setPassword,
     fetchCaptcha,
     forgotPassword,
     resetPassword,
@@ -374,6 +403,7 @@ export function useMemberAuth() {
     fetchOAuthAuthorizeUrl,
     exchangeOAuthTicket,
     fetchOAuthBindings,
+    bindOAuthTicket,
     unbindOAuth,
     fetchInteraction,
     fetchFavorites,

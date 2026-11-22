@@ -159,6 +159,11 @@ public class StandardOAuthProvider implements MemberOAuthProvider {
         info.setNickname(nickname);
         info.setAvatar(avatar);
         info.setEmail(json.string(user, spec.getEmailPath()));
+        info.setEmailVerified(StringUtils.hasText(spec.getEmailVerifiedPath())
+                && json.bool(user, spec.getEmailVerifiedPath()));
+        info.setMobile(json.string(user, spec.getMobilePath()));
+        info.setMobileVerified(StringUtils.hasText(spec.getMobileVerifiedPath())
+                && json.bool(user, spec.getMobileVerifiedPath()));
         info.setRawData(json.truncate(userBody));
         return info;
     }

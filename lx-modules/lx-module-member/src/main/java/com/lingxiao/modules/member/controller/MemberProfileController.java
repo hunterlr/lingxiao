@@ -5,6 +5,7 @@ import com.lingxiao.common.log.annotation.Log;
 import com.lingxiao.common.log.enums.BusinessType;
 import com.lingxiao.modules.member.dto.MemberInfoVO;
 import com.lingxiao.modules.member.dto.MemberPasswordChangeRequest;
+import com.lingxiao.modules.member.dto.MemberPasswordSetRequest;
 import com.lingxiao.modules.member.dto.MemberProfileUpdateRequest;
 import com.lingxiao.modules.member.service.MemberUserService;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,14 @@ public class MemberProfileController {
     @PutMapping("/password")
     public R<Void> changePassword(@Valid @RequestBody MemberPasswordChangeRequest request) {
         userService.changePassword(request);
+        return R.ok();
+    }
+
+    /** 第三方建号首次设置密码；已设置密码的账号只能走改密接口。 */
+    @Log(title = "会员个人中心", businessType = BusinessType.UPDATE, saveRequestData = false)
+    @PutMapping("/password/set")
+    public R<Void> setPassword(@Valid @RequestBody MemberPasswordSetRequest request) {
+        userService.setPassword(request);
         return R.ok();
     }
 }

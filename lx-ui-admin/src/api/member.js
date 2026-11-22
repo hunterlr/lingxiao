@@ -42,6 +42,18 @@ export function deleteMember(memberId) {
   return http.delete(`/admin/member/${memberId}`)
 }
 
+/** 合并前预览：只读统计收藏 / 点赞 / 评论 / 第三方绑定的迁移与去重数量。 */
+export function previewMemberMerge(sourceMemberId, targetMemberId) {
+  return http.get('/admin/member/merge/preview', {
+    params: { sourceMemberId, targetMemberId }
+  })
+}
+
+/** 执行账号合并：迁移互动与绑定，去重后停用旧账号并踢会话。 */
+export function mergeMember(data) {
+  return http.post('/admin/member/merge', data)
+}
+
 /* ==================== 会员消息通道 ==================== */
 
 export function listMemberChannels() {

@@ -115,6 +115,7 @@ public class AppleOAuthProvider implements MemberOAuthProvider {
         info.setOpenId(openId);
         info.setNickname(nickname);
         info.setEmail(email);
+        info.setEmailVerified(StringUtils.hasText(email) && json.bool(claims, "email_verified"));
         info.setRawData(json.truncate(payload));
         return info;
     }

@@ -90,6 +90,7 @@ useSeoMeta({
               :src="memberAvatar"
               :alt="memberName"
               class="member-avatar"
+              referrerpolicy="no-referrer"
             />
             <span v-else class="member-avatar member-avatar-text" aria-hidden="true">{{ memberInitial }}</span>
             <span class="member-name">{{ memberName }}</span>

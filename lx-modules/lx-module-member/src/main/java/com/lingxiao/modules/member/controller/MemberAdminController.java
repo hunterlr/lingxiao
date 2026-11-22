@@ -7,10 +7,14 @@ import com.lingxiao.common.log.enums.BusinessType;
 import com.lingxiao.common.security.annotation.RequiresPermission;
 import com.lingxiao.modules.member.dto.MemberAdminResetPasswordRequest;
 import com.lingxiao.modules.member.dto.MemberCreateRequest;
+import com.lingxiao.modules.member.dto.MemberMergePreviewVO;
+import com.lingxiao.modules.member.dto.MemberMergeRequest;
+import com.lingxiao.modules.member.dto.MemberMergeResultVO;
 import com.lingxiao.modules.member.dto.MemberStatusRequest;
 import com.lingxiao.modules.member.dto.MemberUpdateRequest;
 import com.lingxiao.modules.member.entity.MemLevel;
 import com.lingxiao.modules.member.entity.MemUser;
+import com.lingxiao.modules.member.service.MemberMergeService;
 import com.lingxiao.modules.member.service.MemberUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -43,6 +47,7 @@ import java.util.List;
 public class MemberAdminController {
 
     private final MemberUserService userService;
+    private final MemberMergeService mergeService;
 
     @RequiresPermission("platform:member:user:list")
     @GetMapping("/list")
@@ -104,5 +109,21 @@ public class MemberAdminController {
     public R<Void> remove(@PathVariable Long memberId) {
         userService.delete(memberId);
         return R.ok();
+    }
+
+    /** 合并前预览：只读统计收藏 / 点赞 / 评论 / 绑定的迁移与去重数量。 */
+    @RequiresPermission("platform:member:user:merge")
+    @GetMapping("/merge/preview")
+    public R<MemberMergePreviewVO> mergePreview(@RequestParam Long sourceMemberId,
+                                                @RequestParam Long targetMemberId) {
+        return R.ok(mergeService.preview(sourceMemberId, targetMemberId));
+    }
+
+    /** 执行合并：迁移互动与绑定，去重后停用旧账号并踢会话。 */
+    @RequiresPermission("platform:member:user:merge")
+    @Log(title = "会员管理", businessType = BusinessType.UPDATE)
+    @PostMapping("/merge")
+    public R<MemberMergeResultVO> merge(@Valid @RequestBody MemberMergeRequest request) {
+        return R.ok(mergeService.merge(request));
     }
 }

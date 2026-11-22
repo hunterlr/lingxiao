@@ -116,7 +116,42 @@ public class FileService {
         } catch (IOException e) {
             throw new ServiceException(ErrorCode.FILE_UPLOAD_FAILED, "读取上传文件失败");
         }
+        return store(bytes, originalName, ext, file.getContentType(), bizType, remark);
+    }
 
+    /**
+     * 以字节数组上传文件。
+     *
+     * <p>供服务端内部转存使用（例如第三方登录头像落地），不经过 multipart；
+     * 校验、秒传、图片处理与 {@link #upload(MultipartFile, String, String)} 完全一致。</p>
+     *
+     * @param bytes        文件内容
+     * @param originalName 原始文件名，用于推断扩展名
+     * @param mime         内容类型，可为空
+     * @param bizType      业务场景，例如 member
+     * @param remark       人可读描述，可为空
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public FileVO uploadBytes(byte[] bytes, String originalName, String mime, String bizType, String remark) {
+        if (bytes == null || bytes.length == 0) {
+            throw new ServiceException(ErrorCode.FILE_UPLOAD_FAILED, "上传文件为空");
+        }
+        long maxSizeMb = resolveMaxSizeMb();
+        if (bytes.length > maxSizeMb * 1024 * 1024) {
+            throw new ServiceException(ErrorCode.FILE_TOO_LARGE,
+                    "文件超过 " + maxSizeMb + "MB 限制");
+        }
+
+        String name = StringUtils.hasText(originalName) ? originalName : "unnamed";
+        String ext = resolveExtension(name);
+        if (!isAllowed(ext)) {
+            throw new ServiceException(ErrorCode.FILE_TYPE_NOT_ALLOWED, "不允许的文件类型: " + ext);
+        }
+        return store(bytes, name, ext, mime, bizType, remark);
+    }
+
+    private FileVO store(byte[] bytes, String originalName, String ext, String mime,
+                         String bizType, String remark) {
         String hash = sha256(bytes);
         SysFile existing = findByHash(hash);
         if (existing != null) {
@@ -147,6 +182,7 @@ public class FileService {
                 processed == null ? null : processed.getMediumBytes(),
                 processed == null ? null : processed.getMediumFormat());
 
+        Long operatorId = safeOperatorId();
         SysFile entity = new SysFile();
         entity.setFileId(IdWorker.getId());
         entity.setStorage(storageService.type());
@@ -156,7 +192,7 @@ public class FileService {
         entity.setDisplayName(originalName);
         entity.setFileName(fileName);
         entity.setExt(ext);
-        entity.setMime(file.getContentType());
+        entity.setMime(mime);
         entity.setSize((long) mainBytes.length);
         entity.setWidth(processed == null ? null : processed.getWidth());
         entity.setHeight(processed == null ? null : processed.getHeight());
@@ -167,10 +203,22 @@ public class FileService {
         entity.setRemark(remark);
         entity.setRefCount(0);
         entity.setStatus("0");
-        entity.setUploaderId(LoginHelper.getUserId());
-        entity.setCreateBy(LoginHelper.getUserId());
+        entity.setUploaderId(operatorId);
+        entity.setCreateBy(operatorId);
         fileMapper.insert(entity);
         return toVO(entity);
+    }
+
+    /**
+     * 平台后台操作人；服务端后台任务（会员头像转存等）没有平台登录态时返回 null，
+     * 不让审计字段阻断上传。
+     */
+    private Long safeOperatorId() {
+        try {
+            return LoginHelper.getUserId();
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     public Resource load(Long fileId) {

@@ -3,15 +3,20 @@ package com.lingxiao.modules.cms.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.modules.cms.dto.CmsArticleRecycleVO;
+import com.lingxiao.modules.cms.dto.CmsArticleVersionVO;
 import com.lingxiao.modules.cms.entity.CmsArticle;
+import com.lingxiao.modules.cms.entity.CmsArticleVersion;
 import com.lingxiao.modules.cms.entity.CmsCategory;
+import com.lingxiao.modules.cms.entity.CmsTag;
 import com.lingxiao.modules.cms.mapper.CmsArticleMapper;
 import com.lingxiao.modules.cms.mapper.CmsArticleTagMapper;
+import com.lingxiao.modules.cms.mapper.CmsArticleVersionMapper;
 import com.lingxiao.modules.cms.mapper.CmsCategoryMapper;
 import com.lingxiao.modules.cms.mapper.CmsTagMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
 import java.time.LocalDateTime;
@@ -44,6 +49,7 @@ class CmsArticleServiceTest {
 
     private CmsArticleMapper articleMapper;
     private CmsArticleTagMapper articleTagMapper;
+    private CmsArticleVersionMapper versionMapper;
     private CmsCategoryMapper categoryMapper;
     private CmsTagMapper tagMapper;
     private CmsSiteService siteService;
@@ -54,12 +60,13 @@ class CmsArticleServiceTest {
     void setUp() {
         articleMapper = mock(CmsArticleMapper.class);
         articleTagMapper = mock(CmsArticleTagMapper.class);
+        versionMapper = mock(CmsArticleVersionMapper.class);
         categoryMapper = mock(CmsCategoryMapper.class);
         tagMapper = mock(CmsTagMapper.class);
         siteService = mock(CmsSiteService.class);
         categoryService = mock(CmsCategoryService.class);
-        service = new CmsArticleService(articleMapper, articleTagMapper, categoryMapper,
-                tagMapper, siteService, categoryService);
+        service = new CmsArticleService(articleMapper, articleTagMapper, versionMapper,
+                categoryMapper, tagMapper, siteService, categoryService);
     }
 
     @Test
@@ -169,9 +176,25 @@ class CmsArticleServiceTest {
         when(articleMapper.countBySlugIncludingDeleted(1L, "hello", 5L)).thenReturn(0L);
         when(articleMapper.restoreById(eq(5L), isNull(), any())).thenReturn(1);
 
+        CmsArticle restored = new CmsArticle();
+        restored.setArticleId(5L);
+        restored.setSiteId(1L);
+        restored.setTitle("恢复文章");
+        restored.setSlug("hello");
+        restored.setStatus(CmsArticleService.STATUS_DRAFT);
+        when(articleMapper.selectById(5L)).thenReturn(restored);
+        when(articleTagMapper.selectTagIds(5L)).thenReturn(Collections.emptyList());
+        when(versionMapper.selectLatestHash(5L)).thenReturn(null);
+        when(versionMapper.selectMaxVersionNo(5L)).thenReturn(0);
+        when(versionMapper.insert(any())).thenReturn(1);
+
         service.restore(5L);
 
         verify(articleMapper).restoreById(eq(5L), isNull(), any());
+        ArgumentCaptor<CmsArticleVersion> captor =
+                ArgumentCaptor.forClass(CmsArticleVersion.class);
+        verify(versionMapper).insert(captor.capture());
+        assertThat(captor.getValue().getChangeType()).isEqualTo(CmsArticleService.VERSION_RESTORE);
     }
 
     @Test
@@ -184,8 +207,9 @@ class CmsArticleServiceTest {
 
         service.purge(5L);
 
-        InOrder order = inOrder(articleTagMapper, articleMapper);
+        InOrder order = inOrder(articleTagMapper, versionMapper, articleMapper);
         order.verify(articleTagMapper).deleteByArticleId(5L);
+        order.verify(versionMapper).deleteByArticleId(5L);
         order.verify(articleMapper).hardDeleteDeletedById(5L);
     }
 
@@ -334,18 +358,34 @@ class CmsArticleServiceTest {
     }
 
     @Test
-    @DisplayName("到点扫描：只统计真正抢占成功的文章")
+    @DisplayName("到点扫描：只统计真正抢占成功的文章，成功才写发布快照")
     void publishDueScheduledCountsClaimedRows() {
         when(articleMapper.selectDueScheduledIds(any(), eq(200)))
                 .thenReturn(Arrays.asList(5L, 6L));
         when(articleMapper.publishScheduledById(eq(5L), any())).thenReturn(1);
         when(articleMapper.publishScheduledById(eq(6L), any())).thenReturn(0);
 
-        int published = service.publishDueScheduled(200);
+        CmsArticle published = new CmsArticle();
+        published.setArticleId(5L);
+        published.setSiteId(1L);
+        published.setTitle("到点文章");
+        published.setStatus(CmsArticleService.STATUS_PUBLISHED);
+        when(articleMapper.selectById(5L)).thenReturn(published);
+        when(articleTagMapper.selectTagIds(5L)).thenReturn(Collections.emptyList());
+        when(versionMapper.selectLatestHash(5L)).thenReturn(null);
+        when(versionMapper.selectMaxVersionNo(5L)).thenReturn(0);
+        when(versionMapper.insert(any())).thenReturn(1);
 
-        assertThat(published).isEqualTo(1);
+        int publishedCount = service.publishDueScheduled(200);
+
+        assertThat(publishedCount).isEqualTo(1);
         verify(articleMapper).publishScheduledById(eq(5L), any());
         verify(articleMapper).publishScheduledById(eq(6L), any());
+        ArgumentCaptor<CmsArticleVersion> captor =
+                ArgumentCaptor.forClass(CmsArticleVersion.class);
+        verify(versionMapper).insert(captor.capture());
+        assertThat(captor.getValue().getChangeType()).isEqualTo(CmsArticleService.VERSION_PUBLISH);
+        assertThat(captor.getValue().getStatus()).isEqualTo(CmsArticleService.STATUS_PUBLISHED);
     }
 
     @Test
@@ -358,10 +398,228 @@ class CmsArticleServiceTest {
         verify(articleMapper, never()).publishScheduledById(anyLong(), any());
     }
 
+    /* ==================== 内容版本 ==================== */
+
+    @Test
+    @DisplayName("版本列表：校验文章存在后透传分页")
+    void versionPagePassesThrough() {
+        CmsArticle article = new CmsArticle();
+        article.setArticleId(5L);
+        when(articleMapper.selectById(5L)).thenReturn(article);
+        CmsArticleVersionVO row = new CmsArticleVersionVO();
+        row.setVersionId(50L);
+        row.setVersionNo(3);
+        Page<CmsArticleVersionVO> dbPage = new Page<>(1, 20);
+        dbPage.setTotal(1);
+        dbPage.setRecords(Collections.singletonList(row));
+        when(versionMapper.selectVersionPage(any(), eq(5L))).thenReturn(dbPage);
+
+        CmsArticleVersionVO result = service.versionPage(5L, 1, 20).getRecords().get(0);
+
+        assertThat(result.getVersionNo()).isEqualTo(3);
+        verify(versionMapper).selectVersionPage(any(), eq(5L));
+    }
+
+    @Test
+    @DisplayName("版本详情：读取侧清洗正文并回填标签")
+    void versionDetailSanitizesContent() {
+        CmsArticle article = new CmsArticle();
+        article.setArticleId(5L);
+        when(articleMapper.selectById(5L)).thenReturn(article);
+        CmsArticleVersion version = new CmsArticleVersion();
+        version.setVersionId(50L);
+        version.setArticleId(5L);
+        version.setContent("<p>old</p><script>x</script>");
+        version.setTagIds("7,8");
+        when(versionMapper.selectById(50L)).thenReturn(version);
+
+        CmsArticleVersion detail = service.versionDetail(5L, 50L);
+
+        assertThat(detail.getContent()).contains("<p>old</p>").doesNotContain("<script");
+        assertThat(detail.getTagIdList()).containsExactly(7L, 8L);
+    }
+
+    @Test
+    @DisplayName("版本详情：版本不属于该文章时按不存在处理")
+    void versionDetailRejectsAnotherArticle() {
+        CmsArticle article = new CmsArticle();
+        article.setArticleId(5L);
+        when(articleMapper.selectById(5L)).thenReturn(article);
+        CmsArticleVersion version = new CmsArticleVersion();
+        version.setVersionId(50L);
+        version.setArticleId(6L);
+        when(versionMapper.selectById(50L)).thenReturn(version);
+
+        ServiceException error = catchThrowableOfType(
+                () -> service.versionDetail(5L, 50L), ServiceException.class);
+
+        assertThat(error).isNotNull();
+        assertThat(error.getMessage()).contains("版本不存在");
+    }
+
+    @Test
+    @DisplayName("回滚：版本不存在时 404")
+    void rollbackMissingVersion() {
+        CmsArticle article = new CmsArticle();
+        article.setArticleId(5L);
+        when(articleMapper.selectById(5L)).thenReturn(article);
+        when(versionMapper.selectById(50L)).thenReturn(null);
+
+        ServiceException error = catchThrowableOfType(
+                () -> service.rollback(5L, 50L), ServiceException.class);
+
+        assertThat(error).isNotNull();
+        assertThat(error.getMessage()).contains("版本不存在");
+        verify(articleMapper, never()).updateById(any());
+    }
+
+    @Test
+    @DisplayName("回滚：版本中的栏目已删除时拒绝")
+    void rollbackRejectsMissingCategory() {
+        CmsArticle article = new CmsArticle();
+        article.setArticleId(5L);
+        article.setSiteId(1L);
+        when(articleMapper.selectById(5L)).thenReturn(article);
+        CmsArticleVersion version = new CmsArticleVersion();
+        version.setVersionId(50L);
+        version.setArticleId(5L);
+        version.setCategoryId(8L);
+        when(versionMapper.selectById(50L)).thenReturn(version);
+        when(categoryMapper.selectById(8L)).thenReturn(null);
+
+        ServiceException error = catchThrowableOfType(
+                () -> service.rollback(5L, 50L), ServiceException.class);
+
+        assertThat(error).isNotNull();
+        assertThat(error.getMessage()).contains("栏目已删除");
+        verify(articleMapper, never()).updateById(any());
+    }
+
+    @Test
+    @DisplayName("回滚：slug 被其它文章占用时拒绝")
+    void rollbackRejectsSlugConflict() {
+        CmsArticle article = new CmsArticle();
+        article.setArticleId(5L);
+        article.setSiteId(1L);
+        when(articleMapper.selectById(5L)).thenReturn(article);
+        CmsArticleVersion version = new CmsArticleVersion();
+        version.setVersionId(50L);
+        version.setArticleId(5L);
+        version.setCategoryId(8L);
+        version.setSlug("old-slug");
+        when(versionMapper.selectById(50L)).thenReturn(version);
+        when(categoryMapper.selectById(8L)).thenReturn(category(8L, 1L));
+        when(articleMapper.countBySlugIncludingDeleted(1L, "old-slug", 5L)).thenReturn(1L);
+
+        ServiceException error = catchThrowableOfType(
+                () -> service.rollback(5L, 50L), ServiceException.class);
+
+        assertThat(error).isNotNull();
+        assertThat(error.getMessage()).contains("slug 已存在");
+        verify(articleMapper, never()).updateById(any());
+    }
+
+    @Test
+    @DisplayName("回滚：覆盖内容、回到草稿并写一条 rollback 快照")
+    void rollbackAppliesVersionAndSnapshots() {
+        CmsArticle current = new CmsArticle();
+        current.setArticleId(5L);
+        current.setSiteId(1L);
+        current.setCategoryId(9L);
+        current.setTitle("当前标题");
+        current.setSlug("current");
+        current.setStatus(CmsArticleService.STATUS_PUBLISHED);
+        when(articleMapper.selectById(5L)).thenReturn(current);
+
+        CmsArticleVersion version = new CmsArticleVersion();
+        version.setVersionId(50L);
+        version.setArticleId(5L);
+        version.setCategoryId(8L);
+        version.setTitle("旧标题");
+        version.setSlug("old-slug");
+        version.setSummary("旧摘要");
+        version.setContent("<p>旧正文</p><script>x</script>");
+        version.setSource("旧来源");
+        version.setTagIds("7,8");
+        when(versionMapper.selectById(50L)).thenReturn(version);
+        when(categoryMapper.selectById(8L)).thenReturn(category(8L, 1L));
+        when(articleMapper.countBySlugIncludingDeleted(1L, "old-slug", 5L)).thenReturn(0L);
+        when(articleMapper.updateById(any())).thenReturn(1);
+        when(tagMapper.selectBatchIds(any())).thenReturn(Arrays.asList(tag(7L, 1L), tag(8L, 1L)));
+        when(articleTagMapper.selectTagIds(5L)).thenReturn(Arrays.asList(8L, 7L));
+        when(versionMapper.selectLatestHash(5L)).thenReturn(null);
+        when(versionMapper.selectMaxVersionNo(5L)).thenReturn(3);
+        when(versionMapper.insert(any())).thenReturn(1);
+
+        service.rollback(5L, 50L);
+
+        ArgumentCaptor<CmsArticle> articleCaptor = ArgumentCaptor.forClass(CmsArticle.class);
+        verify(articleMapper).updateById(articleCaptor.capture());
+        CmsArticle saved = articleCaptor.getValue();
+        assertThat(saved.getStatus()).isEqualTo(CmsArticleService.STATUS_DRAFT);
+        assertThat(saved.getTitle()).isEqualTo("旧标题");
+        assertThat(saved.getSlug()).isEqualTo("old-slug");
+        assertThat(saved.getContent()).contains("旧正文").doesNotContain("<script");
+
+        ArgumentCaptor<CmsArticleVersion> versionCaptor =
+                ArgumentCaptor.forClass(CmsArticleVersion.class);
+        verify(versionMapper).insert(versionCaptor.capture());
+        assertThat(versionCaptor.getValue().getChangeType()).isEqualTo(CmsArticleService.VERSION_ROLLBACK);
+        assertThat(versionCaptor.getValue().getVersionNo()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("编辑：内容变化后写 edit 快照并清洗正文")
+    void updateCreatesEditSnapshot() {
+        CmsArticle existing = new CmsArticle();
+        existing.setArticleId(5L);
+        existing.setSiteId(1L);
+        existing.setCategoryId(9L);
+        existing.setTitle("旧标题");
+        existing.setSlug("slug");
+        existing.setStatus(CmsArticleService.STATUS_DRAFT);
+        existing.setContent("<p>v1</p>");
+        when(articleMapper.selectById(5L)).thenReturn(existing);
+        when(categoryMapper.selectById(9L)).thenReturn(category(9L, 1L));
+        when(articleMapper.countBySlugIncludingDeleted(1L, "slug", 5L)).thenReturn(0L);
+        when(articleMapper.updateById(any())).thenReturn(1);
+        when(tagMapper.selectBatchIds(any())).thenReturn(Collections.singletonList(tag(7L, 1L)));
+        when(articleTagMapper.selectTagIds(5L)).thenReturn(Collections.singletonList(7L));
+        when(versionMapper.selectLatestHash(5L)).thenReturn(null);
+        when(versionMapper.selectMaxVersionNo(5L)).thenReturn(0);
+        when(versionMapper.insert(any())).thenReturn(1);
+
+        CmsArticle request = new CmsArticle();
+        request.setCategoryId(9L);
+        request.setTitle("新标题");
+        request.setSlug("slug");
+        request.setContent("<p>v2</p><script>x</script>");
+        request.setTagIds(Collections.singletonList(7L));
+
+        service.update(5L, request);
+
+        ArgumentCaptor<CmsArticleVersion> captor =
+                ArgumentCaptor.forClass(CmsArticleVersion.class);
+        verify(versionMapper).insert(captor.capture());
+        CmsArticleVersion snapshot = captor.getValue();
+        assertThat(snapshot.getChangeType()).isEqualTo(CmsArticleService.VERSION_EDIT);
+        assertThat(snapshot.getVersionNo()).isEqualTo(1);
+        assertThat(snapshot.getTitle()).isEqualTo("新标题");
+        assertThat(snapshot.getContent()).contains("v2").doesNotContain("<script");
+        assertThat(snapshot.getTagIds()).isEqualTo("7");
+    }
+
     private CmsCategory category(Long id, Long siteId) {
         CmsCategory category = new CmsCategory();
         category.setCategoryId(id);
         category.setSiteId(siteId);
         return category;
+    }
+
+    private CmsTag tag(Long id, Long siteId) {
+        CmsTag tag = new CmsTag();
+        tag.setTagId(id);
+        tag.setSiteId(siteId);
+        return tag;
     }
 }

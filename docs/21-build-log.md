@@ -5256,3 +5256,133 @@ ext IN ('jpg','jpeg','png','gif','bmp','webp','svg')
 | 通知 | 发布成功 / 失败只进日志，无站内信；失败下一轮重试 |
 | 时区 | 按服务器本地时区解释，站点级时区未做 |
 | 内容版本 | 排期发布的是“到点时最新内容”；版本快照仍待做 |
+
+---
+
+## 54. CMS 文章内容版本（2026-11-22）
+
+### 54.1 背景与范围
+
+回收站、定时发布之后，内容生命周期补上最后一环：**文章内容版本**。
+目标是编辑误删、改错、误发布时能找回旧稿，而不是做完整的 CMS 审计平台。
+
+- 只做文章：标题 / slug / 摘要 / 封面 / 正文 / 来源 / 栏目 / 标签 / 状态；
+- 不做站点、栏目、标签版本；
+- 不做版本对比（diff）、不做人工命名版本、不做版本保留期界面；
+- 不引入外部依赖，版本号与去重都在应用层完成。
+
+### 54.2 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `V24__cms_article_version.sql` | `cms_article_version` 表、`(article_id, version_no)` 唯一键、按钮 3054 / 3055 |
+| 实体 | `CmsArticleVersion` | 不可变快照；`tagIds` 逗号分隔，`tagIdList` 为详情回填字段 |
+| DTO | `CmsArticleVersionVO` | 列表行，不返回正文 |
+| Mapper | `CmsArticleVersionMapper` | `selectVersionPage` / `selectMaxVersionNo` / `selectLatestHash` / `deleteUpToVersion` / `deleteByArticleId` |
+| Service | `CmsArticleService` | `versionPage` / `versionDetail` / `rollback`；创建 / 编辑 / 发布 / 回滚 / 恢复后 `snapshot` |
+| Controller | `CmsArticleController` | 版本列表 / 详情 / 回滚三个接口，权限码 `version` / `rollback` |
+| 配置 | `application.yml` | `lx.cms.version-keep=30` |
+| 前端接口 | `api/cms.js` | `listArticleVersions` / `getArticleVersion` / `rollbackArticleVersion` |
+| 前端页面 | `views/cms/article/index.vue` | 行内「历史版本」抽屉、详情弹窗、回滚确认、最新版本禁用回滚 |
+| 单测 | `CmsArticleServiceTest` | 27 项（新增 8 项版本相关） |
+
+### 54.3 关键决策
+
+1. **快照不可变。**
+   版本行只增不改；回滚本身也写一条 `rollback` 版本，历史链条不会断。
+2. **版本只覆盖内容字段。**
+   排序、备注、作者、浏览量不进快照；回滚不会覆盖运营后来调整的元数据。
+3. **SHA-256 相邻去重。**
+   哈希包含内容、标签和状态：连续保存相同内容不产生版本；发布、恢复这类
+   状态变化仍会留痕。
+4. **回滚统一回草稿。**
+   不自动重新发布；`publish_time` 保留，`schedule_time` 清空。
+5. **回滚前校验。**
+   版本必须属于该文章；栏目必须存在且同站点；slug 不能被其它文章（含回收站）占用。
+6. **标签宽松恢复。**
+   已删除 / 跨站点的标签跳过并记日志，正文优先恢复。
+7. **按文章限量保留。**
+   默认最近 30 个版本，超出删最旧；文章彻底删除时清空全部版本。
+8. **列表不查正文。**
+   版本列表只出摘要；正文详情读取时再清洗一次。
+9. **最新版本禁止回滚。**
+   前端对第一行禁用回滚按钮，避免“回滚到当前内容”这种无意义操作。
+
+### 54.4 施工步骤
+
+1. **数据库**
+   - 建 `cms_article_version`，唯一键 `(article_id, version_no)`；
+   - 插按钮 3054 `cms:article:version`、3055 `cms:article:rollback`，补超管授权；
+   - SQL 继续用 `INSERT ... SELECT ... WHERE NOT EXISTS`，不用 MySQL 方言。
+2. **后端**
+   - 实体 / VO / Mapper 显式 SQL；
+   - `snapshot` 在创建、编辑、发布、回滚、回收站恢复后调用；
+   - `rollback` 覆盖内容、清定时、回草稿，写 `rollback` 快照；
+   - `purge` 先清标签关联与版本，再物理删文章；
+   - `version-keep` 超限后删最旧版本。
+3. **前端**
+   - 行内新增「历史版本」按钮，打开抽屉；
+   - 抽屉展示版本号、变更类型、标题、状态、操作人、时间；
+   - 版本详情弹窗展示元信息与清洗后的正文；
+   - 回滚二次确认，成功后刷新版本列表与文章列表；
+   - 中英文文案补齐，i18n 键 1051 → 1068。
+
+### 54.5 验证
+
+**A. 后端**
+
+- `mvn -q -pl lx-modules/lx-module-cms -am test` 通过；
+- 全仓 `mvn clean test`：JDK 8 / JDK 11 各一遍，**156 项 / 28 类**，0 失败 0 错误；
+- `mvn -q -DskipTests package` 通过；Flyway 执行到 V24，应用正常启动；
+- 菜单 3054 / 3055 与 `role_id=1` 授权已落库。
+
+**B. 接口 42/42**
+
+`.local/cms-version-check.mjs`：
+
+- 创建自动写 `create`；编辑写 `edit`；相同内容重复保存不新增；
+- 版本分页 `pageSize=1` 返回 1 条、total 正确；
+- 版本详情返回旧标题 / 旧正文，正文中的 `<script>` 被清洗；
+- 回滚恢复标题、正文与草稿状态，写 `rollback`；重复回滚同一版本被去重；
+- 发布写 `publish`；回收站恢复写 `restore`；已发布文章回滚回草稿；
+- 其它文章的版本号读取 / 回滚都 404；
+- slug 被占用时回滚拒绝；
+- 彻底删除后版本行全部清零。
+
+**C. 浏览器 9/9**
+
+`.local/uitest/cms-version.mjs`：
+
+- 文章行出现「历史版本」；抽屉提示与版本顺序正确（发布 / 编辑 / 创建）；
+- 最新版本回滚按钮禁用；
+- 版本详情展示旧正文；
+- 回滚确认后抽屉第一行变「回滚」，主列表变为「草稿」；
+- 页面 Token 复核后端内容与状态已回滚。
+
+截图：`.local/uitest/cms-version.png`（版本抽屉）。
+
+**D. 前端**
+
+- `node scripts/check-i18n-keys.mjs`：zh=1068、en=1068，无 missing / 单边 / dotted-leaf；
+- `npm run build` 通过。
+
+### 54.6 踩坑
+
+| 问题 | 处理 |
+|---|---|
+| 编辑接口 `@Valid` 要求 `siteId`，但服务层不允许改站点 | 版本验收脚本编辑时仍传 `siteId`；真实前端表单本来就带 |
+| `PageResult.total` JSON 里是字符串 | 验收脚本统一 `Number(total)` 比较，不能直接 `=== 1` |
+| 浏览器登录会踢掉 API Token（单会话策略） | 页面内的最终复核用 `localStorage` 的 Token 发请求，清理阶段再刷新 API Token |
+| 恢复快照可能被哈希去重 | 恢复前若最新版本已是草稿且内容相同，不重复记版本；验收按“发布 → 删除 → 恢复”构造状态差 |
+| 用 PowerShell `Set-Content` 改含中文的 `.mjs` 会乱码 | 中文脚本一律用 UTF-8 写入工具或 Node 生成，不用 PS 的默认编码读改写 |
+
+### 54.7 遗留
+
+| 项 | 说明 |
+|---|---|
+| 版本范围 | 仅文章内容；站点 / 栏目 / 标签无版本 |
+| 对比能力 | 无 diff、无并排对比、无人工作版本备注 |
+| 回滚语义 | 统一回草稿，不自动发布、不恢复定时 |
+| 保留策略 | 只按数量截断（默认 30），没有按时间 / 存储量的清理界面 |
+| 数据范围 | 版本列表与其它 CMS 列表一致，暂未接数据范围 |
+| 后续方向 | v1.2 会员体系；内容级多语言与门户工程按 v1.3 计划推进 |

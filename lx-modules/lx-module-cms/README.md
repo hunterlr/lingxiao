@@ -3,9 +3,9 @@
 ## 这个目录是做什么的
 
 后台内容管理：站点 → 栏目树 → 文章 → 标签。v1.1 已做**后台维护链路 + 门户只读接口 +
-素材选择器 + 文章回收站 + 定时发布**，不包含门户渲染、内容版本和内容级多语言。
+素材选择器 + 文章回收站 + 定时发布 + 内容版本**，不包含门户渲染和内容级多语言。
 
-**已实装（v1.1 第一刀 + 门户 API + 回收站 + 定时发布，2026-11-22）**：
+**已实装（v1.1 第一刀 + 门户 API + 回收站 + 定时发布 + 内容版本，2026-11-22）**：
 
 - 站点 CRUD（站点标识、名称、域名、Logo、SEO、状态）；
 - 栏目树 CRUD（`parent_id` + 闭包表，成环校验、跨站点父级拒绝）；
@@ -14,6 +14,7 @@
 - 删除保护：站点 / 栏目 / 标签被引用时拒绝删除；
 - 文章回收站：软删除、记录删除人 / 时间、恢复回草稿、彻底删除；
 - 定时发布：一次性排期，后台任务到点自动发布，支持改期 / 取消；
+- 内容版本：创建 / 编辑 / 发布 / 回滚 / 恢复自动快照，可按版本回滚；
 - 后台页面五个：站点、栏目、文章、标签、回收站；菜单与按钮权限随模块开关下线；
 - 门户只读接口 `/api/portal/cms/**`：站点、导航树、标签、文章列表 / 详情 / 搜索；
 - 素材选择器：站点 Logo、栏目封面、文章封面接文件中心图片库。
@@ -21,7 +22,7 @@
 **明确未做（后置）**：
 
 - Nuxt3 门户工程、SEO / sitemap / 静态化（v1.3 前）；
-- 内容版本、回收站保留期 / 自动清理、定时下线 / 周期发布；
+- 回收站保留期 / 自动清理、定时下线 / 周期发布、版本对比（diff）；
 - `cms_content_ext` 自定义字段；
 - 内容级多语言（L3，`i18n_*` 表）。
 
@@ -48,25 +49,27 @@ com.lingxiao.modules.cms
 │  ├─ CmsSiteController      站点列表 / 选项 / 详情 / 增删改
 │  ├─ CmsCategoryController  栏目树 / 平铺列表 / 详情 / 增删改
 │  ├─ CmsTagController       标签分页 / 选项 / 增删改
-│  ├─ CmsArticleController   文章分页 / 详情 / 增删改 / 发布 / 下线 / 定时 / 回收站
+│  ├─ CmsArticleController   文章分页 / 详情 / 增删改 / 发布 / 下线 / 定时 / 版本 / 回收站
 │  └─ CmsPortalController    门户只读接口（/api/portal/cms/**，无需登录）
 ├─ service/
 │  ├─ CmsSiteService         站点 CRUD、删除保护
 │  ├─ CmsCategoryService     栏目树、闭包全量重建、成环与跨站点校验
 │  ├─ CmsTagService          标签 CRUD、被引用检查
-│  ├─ CmsArticleService      正文清洗、状态流转、slug 唯一、标签同站校验、回收站、定时发布
+│  ├─ CmsArticleService      正文清洗、状态流转、slug 唯一、标签同站校验、回收站、定时发布、内容版本
 │  └─ CmsPortalService       门户可见性、字段白名单、阅读量、子树 / 标签筛选
 ├─ task/CmsScheduleTask      到点扫描与自动发布（CMS 开启才注册）
 ├─ dto/CmsArticleRecycleVO   回收站列表行
 ├─ dto/CmsArticleScheduleDTO 定时发布请求
+├─ dto/CmsArticleVersionVO   版本列表行（不带正文）
 ├─ dto/portal/               门户 VO（站点 / 栏目 / 标签 / 摘要 / 详情）
-├─ entity/                   CmsSite / CmsCategory / CmsArticle / CmsTag
-├─ mapper/                   MyBatis-Plus Mapper（含 hardDelete、标签 EXISTS 过滤、回收站 / 排期 SQL）
+├─ entity/                   CmsSite / CmsCategory / CmsArticle / CmsTag / CmsArticleVersion
+├─ mapper/                   MyBatis-Plus Mapper（含 hardDelete、标签 EXISTS 过滤、回收站 / 排期 / 版本 SQL）
 └─ resources/db/migration/cms/
    ├─ V20__cms_schema.sql    6 张 cms_* 表
    ├─ V21__cms_menu.sql      菜单 3000+ 与按钮权限，module_code='cms'
    ├─ V22__cms_article_recycle.sql  回收站审计列、索引、菜单 3050~3052
-   └─ V23__cms_article_schedule.sql 排期时间、索引、按钮 3053
+   ├─ V23__cms_article_schedule.sql 排期时间、索引、按钮 3053
+   └─ V24__cms_article_version.sql  内容版本表、按钮 3054~3055
 ```
 
 ## 数据模型
@@ -77,6 +80,7 @@ com.lingxiao.modules.cms
 | `cms_category` | 栏目；`parent_id=0` 表示根，`(site_id, category_key)` 唯一 |
 | `cms_category_closure` | 栏目闭包：`category_id / ancestor_id / depth`，只用于子树 / 祖先查询 |
 | `cms_article` | 文章；`status` 0 草稿 / 1 已发布 / 2 已下线 / 3 定时待发布；`schedule_time` 仅状态 3 有效 |
+| `cms_article_version` | 文章内容快照；`(article_id, version_no)` 唯一，`content_hash` 用于相邻去重 |
 | `cms_tag` | 标签；`(site_id, tag_key)` 唯一 |
 | `cms_article_tag` | 文章与标签多对多 |
 
@@ -127,6 +131,20 @@ com.lingxiao.modules.cms
 - 扫描参数在 `application.yml`：`lx.cms.schedule-scan-interval-ms`（默认 30000）、
   `schedule-scan-initial-delay-ms`（默认 15000）、`schedule-batch-size`（默认 200）。
 
+## 内容版本
+
+- 创建 / 编辑 / 发布 / 回滚 / 回收站恢复后自动写一条不可变快照；
+- 快照只覆盖内容字段（标题 / slug / 摘要 / 封面 / 正文 / 来源 / 栏目 / 标签 / 状态），
+  排序 / 备注 / 作者等元数据不进版本；
+- `content_hash` 对内容 + 标签 + 状态做 SHA-256，连续保存相同内容不产生新版本；
+- `GET /api/admin/cms/article/{id}/versions`：分页列表，不返回正文；
+- `GET /api/admin/cms/article/{id}/versions/{versionId}`：详情，正文读取时再清洗；
+- `PUT /api/admin/cms/article/{id}/versions/{versionId}/rollback`：回滚；
+- 回滚统一回草稿、保留 `publish_time`、清空 `schedule_time`；
+  版本必须属于该文章，栏目必须存在且同站点，slug 不能被其它文章占用；
+- 标签已删除或跨站点时跳过，不阻断正文回滚；
+- 默认每篇保留最近 30 个版本（`lx.cms.version-keep`），彻底删除文章时清空版本。
+
 ## 回收站
 
 - `DELETE /api/admin/cms/article/{id}` 只写 `del_flag='1'` 与删除人 / 时间快照，
@@ -160,6 +178,9 @@ com.lingxiao.modules.cms
 | `PUT /api/admin/cms/article/{id}/offline` | `platform:cms:article:offline` |
 | `PUT /api/admin/cms/article/{id}/schedule` | `platform:cms:article:schedule` |
 | `PUT /api/admin/cms/article/{id}/schedule/cancel` | `platform:cms:article:schedule` |
+| `GET /api/admin/cms/article/{id}/versions` | `platform:cms:article:version` |
+| `GET /api/admin/cms/article/{id}/versions/{versionId}` | `platform:cms:article:version` |
+| `PUT /api/admin/cms/article/{id}/versions/{versionId}/rollback` | `platform:cms:article:rollback` |
 | `GET /api/admin/cms/article/recycle/list` | `platform:cms:article:recycle` |
 | `PUT /api/admin/cms/article/{id}/restore` | `platform:cms:article:restore` |
 | `DELETE /api/admin/cms/article/{id}/purge` | `platform:cms:article:purge` |
@@ -167,8 +188,8 @@ com.lingxiao.modules.cms
 | `POST/PUT/DELETE /api/admin/cms/tag` | `tag:add` / `tag:edit` / `tag:remove` |
 
 权限码沿用 v1.0 的 `list / add / edit / remove` 风格；
-文章额外拆 `publish` / `offline` / `schedule` / `recycle` / `restore` / `purge`，
-方便“编辑能改稿、发布只给主编、彻底删除只给管理员”。
+文章额外拆 `publish` / `offline` / `schedule` / `version` / `rollback` /
+`recycle` / `restore` / `purge`，方便“编辑能改稿、发布只给主编、回滚和彻底删除只给管理员”。
 
 ## 门户接口（公开只读）
 
@@ -207,7 +228,7 @@ com.lingxiao.modules.cms
 lx-ui-admin/src/views/cms/
 ├─ site/index.vue       站点：搜索、表格、弹窗表单
 ├─ category/index.vue   栏目：树表、新增根 / 子栏目、父栏目树选择
-├─ article/index.vue    文章：筛选、列表、富文本编辑、发布 / 下线 / 定时、预览、回收站入口
+├─ article/index.vue    文章：筛选、列表、富文本编辑、发布 / 下线 / 定时、历史版本、预览、回收站入口
 ├─ recycle/index.vue    回收站：删除审计、恢复、彻底删除
 └─ tag/index.vue        标签：分页、增删改
 ```
@@ -222,7 +243,7 @@ lx-ui-admin/src/views/cms/
 | 站点 | 仍有文章（含回收站）或栏目 |
 | 栏目 | 仍有子栏目或文章（含回收站） |
 | 标签 | 仍被文章引用（回收站文章也算） |
-| 文章 | 删除只进回收站；彻底删除仅限回收站记录，先清 `cms_article_tag` 再删正文 |
+| 文章 | 删除只进回收站；彻底删除仅限回收站记录，先清 `cms_article_tag` 与 `cms_article_version` 再删正文 |
 
 ## 验证
 
@@ -245,6 +266,9 @@ node .local\cms-recycle-check.mjs
 # 定时发布：39 项
 node .local\cms-schedule-check.mjs
 
+# 内容版本：42 项
+node .local\cms-version-check.mjs
+
 # 浏览器：13 项
 cd .local\uitest; node cms-ui.mjs
 
@@ -257,12 +281,15 @@ cd .local\uitest; node cms-recycle.mjs
 # 定时发布浏览器：10 项
 cd .local\uitest; node cms-schedule.mjs
 
+# 内容版本浏览器：9 项
+cd .local\uitest; node cms-version.mjs
+
 # 模块关闭：接口 404、菜单 / 路由消失、数据保留
 cd .local\uitest; node cms-disabled.mjs
 node .local\portal-disabled.mjs
 ```
 
-2026-11-22 结果：36 项单测（后台 28 + 门户 8）；后台接口 34/34；门户接口 38/38；
+2026-11-22 结果：44 项单测（后台 36 + 门户 8）；后台接口 34/34；门户接口 38/38；
 素材选择器接口 16/16、浏览器 6/6；回收站接口 33/33、浏览器 12/12；
-定时发布接口 39/39、浏览器 10/10；后台浏览器 13/13；
+定时发布接口 39/39、浏览器 10/10；内容版本接口 42/42、浏览器 9/9；后台浏览器 13/13；
 关闭态门户 / 后台接口均 404（5/5），重新开启后数据保留。

@@ -7,7 +7,9 @@ import com.lingxiao.common.log.enums.BusinessType;
 import com.lingxiao.common.security.annotation.RequiresPermission;
 import com.lingxiao.modules.cms.dto.CmsArticleRecycleVO;
 import com.lingxiao.modules.cms.dto.CmsArticleScheduleDTO;
+import com.lingxiao.modules.cms.dto.CmsArticleVersionVO;
 import com.lingxiao.modules.cms.entity.CmsArticle;
+import com.lingxiao.modules.cms.entity.CmsArticleVersion;
 import com.lingxiao.modules.cms.service.CmsArticleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -64,6 +66,33 @@ public class CmsArticleController {
     @GetMapping("/{articleId}")
     public R<CmsArticle> detail(@PathVariable Long articleId) {
         return R.ok(articleService.detail(articleId));
+    }
+
+    /** 历史版本列表：只出摘要，正文按版本详情单独读取。 */
+    @RequiresPermission("platform:cms:article:version")
+    @GetMapping("/{articleId}/versions")
+    public R<PageResult<CmsArticleVersionVO>> versions(
+            @PathVariable Long articleId,
+            @RequestParam(defaultValue = "1") long pageNum,
+            @RequestParam(defaultValue = "20") long pageSize) {
+        return R.ok(articleService.versionPage(articleId, pageNum, pageSize));
+    }
+
+    @RequiresPermission("platform:cms:article:version")
+    @GetMapping("/{articleId}/versions/{versionId}")
+    public R<CmsArticleVersion> versionDetail(@PathVariable Long articleId,
+                                              @PathVariable Long versionId) {
+        return R.ok(articleService.versionDetail(articleId, versionId));
+    }
+
+    /** 回滚：覆盖当前内容并回到草稿，需要重新发布才对外可见。 */
+    @RequiresPermission("platform:cms:article:rollback")
+    @Log(title = "CMS 文章版本回滚", businessType = BusinessType.UPDATE)
+    @PutMapping("/{articleId}/versions/{versionId}/rollback")
+    public R<Void> rollback(@PathVariable Long articleId,
+                            @PathVariable Long versionId) {
+        articleService.rollback(articleId, versionId);
+        return R.ok();
     }
 
     @RequiresPermission("platform:cms:article:add")

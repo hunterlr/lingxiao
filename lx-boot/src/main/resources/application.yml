@@ -189,6 +189,8 @@ lx:
     schedule-scan-initial-delay-ms: 15000
     # 单轮最多发布多少篇：积压时下一轮继续，避免一次大事务拖住数据库
     schedule-batch-size: 200
+    # 每篇文章保留的历史版本数：超出后删最旧的，避免正文快照无限增长
+    version-keep: 30
 
 logging:
   level:

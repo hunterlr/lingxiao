@@ -97,12 +97,20 @@
         </el-table-column>
         <el-table-column prop="viewCount" :label="t('page.cms.article.views')" width="90" align="center" />
         <el-table-column prop="createTime" :label="t('common.createTime')" width="160" />
-        <el-table-column :label="t('common.operation')" width="400" fixed="right">
+        <el-table-column :label="t('common.operation')" width="480" fixed="right">
           <template #default="{ row }">
             <div class="table-actions">
               <el-button link type="primary" @click="openPreview(row)">{{ t('page.cms.article.preview') }}</el-button>
               <el-button v-hasPerm="'platform:cms:article:edit'" link type="primary" @click="openEdit(row)">
                 {{ t('common.edit') }}
+              </el-button>
+              <el-button
+                v-hasPerm="'platform:cms:article:version'"
+                link
+                type="info"
+                @click="openVersions(row)"
+              >
+                {{ t('page.cms.article.versionHistory') }}
               </el-button>
               <el-button
                 v-if="row.status !== '1'"
@@ -295,6 +303,114 @@
       </template>
     </el-dialog>
 
+    <el-drawer
+      v-model="versionVisible"
+      :title="t('page.cms.article.versionTitle', { title: versionArticle ? versionArticle.title : '' })"
+      size="860px"
+      append-to-body
+    >
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        :title="t('page.cms.article.versionHint')"
+        style="margin-bottom: 16px"
+      />
+      <el-table v-loading="versionLoading" :data="versionRows" border>
+        <el-table-column prop="versionNo" :label="t('page.cms.article.versionNo')" width="80" align="center" />
+        <el-table-column :label="t('page.cms.article.changeType')" width="110">
+          <template #default="{ row }">{{ changeTypeLabel(row.changeType) }}</template>
+        </el-table-column>
+        <el-table-column prop="title" :label="t('page.cms.article.articleTitle')" min-width="200" show-overflow-tooltip />
+        <el-table-column :label="t('common.status')" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.status" :type="statusTagType(row.status)" size="small">
+              {{ statusLabel(row.status) }}
+            </el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="operatorName" :label="t('page.cms.article.versionOperator')" width="110" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.operatorName || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="createTime" :label="t('common.createTime')" width="165" />
+        <el-table-column :label="t('common.operation')" width="150" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="openVersionDetail(row)">
+              {{ t('page.cms.article.preview') }}
+            </el-button>
+            <el-button
+              v-hasPerm="'platform:cms:article:rollback'"
+              link
+              type="warning"
+              :disabled="row.versionNo === latestVersionNo"
+              @click="handleRollback(row)"
+            >
+              {{ t('page.cms.article.versionRollback') }}
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="pagination-bar">
+        <el-pagination
+          v-model:current-page="versionQuery.pageNum"
+          v-model:page-size="versionQuery.pageSize"
+          :total="versionTotal"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next, jumper"
+          background
+          @size-change="loadVersions"
+          @current-change="loadVersions"
+        />
+      </div>
+    </el-drawer>
+
+    <el-dialog
+      v-model="versionDetailVisible"
+      :title="t('page.cms.article.versionDetailTitle', { no: versionDetail ? versionDetail.versionNo : '' })"
+      width="820px"
+      top="5vh"
+      append-to-body
+      destroy-on-close
+    >
+      <el-descriptions v-if="versionDetail" :column="2" border>
+        <el-descriptions-item :label="t('page.cms.article.changeType')">
+          {{ changeTypeLabel(versionDetail.changeType) }}
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('common.createTime')">
+          {{ versionDetail.createTime || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('page.cms.article.articleTitle')" :span="2">
+          {{ versionDetail.title }}
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('page.cms.article.slug')">
+          {{ versionDetail.slug || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('page.cms.article.versionOperator')">
+          {{ versionDetail.operatorName || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item :label="t('page.cms.article.summary')" :span="2">
+          {{ versionDetail.summary || '-' }}
+        </el-descriptions-item>
+      </el-descriptions>
+      <div class="version-content">
+        <div class="article-preview" v-html="versionDetail ? versionDetail.content : ''"></div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="versionDetailVisible = false">{{ t('common.close') }}</el-button>
+          <el-button
+            v-if="versionDetail && versionDetail.versionNo !== latestVersionNo"
+            v-hasPerm="'platform:cms:article:rollback'"
+            type="warning"
+            @click="handleRollback(versionDetail)"
+          >
+            {{ t('page.cms.article.versionRollback') }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <el-drawer v-model="previewVisible" :title="previewTitle" size="640px" append-to-body>
       <el-alert
         type="info"
@@ -322,12 +438,15 @@ import {
   cancelScheduleArticle,
   deleteArticle,
   getArticle,
+  getArticleVersion,
   getCategoryTree,
   listArticles,
+  listArticleVersions,
   listSiteOptions,
   listTagOptions,
   offlineArticle,
   publishArticle,
+  rollbackArticleVersion,
   scheduleArticle,
   updateArticle
 } from '@/api/cms'
@@ -720,6 +839,78 @@ async function handleDelete(row) {
   await loadList()
 }
 
+/* ==================== 内容版本 ==================== */
+const versionVisible = ref(false)
+const versionLoading = ref(false)
+const versionRows = ref([])
+const versionTotal = ref(0)
+const versionArticle = ref(null)
+const versionQuery = reactive({ pageNum: 1, pageSize: 10 })
+const latestVersionNo = ref(0)
+const versionDetailVisible = ref(false)
+const versionDetail = ref(null)
+
+const changeTypeKeys = {
+  create: 'page.cms.article.changeCreate',
+  edit: 'page.cms.article.changeEdit',
+  publish: 'page.cms.article.changePublish',
+  rollback: 'page.cms.article.changeRollback',
+  restore: 'page.cms.article.changeRestore'
+}
+
+function changeTypeLabel(type) {
+  const key = changeTypeKeys[type]
+  return key ? t(key) : (type || '-')
+}
+
+async function openVersions(row) {
+  versionArticle.value = row
+  versionQuery.pageNum = 1
+  latestVersionNo.value = 0
+  versionVisible.value = true
+  await loadVersions()
+}
+
+async function loadVersions() {
+  if (!versionArticle.value) return
+  versionLoading.value = true
+  try {
+    const data = await listArticleVersions(versionArticle.value.articleId, {
+      pageNum: versionQuery.pageNum,
+      pageSize: versionQuery.pageSize
+    })
+    versionRows.value = data.records || []
+    versionTotal.value = data.total || 0
+    if (versionQuery.pageNum === 1 && versionRows.value.length) {
+      latestVersionNo.value = versionRows.value[0].versionNo
+    }
+  } finally {
+    versionLoading.value = false
+  }
+}
+
+async function openVersionDetail(row) {
+  versionDetail.value = await getArticleVersion(versionArticle.value.articleId, row.versionId)
+  versionDetailVisible.value = true
+}
+
+async function handleRollback(row) {
+  try {
+    await ElMessageBox.confirm(
+      t('page.cms.article.versionRollbackConfirm', { no: row.versionNo }),
+      t('page.cms.article.versionRollback'),
+      { type: 'warning', confirmButtonText: t('page.cms.article.versionRollback'), cancelButtonText: t('common.cancel') }
+    )
+  } catch (e) {
+    return
+  }
+  await rollbackArticleVersion(versionArticle.value.articleId, row.versionId)
+  ElMessage.success(t('page.cms.article.versionRollbackSuccess'))
+  versionDetailVisible.value = false
+  await loadVersions()
+  await loadList()
+}
+
 /* ==================== 预览 ==================== */
 const previewVisible = ref(false)
 const previewTitle = ref('')
@@ -740,6 +931,12 @@ async function openPreview(row) {
   font-size: 14px;
   color: var(--lx-text);
   word-break: break-word;
+}
+
+.version-content {
+  margin-top: 16px;
+  max-height: 48vh;
+  overflow-y: auto;
 }
 
 .article-preview :deep(img) {

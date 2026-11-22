@@ -270,7 +270,7 @@ platform:cms:tag:list|add|edit|remove
 | 门户 API `/api/portal/cms/**` | ✅ 已完成 | 只读、只出已发布内容（§15） |
 | 文章回收站 | ✅ 已完成（2026-11-22） | 软删除 + 恢复回草稿 + 彻底删除（§16） |
 | 定时发布 | ✅ 已完成（2026-11-22） | `status='3'` 到点由后台扫描发布（§17） |
-| 内容版本 | ⏳ 未开始 | 表与页面均未建 |
+| 内容版本 | ✅ 已完成（2026-11-22） | 不可变快照 + 相邻去重 + 回滚回草稿（§18） |
 | `cms_content_ext` 自定义字段 | ⏳ 未开始 | 避免过早固定内容模型 |
 | 素材选择器 | ✅ 已完成（2026-11-22） | 站点 Logo / 栏目封面 / 文章封面接文件中心；仍兼容 URL 手填 |
 | 内容级多语言 | ⏳ 未开始 | 走后续 `i18n_*` 内容翻译阶段 |
@@ -690,8 +690,8 @@ cd .local\uitest; node cms-recycle.mjs
 - 只支持一次性排期，不支持周期发布、批量排期、定时下线。
 - 排期成功 / 失败没有站内通知，失败只在日志里，下一轮自动重试；成功与否可在列表状态看到。
 - 时间统一按服务器本地时区解释，站点级时区未做。
-- 排期后仍允许普通编辑（内容会先保存，到点发布的是最新版本），这是有意为之，
-  但运营需要知道“排期的是文章，不是某个版本”；内容版本功能后置。
+- 排期后仍允许普通编辑（内容会先保存，到点发布的是最新版本），这是有意为之；
+  需要找回旧稿时用内容版本回滚（§18）。
 
 ### 17.5 复验命令
 
@@ -699,4 +699,85 @@ cd .local\uitest; node cms-recycle.mjs
 # 后端 8080（关闭验证码）+ 前端 5173；扫描间隔默认 30 秒
 node .local\cms-schedule-check.mjs
 cd .local\uitest; node cms-schedule.mjs
+```
+
+---
+
+## 18. v1.1 CMS 文章内容版本（2026-11-22）
+
+内容生命周期的第三刀：每篇文章保留最近若干个内容快照，编辑失误或误发布时可以
+找回旧稿。范围只做**文章内容**，不做站点 / 栏目 / 标签版本，也不做版本对比视图。
+
+### 18.1 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `db/migration/cms/V24__cms_article_version.sql` | `cms_article_version` 表、`(article_id, version_no)` 唯一键、按钮 3054 / 3055 |
+| 实体 | `entity/CmsArticleVersion` | 不可变快照；`tagIds` 存逗号分隔的 ID 快照 |
+| DTO | `dto/CmsArticleVersionVO` | 列表行，不返回正文 |
+| Mapper | `mapper/CmsArticleVersionMapper` | 列表分页、最大版本号、最新哈希、按上限清理、按文章清理 |
+| Service | `CmsArticleService` | `versionPage` / `versionDetail` / `rollback`，创建 / 编辑 / 发布 / 回滚 / 恢复后写快照 |
+| Controller | `CmsArticleController` | `GET /{id}/versions`、`GET /{id}/versions/{versionId}`、`PUT /{id}/versions/{versionId}/rollback` |
+| 配置 | `application.yml` | `lx.cms.version-keep`（默认 30） |
+| 前端接口 | `api/cms.js` | `listArticleVersions` / `getArticleVersion` / `rollbackArticleVersion` |
+| 前端页面 | `views/cms/article/index.vue` | 行内「历史版本」抽屉、版本详情弹窗、回滚确认、最新版禁止回滚 |
+| 单测 | `CmsArticleServiceTest` | 27 项（新增 8 项：列表 / 详情 / 归属校验 / 栏目缺失 / slug 冲突 / 回滚快照 / 编辑快照） |
+
+### 18.2 关键决策
+
+1. **快照不可变，只增不改。**
+   版本行一旦写入就不再更新；回滚本身也写一条新版本，历史链条完整，
+   不会出现“回滚后旧版本被覆盖”的情况。
+2. **版本只覆盖内容字段。**
+   标题、slug、摘要、封面、正文、来源、来源地址、栏目、标签、状态进入快照；
+   排序、备注、作者、浏览量等元数据不进版本，回滚不会把运营后来调整的排序改回去。
+3. **相邻哈希去重。**
+   `content_hash` 对内容 + 标签 + 状态做 SHA-256；连续保存相同内容不产生新版本，
+   避免“点十次保存多十个版本”。状态参与哈希，所以发布、回收站恢复仍会留下记录。
+4. **回滚统一回草稿。**
+   不能因为点了一次回滚就把旧内容直接推上线；需要运营重新确认发布。
+   `publish_time` 作为首次发布时间保留，`schedule_time` 清空。
+5. **回滚前做归属与冲突校验。**
+   版本必须属于该文章；栏目必须仍存在且属于同一站点（否则提示无法回滚）；
+   slug 不能被其它文章（含回收站）占用。
+6. **标签宽松恢复。**
+   版本里的标签若已被删除或已跨站点，回滚时跳过并记日志；正文优先恢复，
+   不因为几个标签丢失而整体失败。
+7. **按文章限量保留。**
+   默认保留最近 30 个版本，超出后删最旧的；文章彻底删除时同步清理全部版本，
+   回收站期间版本保留，恢复后仍可回溯。
+8. **列表不返回正文。**
+   版本列表只出摘要字段；正文在版本详情里按需读取，并在读取侧再过一次
+   `HtmlSanitizer`，避免历史脏数据绕过白名单。
+9. **权限拆两档。**
+   `platform:cms:article:version` 查看历史，`platform:cms:article:rollback` 执行回滚；
+   可以给编辑看历史，但只给主编回滚权限。
+
+### 18.3 验证结果
+
+| 项 | 结果 |
+|---|---|
+| 编译 / 打包 | `mvn -q -DskipTests package` 通过 |
+| Flyway | `V24 - cms article version` 成功；菜单 3054 / 3055 与超管授权已落库 |
+| 单测 | CMS 44 项（文章 27 项）；全仓 **156 项 / 28 类**，JDK 8 与 JDK 11 各跑一遍全部通过 |
+| 接口验收 | `.local/cms-version-check.mjs` **42/42**：创建 / 编辑 / 去重 / 分页 / 详情清洗 / 回滚内容与状态 / 重复回滚去重 / 发布与恢复快照 / 版本归属 404 / slug 冲突 / 彻底删除清理 |
+| 浏览器验收 | `.local/uitest/cms-version.mjs` **9/9**：入口、抽屉提示、版本顺序、最新版禁止回滚、详情正文、回滚确认、列表回草稿、后端内容复核 |
+| 前端 | `check-i18n-keys.mjs` zh=1068、en=1068，无 missing / dotted-leaf；`npm run build` 通过 |
+| 数据清理 | 验收后 `cms_article_version` 0 行、临时站点 0 个 |
+
+### 18.4 当前限制
+
+- 只做文章内容版本；站点 / 栏目 / 标签没有版本。
+- 没有版本对比（diff）视图，只能看单个版本详情与回滚。
+- 回滚后统一回草稿，不会自动重新发布，也不会恢复定时计划。
+- 内容完全相同的重复回滚 / 重复发布会因哈希去重不产生新版本。
+- 版本保留数量只能改配置 `lx.cms.version-keep`，没有后台清理界面。
+- 快照记录操作人 ID / 昵称与时间，但不在版本列表里做数据范围隔离。
+
+### 18.5 复验命令
+
+```powershell
+# 后端 8080（关闭验证码）+ 前端 5173
+node .local\cms-version-check.mjs
+cd .local\uitest; node cms-version.mjs
 ```

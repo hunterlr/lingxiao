@@ -685,5 +685,29 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 详见 `docs/20-cms-embed-plan.md` §17、`docs/21-build-log.md` §53、
 `lx-modules/lx-module-cms/README.md`。
 
-**下一步**：内容版本（发布 / 编辑快照、回滚），随后进入 v1.2 会员体系；
-门户工程与模板列表按 v1.3 计划推进。
+### 12.13 P1：v1.1 CMS 文章内容版本（✅ 已完成，2026-11-22）
+
+**完成内容**：
+
+- 新增迁移 `V24__cms_article_version.sql`：`cms_article_version` 表、
+  `(article_id, version_no)` 唯一键；新增按钮权限 `platform:cms:article:version`
+  （菜单 3054）与 `platform:cms:article:rollback`（菜单 3055）；
+- 创建 / 编辑 / 发布 / 回滚 / 回收站恢复后自动写内容快照，快照不可变；
+- 快照覆盖标题 / slug / 摘要 / 封面 / 正文 / 来源 / 栏目 / 标签 / 状态，
+  不覆盖排序 / 备注 / 作者等元数据；
+- SHA-256 相邻去重：连续保存相同内容不产生新版本；
+- 新增接口 `GET /{id}/versions`、`GET /{id}/versions/{versionId}`、
+  `PUT /{id}/versions/{versionId}/rollback`；
+- 回滚统一回草稿、保留 `publish_time`、清空 `schedule_time`；回滚前校验版本归属、
+  栏目存在且同站点、slug 未被占用；标签缺失时宽松跳过；
+- 默认每篇文章保留最近 30 个版本（`lx.cms.version-keep`），彻底删除文章时清空版本；
+- 前端文章页新增「历史版本」抽屉、版本详情弹窗与回滚确认，中英文文案补齐。
+
+**验收**：CMS 单测 44 项（文章 27 项）；全仓 **156 项 / 28 类**，JDK 8 / 11 均通过；
+真实接口 42/42；浏览器 9/9；i18n 1068/1068；`vite build` 通过。
+
+详见 `docs/20-cms-embed-plan.md` §18、`docs/21-build-log.md` §54、
+`lx-modules/lx-module-cms/README.md`。
+
+**下一步**：v1.1 CMS 内容生命周期收口，进入 v1.2 会员体系；
+门户工程、模板列表与内容级多语言按 v1.3 计划推进。

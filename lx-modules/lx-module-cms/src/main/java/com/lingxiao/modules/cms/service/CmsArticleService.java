@@ -10,25 +10,33 @@ import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.common.security.util.LoginHelper;
 import com.lingxiao.common.web.util.HtmlSanitizer;
 import com.lingxiao.modules.cms.dto.CmsArticleRecycleVO;
+import com.lingxiao.modules.cms.dto.CmsArticleVersionVO;
 import com.lingxiao.modules.cms.entity.CmsArticle;
+import com.lingxiao.modules.cms.entity.CmsArticleVersion;
 import com.lingxiao.modules.cms.entity.CmsCategory;
 import com.lingxiao.modules.cms.entity.CmsTag;
 import com.lingxiao.modules.cms.mapper.CmsArticleMapper;
 import com.lingxiao.modules.cms.mapper.CmsArticleTagMapper;
+import com.lingxiao.modules.cms.mapper.CmsArticleVersionMapper;
 import com.lingxiao.modules.cms.mapper.CmsCategoryMapper;
 import com.lingxiao.modules.cms.mapper.CmsTagMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * CMS 文章服务。
@@ -54,12 +62,24 @@ public class CmsArticleService {
     public static final String STATUS_OFFLINE = "2";
     public static final String STATUS_SCHEDULED = "3";
 
+    /** 版本来源：创建 / 编辑 / 发布 / 回滚 / 回收站恢复 */
+    public static final String VERSION_CREATE = "create";
+    public static final String VERSION_EDIT = "edit";
+    public static final String VERSION_PUBLISH = "publish";
+    public static final String VERSION_ROLLBACK = "rollback";
+    public static final String VERSION_RESTORE = "restore";
+
     private final CmsArticleMapper articleMapper;
     private final CmsArticleTagMapper articleTagMapper;
+    private final CmsArticleVersionMapper versionMapper;
     private final CmsCategoryMapper categoryMapper;
     private final CmsTagMapper tagMapper;
     private final CmsSiteService siteService;
     private final CmsCategoryService categoryService;
+
+    /** 每篇文章保留的版本数；Spring 注入，单测直接使用默认值 */
+    @Value("${lx.cms.version-keep:30}")
+    private int versionKeep = 30;
 
     public PageResult<CmsArticle> page(long pageNum, long pageSize, Long siteId, Long categoryId,
                                        Long tagId, String keyword, String status) {
@@ -115,6 +135,7 @@ public class CmsArticleService {
         articleMapper.insert(article);
 
         replaceTags(article.getArticleId(), article.getSiteId(), article.getTagIds());
+        snapshot(article, VERSION_CREATE);
         return article.getArticleId();
     }
 
@@ -136,17 +157,21 @@ public class CmsArticleService {
         existing.setSourceUrl(article.getSourceUrl());
         existing.setSort(article.getSort() == null ? existing.getSort() : article.getSort());
         existing.setRemark(article.getRemark());
-        existing.setUpdateBy(LoginHelper.getUserId());
+        existing.setUpdateBy(currentUserId());
         articleMapper.updateById(existing);
 
         replaceTags(articleId, siteId, article.getTagIds());
+        snapshot(existing, VERSION_EDIT);
     }
 
     /**
      * 发布：草稿 / 已下线 → 已发布；首次发布写 publishTime，重新发布保留原时间。
      *
      * <p>手动发布会顺带取消定时：既然人已经决定现在发，计划时间不应再留着。</p>
+     *
+     * <p>发布后写一条 publish 快照；内容与最近一次快照完全相同（含状态）时由哈希去重跳过。</p>
      */
+    @Transactional(rollbackFor = Exception.class)
     public void publish(Long articleId) {
         CmsArticle existing = mustGet(articleId);
         LambdaUpdateWrapper<CmsArticle> update = new LambdaUpdateWrapper<CmsArticle>()
@@ -158,6 +183,7 @@ public class CmsArticleService {
             update.set(CmsArticle::getPublishTime, LocalDateTime.now());
         }
         articleMapper.update(null, update);
+        snapshot(mustGet(articleId), VERSION_PUBLISH);
     }
 
     /** 下线：已发布 → 已下线；草稿调用也允许，结果就是“不会出现在门户”。 */
@@ -226,7 +252,11 @@ public class CmsArticleService {
         }
         int published = 0;
         for (Long articleId : dueIds) {
-            published += articleMapper.publishScheduledById(articleId, now);
+            // 条件 UPDATE 抢到的实例才写发布快照：没抢到的实例不重复记版本
+            if (articleMapper.publishScheduledById(articleId, now) > 0) {
+                published++;
+                snapshot(mustGet(articleId), VERSION_PUBLISH);
+            }
         }
         return published;
     }
@@ -285,17 +315,87 @@ public class CmsArticleService {
         if (updated == 0) {
             throw new ServiceException(ErrorCode.NOT_FOUND, "回收站中不存在该文章");
         }
+        snapshot(mustGet(articleId), VERSION_RESTORE);
     }
 
-    /** 彻底删除：仅限回收站记录；先清标签关联，再物理删除正文。 */
+    /** 彻底删除：仅限回收站记录；先清标签关联与历史版本，再物理删除正文。 */
     @Transactional(rollbackFor = Exception.class)
     public void purge(Long articleId) {
         mustGetDeleted(articleId);
         articleTagMapper.deleteByArticleId(articleId);
+        versionMapper.deleteByArticleId(articleId);
         int removed = articleMapper.hardDeleteDeletedById(articleId);
         if (removed == 0) {
             throw new ServiceException(ErrorCode.NOT_FOUND, "回收站中不存在该文章");
         }
+    }
+
+    /* ==================== 内容版本 ==================== */
+
+    /** 版本列表：校验文章存在，只返回摘要字段，不查正文。 */
+    public PageResult<CmsArticleVersionVO> versionPage(Long articleId, long pageNum, long pageSize) {
+        mustGet(articleId);
+        long current = Math.max(pageNum, 1);
+        long size = Math.min(Math.max(pageSize, 1), 100);
+        Page<CmsArticleVersionVO> page = new Page<>(current, size);
+        Page<CmsArticleVersionVO> result = versionMapper.selectVersionPage(page, articleId);
+        return PageResult.of(result.getTotal(), result.getCurrent(), result.getSize(),
+                result.getRecords());
+    }
+
+    /** 版本详情：返回正文（读取侧再清洗一次）与标签 ID 快照。 */
+    public CmsArticleVersion versionDetail(Long articleId, Long versionId) {
+        mustGet(articleId);
+        CmsArticleVersion version = versionId == null ? null : versionMapper.selectById(versionId);
+        if (version == null || !Objects.equals(version.getArticleId(), articleId)) {
+            throw new ServiceException(ErrorCode.NOT_FOUND, "版本不存在");
+        }
+        version.setContent(HtmlSanitizer.clean(version.getContent()));
+        version.setTagIdList(parseTagIds(version.getTagIds()));
+        return version;
+    }
+
+    /**
+     * 回滚到指定版本。
+     *
+     * <p>回滚会覆盖当前内容并统一回到草稿：不能因为点了一次回滚就把旧内容
+     * 直接推上线，需要运营重新确认发布。{@code publish_time} 作为首次发布时间保留。</p>
+     *
+     * <p>回滚前校验：版本属于该文章、栏目仍存在且属于同一站点、slug 未被其它文章占用。
+     * 版本中的标签若已被删除或跨站点，会被跳过（内容优先），并在日志里留痕。</p>
+     *
+     * <p>回滚成功后写一条 rollback 快照，当前内容仍可从版本列表里找回。</p>
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void rollback(Long articleId, Long versionId) {
+        CmsArticle current = mustGet(articleId);
+        CmsArticleVersion version = versionId == null ? null : versionMapper.selectById(versionId);
+        if (version == null || !Objects.equals(version.getArticleId(), articleId)) {
+            throw new ServiceException(ErrorCode.NOT_FOUND, "版本不存在");
+        }
+        CmsCategory category = version.getCategoryId() == null
+                ? null : categoryMapper.selectById(version.getCategoryId());
+        if (category == null || !Objects.equals(category.getSiteId(), current.getSiteId())) {
+            throw new ServiceException(ErrorCode.BAD_REQUEST,
+                    "版本中的栏目已删除或不属于当前站点，无法回滚");
+        }
+        ensureSlugUnique(current.getSiteId(), version.getSlug(), articleId);
+
+        current.setCategoryId(category.getCategoryId());
+        current.setTitle(version.getTitle());
+        current.setSlug(version.getSlug());
+        current.setSummary(version.getSummary());
+        current.setCover(version.getCover());
+        current.setContent(HtmlSanitizer.clean(version.getContent()));
+        current.setSource(version.getSource());
+        current.setSourceUrl(version.getSourceUrl());
+        current.setStatus(STATUS_DRAFT);
+        current.setScheduleTime(null);
+        current.setUpdateBy(currentUserId());
+        articleMapper.updateById(current);
+
+        restoreTagsLenient(articleId, current.getSiteId(), parseTagIds(version.getTagIds()));
+        snapshot(current, VERSION_ROLLBACK);
     }
 
     // ==================== 内部方法 ====================
@@ -395,6 +495,145 @@ public class CmsArticleService {
         if (count > 0) {
             throw new ServiceException(ErrorCode.BAD_REQUEST, "文章 slug 已存在：" + slug);
         }
+    }
+
+    /**
+     * 写一条内容快照。
+     *
+     * <p>哈希包含状态与标签：状态从草稿变已发布也算一次不同快照；
+     * 内容完全没变的普通编辑会被相邻哈希去重掉。版本号按文章自增，
+     * 超出 {@code lx.cms.version-keep} 后删最旧的。</p>
+     */
+    private void snapshot(CmsArticle article, String changeType) {
+        Long articleId = article.getArticleId();
+        List<Long> tagIds = parseTagIdList(articleTagMapper.selectTagIds(articleId));
+        List<Long> sortedTags = new ArrayList<>(new TreeSet<>(tagIds));
+        String tagText = joinTagIds(sortedTags);
+        String hash = hashSnapshot(article, tagText);
+        if (hash.equals(versionMapper.selectLatestHash(articleId))) {
+            return;
+        }
+
+        int nextNo = versionMapper.selectMaxVersionNo(articleId) + 1;
+        CmsArticleVersion version = new CmsArticleVersion();
+        version.setArticleId(articleId);
+        version.setSiteId(article.getSiteId());
+        version.setVersionNo(nextNo);
+        version.setChangeType(changeType);
+        version.setCategoryId(article.getCategoryId());
+        version.setTitle(article.getTitle());
+        version.setSlug(article.getSlug());
+        version.setSummary(article.getSummary());
+        version.setCover(article.getCover());
+        version.setContent(article.getContent());
+        version.setSource(article.getSource());
+        version.setSourceUrl(article.getSourceUrl());
+        version.setTagIds(tagText);
+        version.setStatus(article.getStatus());
+        version.setContentHash(hash);
+        version.setOperatorId(currentUserId());
+        version.setOperatorName(currentOperatorName());
+        version.setCreateTime(LocalDateTime.now());
+        versionMapper.insert(version);
+
+        int keep = Math.max(versionKeep, 1);
+        int threshold = nextNo - keep;
+        if (threshold > 0) {
+            versionMapper.deleteUpToVersion(articleId, threshold);
+        }
+    }
+
+    /** 快照哈希：内容字段 + 标签 + 状态，空值按空串参与计算。 */
+    private String hashSnapshot(CmsArticle article, String tagText) {
+        StringBuilder payload = new StringBuilder();
+        appendHashPart(payload, article.getTitle());
+        appendHashPart(payload, article.getSlug());
+        appendHashPart(payload, article.getSummary());
+        appendHashPart(payload, article.getCover());
+        appendHashPart(payload, article.getContent());
+        appendHashPart(payload, article.getSource());
+        appendHashPart(payload, article.getSourceUrl());
+        appendHashPart(payload, article.getCategoryId());
+        appendHashPart(payload, tagText);
+        appendHashPart(payload, article.getStatus());
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest(payload.toString().getBytes(StandardCharsets.UTF_8));
+            char[] hex = new char[bytes.length * 2];
+            char[] alphabet = "0123456789abcdef".toCharArray();
+            for (int i = 0; i < bytes.length; i++) {
+                int value = bytes[i] & 0xff;
+                hex[i * 2] = alphabet[value >>> 4];
+                hex[i * 2 + 1] = alphabet[value & 0x0f];
+            }
+            return new String(hex);
+        } catch (NoSuchAlgorithmException e) {
+            // JDK 必须提供 SHA-256；真出现说明运行环境异常，直接失败比静默降级安全
+            throw new IllegalStateException("当前 JDK 不支持 SHA-256", e);
+        }
+    }
+
+    private void appendHashPart(StringBuilder payload, Object value) {
+        payload.append(value == null ? "" : value).append('\u0001');
+    }
+
+    /**
+     * 回滚标签：只恢复仍然存在且属于当前站点的标签。
+     * 标签被删不影响正文回滚，但会在日志里记录跳过的数量。
+     */
+    private void restoreTagsLenient(Long articleId, Long siteId, List<Long> tagIds) {
+        articleTagMapper.deleteByArticleId(articleId);
+        if (tagIds == null || tagIds.isEmpty()) {
+            return;
+        }
+        Set<Long> distinct = new LinkedHashSet<>(tagIds);
+        List<CmsTag> tags = tagMapper.selectBatchIds(distinct);
+        List<Long> valid = new ArrayList<>();
+        for (CmsTag tag : tags) {
+            if (Objects.equals(tag.getSiteId(), siteId)) {
+                valid.add(tag.getTagId());
+            }
+        }
+        if (valid.size() < distinct.size()) {
+            log.warn("版本回滚跳过 {} 个已删除或跨站点的标签，articleId={}",
+                    distinct.size() - valid.size(), articleId);
+        }
+        if (!valid.isEmpty()) {
+            articleTagMapper.insertBatch(articleId, valid);
+        }
+    }
+
+    private List<Long> parseTagIds(String text) {
+        List<Long> result = new ArrayList<>();
+        if (!StringUtils.hasText(text)) {
+            return result;
+        }
+        for (String part : text.split(",")) {
+            try {
+                result.add(Long.valueOf(part.trim()));
+            } catch (NumberFormatException ignored) {
+                // 手工改库产生的脏值直接跳过，不让单个坏 ID 拖垮回滚
+            }
+        }
+        return result;
+    }
+
+    private List<Long> parseTagIdList(List<Long> tagIds) {
+        return tagIds == null ? new ArrayList<>() : tagIds;
+    }
+
+    private String joinTagIds(List<Long> tagIds) {
+        StringBuilder text = new StringBuilder();
+        for (Long tagId : tagIds) {
+            if (tagId == null) {
+                continue;
+            }
+            if (text.length() > 0) {
+                text.append(',');
+            }
+            text.append(tagId);
+        }
+        return text.toString();
     }
 
     /**

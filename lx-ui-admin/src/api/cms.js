@@ -119,6 +119,20 @@ export function deleteArticle(articleId) {
   return http.delete(`/admin/cms/article/${articleId}`)
 }
 
+/* ==================== 文章内容版本 ==================== */
+
+export function listArticleVersions(articleId, params) {
+  return http.get(`/admin/cms/article/${articleId}/versions`, { params })
+}
+
+export function getArticleVersion(articleId, versionId) {
+  return http.get(`/admin/cms/article/${articleId}/versions/${versionId}`)
+}
+
+export function rollbackArticleVersion(articleId, versionId) {
+  return http.put(`/admin/cms/article/${articleId}/versions/${versionId}/rollback`)
+}
+
 /* ==================== 文章回收站 ==================== */
 
 export function listRecycleArticles(params) {

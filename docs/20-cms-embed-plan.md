@@ -871,3 +871,64 @@ java -jar lx-boot\target\lingxiao.jar --lx.captcha.enabled=false
 node .local\member-check.mjs
 ```
 
+---
+
+## 20. v1.2 会员第二刀：安全补口（2026-11-22）
+
+第一刀把注册 / 登录 / 找回密码 / 个人中心 / 后台管理打通；第二刀只补安全缺口，
+不扩业务面：限流、验证码错误次数、短信 / 邮件通道接口化。
+
+### 20.1 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `db/migration/member/V26__member_security_hardening.sql` | 参数 19~25：验证码尝试次数、注册 / 登录 / 找回限流 |
+| 限流 | `MemberRateLimitService` | 单机内存固定窗口，按动作 + 账号 + IP 计数，超限 1006 |
+| 验证码 | `MemberCaptchaService` | 同一 key 允许输错 N 次，达到上限立即作废 |
+| 通道接口 | `MemberSmsSender` / `MemberEmailSender` | 短信、邮件真实通道 SPI |
+| 开发实现 | `DevMemberSmsSender` / `DevMemberEmailSender` | 只写日志，保留 `memberId / username / code` 行 |
+| 装配 | `MemberChannelConfiguration` | `lx.member.channel.mode=dev` 默认装配开发实现 |
+| 路由 | `RoutingMemberResetCodeSender` | 手机号走短信、邮箱走邮件、用户名优先手机号 |
+| 业务 | `MemberUserService` | 注册 / 登录 / 找回 / 重置入口统一先限流 |
+| 单测 | `MemberRateLimitServiceTest` / `RoutingMemberResetCodeSenderTest` | 窗口边界、Key 隔离、通道路由 |
+| 配置 | `application.yml` | `lx.member.channel.mode: dev` |
+
+### 20.2 关键决策
+
+1. **限流与锁定分层。** 限流挡短时间脚本重放，内存窗口、重启清零；
+   账号锁定仍落 `mem_user.login_fail_count / lock_time`，重启不丢。
+2. **账号 + IP 双维度。** 每个动作两个 Key；IP 阈值自动放宽为账号阈值的 10 倍。
+3. **动作独立计数。** 注册 / 登录 / 找回 / 重置互不占用额度。
+4. **验证码有限重试。** 默认 3 次，达到上限立即作废；成功也立即作废。
+5. **通道接口解耦。** 业务层只依赖 `MemberResetCodeSender`；生产实现
+   `MemberSmsSender` / `MemberEmailSender` 即可，不改业务逻辑。
+6. **开发通道可验收。** 日志保留 `memberId / username / code / expireMinutes`，
+   本地脚本直接读取；生产必须切 `mode=prod`。
+
+### 20.3 验证结果
+
+| 项 | 结果 |
+|---|---|
+| 编译 / 打包 | `mvn -q -DskipTests package` 通过 |
+| Flyway | `V26 - member security hardening` 成功；参数 19~25 已落库 |
+| 单测 | 会员 40 项；全仓 **196 项 / 33 类**，失败 0 错误 0 |
+| 接口验收 | `.local/member-check.mjs` **57/57**：新增短信 / 邮件开发通道、注册 / 登录 / 找回 / 重置限流 |
+| 验证码次数 | 单测覆盖：前两次错误可重试，第 3 次作废，之后正确码也不能用 |
+| 平台隔离 | 后台会话、会员菜单、CMS 不受影响 |
+
+### 20.4 当前限制
+
+- 真实短信 / 邮件服务商未接入：默认 `mode=dev` 只写日志，生产必须实现接口。
+- 限流为单机内存窗口，多实例部署各节点独立计数；后续可换 Redis / 网关限流。
+- 等级升级、积分规则、评论 / 收藏 / 点赞、第三方登录、会员权限码仍未做。
+
+### 20.5 复验命令
+
+```powershell
+# 后端 8080（关闭验证码）
+java -jar lx-boot\target\lingxiao.jar --lx.captcha.enabled=false
+node .local\member-check.mjs
+
+# 全仓单测
+mvn -q test
+```

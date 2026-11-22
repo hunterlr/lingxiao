@@ -38,6 +38,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -65,6 +66,10 @@ public class MemberUserService {
     private static final int DEFAULT_MAX_RETRY = 5;
     private static final int DEFAULT_LOCK_MINUTES = 10;
     private static final int DEFAULT_RESET_EXPIRE_MINUTES = 10;
+    private static final int DEFAULT_REGISTER_LIMIT = 5;
+    private static final int DEFAULT_LOGIN_LIMIT = 30;
+    private static final int DEFAULT_RESET_LIMIT = 5;
+    private static final int DEFAULT_RATE_LIMIT_MINUTES = 10;
     private static final Set<String> SEX_VALUES = new HashSet<>(Arrays.asList("0", "1", "2"));
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -76,6 +81,7 @@ public class MemberUserService {
     private final MemberCaptchaService captchaService;
     private final MemberTokenIssuer tokenIssuer;
     private final MemberResetCodeSender resetCodeSender;
+    private final MemberRateLimitService rateLimitService;
     private final ConfigProvider configProvider;
 
     // ==================== 会员端 ====================
@@ -87,6 +93,7 @@ public class MemberUserService {
      * 唯一性失败优先提示具体字段，不然用户只会看到“注册失败”。</p>
      */
     public MemberLoginResponse register(MemberRegisterRequest request) {
+        limitRegister(request.getUsername());
         captchaService.verify("register", request.getCaptchaKey(), request.getCaptchaCode());
         if (!Boolean.TRUE.equals(request.getAgreement())) {
             throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.member.agreement");
@@ -134,6 +141,7 @@ public class MemberUserService {
      * 找到第一个即停止；不会出现“用户名命中 A、手机号命中 B”时选错人的情况。</p>
      */
     public MemberLoginResponse login(MemberLoginRequest request) {
+        limitLogin(request.getAccount());
         captchaService.verify("login", request.getCaptchaKey(), request.getCaptchaCode());
 
         MemUser user = findByAccount(request.getAccount());
@@ -249,6 +257,7 @@ public class MemberUserService {
      * BCrypt 哈希，有效期由 {@code mem.register.resetCodeExpireMinutes} 控制。</p>
      */
     public void forgotPassword(String account) {
+        limitReset("forgot", account);
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
         String hash = passwordEncoder.encode(code);
         int expireMinutes = resetExpireMinutes();
@@ -276,12 +285,13 @@ public class MemberUserService {
         reset.setCreateTime(now);
         passwordResetMapper.insert(reset);
 
-        resetCodeSender.send(user, code, expireMinutes);
+        resetCodeSender.send(user, account, code, expireMinutes);
         log.info("会员申请找回密码: memberId={}, expireMinutes={}", user.getMemberId(), expireMinutes);
     }
 
     /** 找回密码第二步：校验验证码并重置密码。 */
     public void resetPassword(MemberResetPasswordRequest request) {
+        limitReset("reset", request.getAccount());
         MemUser user = findByAccount(request.getAccount());
         if (user == null) {
             throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "error.1001.member.resetCodeInvalid");
@@ -581,6 +591,77 @@ public class MemberUserService {
         int value = configProvider.getIntValue("mem.register.resetCodeExpireMinutes",
                 DEFAULT_RESET_EXPIRE_MINUTES);
         return Math.min(60, Math.max(5, value));
+    }
+
+    /**
+     * 注册限流：同一用户名与同一 IP 各一个窗口。
+     *
+     * <p>用户名维度防单账号重放，IP 维度防脚本批量注册；IP 阈值是账号阈值的
+     * 10 倍，正常用户不会碰到，脚本刷接口会先被挡住。</p>
+     */
+    private void limitRegister(String username) {
+        int count = registerLimitCount();
+        int minutes = registerLimitMinutes();
+        rateLimitService.check(rateKey("register", "id", username), count, minutes);
+        rateLimitService.check(rateKey("register", "ip", ServletUtils.getClientIp()),
+                ipLimit(count), minutes);
+    }
+
+    /** 登录限流：账号 / IP 两个维度；账号锁定逻辑仍然落库，两者互不替代。 */
+    private void limitLogin(String account) {
+        int count = loginLimitCount();
+        int minutes = loginLimitMinutes();
+        rateLimitService.check(rateKey("login", "id", account), count, minutes);
+        rateLimitService.check(rateKey("login", "ip", ServletUtils.getClientIp()),
+                ipLimit(count), minutes);
+    }
+
+    /** 找回密码与重置密码共用一组参数，但动作 Key 分开，互不占用额度。 */
+    private void limitReset(String action, String account) {
+        int count = resetLimitCount();
+        int minutes = resetLimitMinutes();
+        rateLimitService.check(rateKey(action, "id", account), count, minutes);
+        rateLimitService.check(rateKey(action, "ip", ServletUtils.getClientIp()),
+                ipLimit(count), minutes);
+    }
+
+    private String rateKey(String action, String dimension, String value) {
+        String normalized = StringUtils.hasText(value)
+                ? value.trim().toLowerCase(Locale.ROOT)
+                : "-";
+        return "member:" + action + ":" + dimension + ":" + normalized;
+    }
+
+    private int ipLimit(int accountLimit) {
+        return (int) Math.min(1000L, Math.max(10L, (long) accountLimit * 10L));
+    }
+
+    private int registerLimitCount() {
+        return clamp(configProvider.getIntValue("mem.register.rateLimitCount", DEFAULT_REGISTER_LIMIT), 1, 100);
+    }
+
+    private int registerLimitMinutes() {
+        return clamp(configProvider.getIntValue("mem.register.rateLimitMinutes", DEFAULT_RATE_LIMIT_MINUTES), 1, 1440);
+    }
+
+    private int loginLimitCount() {
+        return clamp(configProvider.getIntValue("mem.account.loginRateLimitCount", DEFAULT_LOGIN_LIMIT), 1, 1000);
+    }
+
+    private int loginLimitMinutes() {
+        return clamp(configProvider.getIntValue("mem.account.loginRateLimitMinutes", DEFAULT_RATE_LIMIT_MINUTES), 1, 1440);
+    }
+
+    private int resetLimitCount() {
+        return clamp(configProvider.getIntValue("mem.register.resetRateLimitCount", DEFAULT_RESET_LIMIT), 1, 100);
+    }
+
+    private int resetLimitMinutes() {
+        return clamp(configProvider.getIntValue("mem.register.resetRateLimitMinutes", DEFAULT_RATE_LIMIT_MINUTES), 1, 1440);
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.min(max, Math.max(min, value));
     }
 
     private boolean mobileRequired() {

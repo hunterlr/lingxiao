@@ -62,6 +62,7 @@ class MemberUserServiceTest {
     private MemberCaptchaService captchaService;
     private MemberTokenIssuer tokenIssuer;
     private MemberResetCodeSender resetCodeSender;
+    private MemberRateLimitService rateLimitService;
     private ConfigProvider configProvider;
     private MemberUserService service;
 
@@ -87,13 +88,20 @@ class MemberUserServiceTest {
         captchaService = mock(MemberCaptchaService.class);
         tokenIssuer = mock(MemberTokenIssuer.class);
         resetCodeSender = mock(MemberResetCodeSender.class);
+        rateLimitService = mock(MemberRateLimitService.class);
         configProvider = mock(ConfigProvider.class);
         service = new MemberUserService(userMapper, passwordResetMapper, levelService, passwordPolicy,
-                passwordEncoder, captchaService, tokenIssuer, resetCodeSender, configProvider);
+                passwordEncoder, captchaService, tokenIssuer, resetCodeSender, rateLimitService, configProvider);
 
         when(configProvider.getIntValue(eq("mem.account.maxRetryCount"), anyInt())).thenReturn(5);
         when(configProvider.getIntValue(eq("mem.account.lockMinutes"), anyInt())).thenReturn(10);
         when(configProvider.getIntValue(eq("mem.register.resetCodeExpireMinutes"), anyInt())).thenReturn(10);
+        when(configProvider.getIntValue(eq("mem.register.rateLimitCount"), anyInt())).thenReturn(5);
+        when(configProvider.getIntValue(eq("mem.register.rateLimitMinutes"), anyInt())).thenReturn(10);
+        when(configProvider.getIntValue(eq("mem.account.loginRateLimitCount"), anyInt())).thenReturn(30);
+        when(configProvider.getIntValue(eq("mem.account.loginRateLimitMinutes"), anyInt())).thenReturn(10);
+        when(configProvider.getIntValue(eq("mem.register.resetRateLimitCount"), anyInt())).thenReturn(5);
+        when(configProvider.getIntValue(eq("mem.register.resetRateLimitMinutes"), anyInt())).thenReturn(10);
         when(passwordEncoder.encode(anyString())).thenReturn("encoded");
         when(levelService.defaultLevel()).thenReturn(level(1L, "注册会员"));
         when(levelService.nameOf(anyLong())).thenAnswer(inv -> "注册会员");
@@ -258,7 +266,7 @@ class MemberUserServiceTest {
         service.forgotPassword("nobody");
 
         verify(passwordResetMapper, never()).insert(any(MemPasswordReset.class));
-        verify(resetCodeSender, never()).send(any(MemUser.class), anyString(), anyInt());
+        verify(resetCodeSender, never()).send(any(MemUser.class), anyString(), anyString(), anyInt());
     }
 
     @Test
@@ -276,7 +284,7 @@ class MemberUserServiceTest {
         assertThat(captor.getValue().getExpireTime()).isAfter(LocalDateTime.now());
 
         ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
-        verify(resetCodeSender).send(eq(user), code.capture(), eq(10));
+        verify(resetCodeSender).send(eq(user), eq("alice"), code.capture(), eq(10));
         assertThat(code.getValue()).hasSize(6).containsOnlyDigits();
     }
 
@@ -375,5 +383,59 @@ class MemberUserServiceTest {
 
         verify(userMapper).deleteById(100L);
         verify(tokenIssuer).logoutAll(100L);
+    }
+
+    @Test
+    @DisplayName("注册限流：先按用户名与 IP 各记一次，再校验验证码")
+    void registerAppliesRateLimit() {
+        when(userMapper.selectCount(any())).thenReturn(0L);
+        when(levelService.defaultLevel()).thenReturn(level(1L, "注册会员"));
+        when(tokenIssuer.issue(any(MemUser.class), anyString())).thenReturn(new MemberLoginResponse());
+
+        service.register(registerRequest());
+
+        verify(rateLimitService).check("member:register:id:alice", 5, 10);
+        verify(rateLimitService).check("member:register:ip:unknown", 50, 10);
+    }
+
+    @Test
+    @DisplayName("登录限流：按账号与 IP 各记一次")
+    void loginAppliesRateLimit() {
+        MemUser user = user();
+        when(userMapper.selectList(any())).thenReturn(Collections.singletonList(user));
+        when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
+        when(tokenIssuer.issue(any(MemUser.class), anyString())).thenReturn(new MemberLoginResponse());
+
+        service.login(loginRequest());
+
+        verify(rateLimitService).check("member:login:id:alice", 30, 10);
+        verify(rateLimitService).check("member:login:ip:unknown", 300, 10);
+    }
+
+    @Test
+    @DisplayName("找回密码限流：账号不存在也计数，避免枚举")
+    void forgotPasswordAppliesRateLimit() {
+        when(userMapper.selectList(any())).thenReturn(Collections.emptyList());
+
+        service.forgotPassword("nobody");
+
+        verify(rateLimitService).check("member:forgot:id:nobody", 5, 10);
+        verify(rateLimitService).check("member:forgot:ip:unknown", 50, 10);
+    }
+
+    @Test
+    @DisplayName("重置密码限流：与找回密码动作分开计数")
+    void resetPasswordAppliesRateLimit() {
+        when(userMapper.selectList(any())).thenReturn(Collections.emptyList());
+        MemberResetPasswordRequest request = new MemberResetPasswordRequest();
+        request.setAccount("alice");
+        request.setCode("123456");
+        request.setNewPassword("newpass123");
+
+        assertThatThrownBy(() -> service.resetPassword(request))
+                .isInstanceOf(ServiceException.class);
+
+        verify(rateLimitService).check("member:reset:id:alice", 5, 10);
+        verify(rateLimitService).check("member:reset:ip:unknown", 50, 10);
     }
 }

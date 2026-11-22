@@ -5533,3 +5533,80 @@ v1.0 基座与 v1.1 CMS 之后进入会员体系。第一刀只打穿“账号 +
 | 会员权限 | 只有登录态，没有会员角色 / 权限码 |
 | 注销 | 只有后台逻辑删除，没有会员自助注销 |
 | 后续方向 | 会员等级升级与积分规则、互动能力、第三方登录绑定 |
+
+---
+
+## 56. v1.2 会员第二刀：安全补口（2026-11-22）
+
+### 56.1 背景与范围
+
+第一刀打通“账号 + 登录 + 个人中心 + 后台可管”后，第二刀只补安全缺口：
+注册 / 登录 / 找回密码 / 重置密码限流、验证码错误次数、短信 / 邮件通道接口化。
+不扩等级、积分、评论、第三方登录等业务面。
+
+### 56.2 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `db/migration/member/V26__member_security_hardening.sql` | 参数 19~25：验证码尝试次数、注册 / 登录 / 找回限流 |
+| 限流 | `MemberRateLimitService` | 单机内存固定窗口，按动作 + 账号 + IP 计数，超限 1006 |
+| 验证码 | `MemberCaptchaService` | 同一 key 允许输错 N 次，达到上限立即作废 |
+| 通道接口 | `MemberSmsSender` / `MemberEmailSender` | 短信、邮件真实通道 SPI |
+| 开发实现 | `DevMemberSmsSender` / `DevMemberEmailSender` | 只写日志，保留可解析验证码行 |
+| 装配 | `MemberChannelConfiguration` | `lx.member.channel.mode=dev` 默认装配开发实现 |
+| 路由 | `RoutingMemberResetCodeSender` | 手机号走短信、邮箱走邮件、用户名优先手机号 |
+| 业务 | `MemberUserService` | 注册 / 登录 / 找回 / 重置入口统一先限流 |
+| 单测 | `MemberRateLimitServiceTest` / `RoutingMemberResetCodeSenderTest` | 窗口边界、Key 隔离、通道路由 |
+| 配置 | `application.yml` | `lx.member.channel.mode: dev` |
+
+### 56.3 关键决策
+
+1. **限流与锁定分层。** 限流挡短时间脚本重放，内存窗口、重启清零；
+   账号锁定仍落 `mem_user.login_fail_count / lock_time`，重启不丢。
+2. **账号 + IP 双维度。** 每个动作两个 Key；IP 阈值自动放宽为账号阈值的 10 倍。
+3. **动作独立计数。** 注册 / 登录 / 找回 / 重置互不占用额度。
+4. **验证码有限重试。** 默认 3 次，达到上限立即作废；成功也立即作废。
+5. **通道接口解耦。** 业务层只依赖 `MemberResetCodeSender`；生产实现
+   `MemberSmsSender` / `MemberEmailSender` 即可，不改业务逻辑。
+6. **开发通道可验收。** 日志保留 `memberId / username / code / expireMinutes`，
+   本地脚本直接读取；生产必须切 `mode=prod`。
+
+### 56.4 验证
+
+```text
+mvn -q test                       196 项 / 33 类，失败 0 错误 0
+mvn -q -DskipTests package        通过
+member-check.mjs                  57/57
+Flyway                            V26 - member security hardening 成功
+参数 19~25                        已落库
+```
+
+接口脚本新增覆盖：
+
+```text
+注册前 5 次正常进入业务校验，第 6 次 1006
+找回密码前 5 次静默成功，第 6 次 1006
+重置密码前 5 次正常进入业务校验，第 6 次 1006
+登录前 30 次 2001，第 31 次 1006
+手机号申请 → DevMemberSmsSender 日志；邮箱申请 → DevMemberEmailSender 日志
+```
+
+验证码错误次数由单测覆盖：前两次错误可重试，第 3 次作废，之后正确码也不能用。
+
+### 56.5 踩坑
+
+| 问题 | 处理 |
+|---|---|
+| 验收脚本用同一账号反复登录，登录限流会先于业务错误触发 | 默认登录阈值设 30，脚本现有登录次数约 15；限流验收用独立不存在账号 |
+| 注册限流若只按 IP 计数，连续跑验收会互相影响 | 账号维度优先，IP 阈值放宽为 10 倍 |
+| 找回密码账号不存在也要计数 | 先限流再查账号，避免用限流差异探测账号是否存在 |
+| 开发通道日志格式变化导致脚本取不到验证码 | 保持 `memberId=..., username=..., code=..., expireMinutes=...` 顺序 |
+
+### 56.6 遗留
+
+| 项 | 说明 |
+|---|---|
+| 真实服务商 | 当前默认 `lx.member.channel.mode=dev` 只写日志，生产需实现短信 / 邮件接口 |
+| 多实例限流 | 内存窗口各节点独立计数，后续可换 Redis / 网关限流 |
+| 等级与积分 | 等级表与字段已就绪，升级任务、积分规则、权益未做 |
+| 互动 / 第三方 / 权限 | 与第一刀遗留一致 |

@@ -35,6 +35,9 @@ import java.util.UUID;
  *
  * <p>场景：{@code login} / {@code register} / {@code reset}。场景参与 Key，
  * 登录验证码不能拿去注册，注册验证码不能拿去重置密码。</p>
+ *
+ * <p>同一个验证码允许输错有限次（{@code mem.security.captchaMaxAttempts}，默认 3），
+ * 达到上限后立即作废；验证通过也会立即删除，不能重复使用。</p>
  */
 @Slf4j
 @Service
@@ -43,8 +46,11 @@ import java.util.UUID;
 public class MemberCaptchaService {
 
     private static final long EXPIRE_SECONDS = 300;
+    private static final int DEFAULT_MAX_ATTEMPTS = 3;
     private static final String KEY_PREFIX = "lx:member:captcha:";
+    private static final String ATTEMPT_PREFIX = "lx:member:captcha:attempt:";
     private static final String CONFIG_KEY = "mem.security.captchaEnabled";
+    private static final String MAX_ATTEMPTS_KEY = "mem.security.captchaMaxAttempts";
     private static final Set<String> SCENES = new HashSet<>(Arrays.asList("login", "register", "reset"));
 
     @Value("${lx.captcha.enabled:true}")
@@ -89,7 +95,10 @@ public class MemberCaptchaService {
         if (!StringUtils.hasText(key) || !StringUtils.hasText(code)) {
             throw new ServiceException(ErrorCode.CAPTCHA_INVALID);
         }
-        String storeKey = KEY_PREFIX + normalizeScene(scene) + ":" + key.trim();
+        String normalized = normalizeScene(scene);
+        String keyPart = key.trim();
+        String storeKey = KEY_PREFIX + normalized + ":" + keyPart;
+        String attemptKey = ATTEMPT_PREFIX + normalized + ":" + keyPart;
         SaTokenDao dao = SaManager.getSaTokenDao();
         String expected;
         try {
@@ -98,11 +107,55 @@ public class MemberCaptchaService {
             log.warn("读取会员验证码失败，按验证码错误处理: {}", e.getMessage());
             throw new ServiceException(ErrorCode.CAPTCHA_INVALID);
         }
-        // 无论成功失败都删除，避免同一验证码被暴力尝试
-        dao.delete(storeKey);
-        if (expected == null || !expected.equalsIgnoreCase(code.trim())) {
+        if (expected == null) {
+            dao.delete(attemptKey);
             throw new ServiceException(ErrorCode.CAPTCHA_INVALID);
         }
+        if (expected.equalsIgnoreCase(code.trim())) {
+            // 验证通过立即作废，不能重复使用
+            dao.delete(storeKey);
+            dao.delete(attemptKey);
+            return;
+        }
+
+        int attempts = nextAttempt(dao, attemptKey);
+        if (attempts >= maxAttempts()) {
+            // 错误次数达到上限，连同验证码一起作废，逼迫客户端重新获取
+            dao.delete(storeKey);
+            dao.delete(attemptKey);
+            log.warn("会员验证码错误次数达到上限，已作废: scene={}, key={}, attempts={}",
+                    normalized, keyPart, attempts);
+            throw ServiceException.keyed(ErrorCode.CAPTCHA_INVALID, "error.2003.attempts");
+        }
+        throw new ServiceException(ErrorCode.CAPTCHA_INVALID);
+    }
+
+    private int nextAttempt(SaTokenDao dao, String attemptKey) {
+        int previous = 0;
+        try {
+            String value = dao.get(attemptKey);
+            if (value != null) {
+                previous = Integer.parseInt(value);
+            }
+        } catch (RuntimeException e) {
+            // 计数损坏按首次错误处理，不能因为缓存脏数据放行
+            log.warn("读取会员验证码错误次数失败，按 0 处理: {}", e.getMessage());
+            previous = 0;
+        }
+        int next = previous + 1;
+        dao.set(attemptKey, String.valueOf(next), EXPIRE_SECONDS);
+        return next;
+    }
+
+    private int maxAttempts() {
+        int value;
+        try {
+            value = configProvider.getIntValue(MAX_ATTEMPTS_KEY, DEFAULT_MAX_ATTEMPTS);
+        } catch (RuntimeException e) {
+            log.warn("读取会员验证码错误次数上限失败，按默认值处理: {}", e.getMessage());
+            value = DEFAULT_MAX_ATTEMPTS;
+        }
+        return Math.min(10, Math.max(1, value));
     }
 
     private String normalizeScene(String scene) {

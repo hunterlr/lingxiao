@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -38,6 +39,7 @@ class MemberCaptchaServiceTest {
         service = new MemberCaptchaService(configProvider);
         ReflectionTestUtils.setField(service, "masterEnabled", true);
         when(configProvider.getBooleanValue(eq(CONFIG_KEY), anyBoolean())).thenReturn(true);
+        when(configProvider.getIntValue(eq("mem.security.captchaMaxAttempts"), anyInt())).thenReturn(3);
     }
 
     private String codeOf(String scene, String key) {
@@ -64,6 +66,29 @@ class MemberCaptchaServiceTest {
 
         assertThatCode(() -> service.verify("login", response.getKey(), code)).doesNotThrowAnyException();
         assertThatThrownBy(() -> service.verify("login", response.getKey(), code))
+                .isInstanceOf(ServiceException.class)
+                .satisfies(e -> assertThat(((ServiceException) e).getCode())
+                        .isEqualTo(ErrorCode.CAPTCHA_INVALID.getCode()));
+    }
+
+    @Test
+    @DisplayName("验证码错误次数限制：前两次可重试，第 3 次作废且正确码也不能再用")
+    void wrongAttemptsAreLimited() {
+        MemberCaptchaResponse response = service.create("login");
+        String key = response.getKey();
+        String code = codeOf("login", key);
+
+        assertThatThrownBy(() -> service.verify("login", key, "!!!!"))
+                .isInstanceOf(ServiceException.class);
+        assertThatThrownBy(() -> service.verify("login", key, "!!!!"))
+                .isInstanceOf(ServiceException.class);
+        assertThatThrownBy(() -> service.verify("login", key, "!!!!"))
+                .isInstanceOf(ServiceException.class)
+                .satisfies(e -> assertThat(((ServiceException) e).getMessageKey())
+                        .isEqualTo("error.2003.attempts"));
+
+        assertThat(codeOf("login", key)).isNull();
+        assertThatThrownBy(() -> service.verify("login", key, code))
                 .isInstanceOf(ServiceException.class)
                 .satisfies(e -> assertThat(((ServiceException) e).getCode())
                         .isEqualTo(ErrorCode.CAPTCHA_INVALID.getCode()));

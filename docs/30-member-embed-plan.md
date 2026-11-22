@@ -155,6 +155,13 @@ DELETE /api/admin/member/{memberId}
 | `mem.register.mobileRequired` | switch | false | 注册手机号是否必填 |
 | `mem.register.emailRequired` | switch | false | 注册邮箱是否必填 |
 | `mem.register.resetCodeExpireMinutes` | number | 10 | 找回密码验证码有效期 |
+| `mem.security.captchaMaxAttempts` | number | 3 | 同一图形验证码允许输错次数 |
+| `mem.register.rateLimitCount` | number | 5 | 注册限流：单用户名 / IP 窗口内请求数 |
+| `mem.register.rateLimitMinutes` | number | 10 | 注册限流窗口（分钟） |
+| `mem.account.loginRateLimitCount` | number | 30 | 登录限流：单账号 / IP 窗口内请求数 |
+| `mem.account.loginRateLimitMinutes` | number | 10 | 登录限流窗口（分钟） |
+| `mem.register.resetRateLimitCount` | number | 5 | 找回 / 重置密码限流：单账号 / IP 窗口内请求数 |
+| `mem.register.resetRateLimitMinutes` | number | 10 | 找回 / 重置密码限流窗口（分钟） |
 
 删除参数时模块回退代码里的默认值，不会出现空指针。
 
@@ -164,8 +171,13 @@ DELETE /api/admin/member/{memberId}
 
 - 密码只存 BCrypt 哈希；响应体不返回密码字段。
 - 登录失败计数落库（`login_fail_count` / `lock_time`），锁定期内不再比对密码。
-- 验证码存 Sa-Token DAO，按场景（login / register / reset）隔离，一次性使用。
+- 注册 / 登录 / 找回密码 / 重置密码有独立限流：账号（用户名 / 手机号 / 邮箱）与 IP
+  两个维度，超限返回 `1006`；限流是内存固定窗口，重启清零，不替代登录失败锁定。
+- 验证码存 Sa-Token DAO，按场景（login / register / reset）隔离；同一验证码允许
+  输错 `mem.security.captchaMaxAttempts` 次，达到上限立即作废，验证通过也立即作废。
 - 找回密码验证码只存 BCrypt 哈希；账号不存在时静默成功，不暴露账号是否注册。
+- 找回密码验证码按账号选择通道：手机号走短信、邮箱走邮件、用户名优先手机号；
+  开发环境默认写日志，生产需实现 `MemberSmsSender` / `MemberEmailSender`。
 - 停用 / 删除 / 重置密码都会踢掉该会员全部会话。
 - 多端登录默认关闭（新登录踢旧会话）；开启后同一账号可多端并存。
 - 会员验证码受总闸 `lx.captcha.enabled` 与参数 `mem.security.captchaEnabled` 双重控制。
@@ -177,24 +189,99 @@ DELETE /api/admin/member/{memberId}
 | 切片 | 内容 | 状态 |
 | --- | --- | --- |
 | 1 | 表结构、独立 StpLogic、注册 / 登录 / 找回密码、个人中心、后台 CRUD | v1.2 第一刀，已完成 |
+| 1.5 | 注册 / 登录 / 找回密码限流、验证码错误次数、短信 / 邮件通道接口与开发实现 | v1.2 第二刀，已完成 |
 | 2 | 会员等级升级任务、积分 / 成长值规则 | 待排期 |
 | 3 | 评论 / 收藏 / 点赞 / 消息 | 待排期 |
 | 4 | 第三方登录绑定（`mem_oauth`） | 待排期 |
 | 5 | 会员角色与细粒度权限 | 待排期 |
 
-**第一刀明确未做**：真实短信 / 邮件通道（当前 `LogMemberResetCodeSender` 只写日志）、
-等级自动升级、积分规则、内容级多语言。
+**第二刀后仍未做**：真实短信 / 邮件服务商实现（当前默认 `lx.member.channel.mode=dev`
+只写日志，生产需实现 `MemberSmsSender` / `MemberEmailSender`）、等级自动升级、
+积分规则、内容级多语言。
 
 ---
 
 ## 9. 验收基线
 
-- 单测：`MemberUserServiceTest` 15 项、`MemberPasswordPolicyTest` 5 项、
-  `MemberCaptchaServiceTest` 6 项，共 26 项。
-- 接口：`.local/member-check.mjs` 46 项全部通过（域隔离、注册登录、找回密码、
-  锁定、启停、删除、菜单下发、验证码开关）。
+- 单测：会员模块共 40 项 —— `MemberUserServiceTest` 19 项、
+  `MemberPasswordPolicyTest` 5 项、`MemberCaptchaServiceTest` 7 项、
+  `MemberRateLimitServiceTest` 4 项、`RoutingMemberResetCodeSenderTest` 5 项。
+- 全仓：**196 项 / 33 类**，JDK 8 下失败 0 错误 0。
+- 接口：`.local/member-check.mjs` **57 项全部通过**（域隔离、注册登录、找回密码、
+  短信 / 邮件开发通道、锁定、启停、删除、菜单下发、验证码开关、
+  注册 / 登录 / 找回 / 重置限流）。
 - 浏览器：`.local/uitest/member.mjs` 12 项全部通过（列表、筛选、编辑、启停、
   重置密码、删除、无前端报错）。
 - 关闭态：`.local/member-off-check.mjs` 7 项全部通过。`member.enabled=false` 重启后
   `/api/app/**` 与 `/api/admin/member/**` 返回 404，会员菜单不下发，平台后台与 CMS 正常，
   已建表与数据保留。
+
+---
+
+## 10. v1.2 第二刀：会员安全补口（2026-11-22）
+
+第一刀打通账号闭环后，第二刀只补安全缺口，不扩业务面：
+
+- 注册 / 登录 / 找回密码 / 重置密码限流；
+- 图形验证码错误次数上限；
+- 短信 / 邮件通道接口化，开发环境保留日志实现，生产可替换；
+- V26 参数迁移、单测与接口验收补齐。
+
+### 10.1 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `db/migration/member/V26__member_security_hardening.sql` | 参数 19~25：验证码尝试次数、注册 / 登录 / 找回限流 |
+| 限流 | `MemberRateLimitService` | 内存固定窗口，按动作 + 账号 + IP 计数，超限 1006 |
+| 验证码 | `MemberCaptchaService` | 同一 key 允许输错 N 次，达到上限立即作废 |
+| 通道接口 | `MemberSmsSender` / `MemberEmailSender` | 短信、邮件真实通道 SPI |
+| 开发实现 | `DevMemberSmsSender` / `DevMemberEmailSender` | 只写应用日志，保留可解析的验证码行 |
+| 装配 | `MemberChannelConfiguration` | `lx.member.channel.mode=dev` 默认装配开发实现 |
+| 路由 | `RoutingMemberResetCodeSender` | 手机号走短信、邮箱走邮件、用户名优先手机号 |
+| 业务 | `MemberUserService` | 注册 / 登录 / 找回 / 重置入口统一先限流 |
+| 单测 | `MemberRateLimitServiceTest` / `RoutingMemberResetCodeSenderTest` | 窗口边界、Key 隔离、通道路由 |
+| 配置 | `application.yml` | `lx.member.channel.mode: dev` |
+
+### 10.2 关键决策
+
+1. **限流与锁定分层。**
+   限流挡短时间脚本重放，内存固定窗口、重启清零；账号锁定仍落
+   `mem_user.login_fail_count / lock_time`，重启不丢，两者互不替代。
+2. **账号 + IP 双维度。**
+   每个动作同时记账号键与 IP 键；IP 阈值自动放宽为账号阈值的 10 倍，
+   正常用户不误伤，批量脚本会先撞 IP 上限。
+3. **动作独立计数。**
+   注册、登录、找回、重置分别计数；找回验证码错误不会占用登录额度。
+4. **验证码有限重试。**
+   同一个验证码允许输错 `mem.security.captchaMaxAttempts` 次（默认 3），
+   达到上限立即删除验证码；验证成功也立即删除，仍是一次性使用。
+5. **通道接口与业务解耦。**
+   业务层只调用 `MemberResetCodeSender`；生产实现短信 / 邮件接口即可，
+   不需要改注册、找回或后台管理逻辑。
+6. **开发通道可验收。**
+   开发实现按原格式输出 `memberId / username / code / expireMinutes`，
+   本地脚本可直接从日志取验证码；生产必须切 `mode=prod` 并装配真实实现。
+7. **参数缺失回退默认值。**
+   新增 7 个参数全部走 `ConfigProvider`，删除参数不会导致空指针或登录失败。
+
+### 10.3 验证结果
+
+| 项 | 结果 |
+|---|---|
+| 编译 / 打包 | `mvn -q -DskipTests package` 通过 |
+| Flyway | `V26 - member security hardening` 成功；参数 19~25 已落库 |
+| 单测 | 会员 40 项；全仓 **196 项 / 33 类**，失败 0 错误 0 |
+| 接口验收 | `.local/member-check.mjs` **57/57**；新增短信 / 邮件通道、注册 / 登录 / 找回 / 重置限流 |
+| 验证码次数 | 单测覆盖：前两次错误可重试，第 3 次作废，之后正确码也不能用 |
+| 平台隔离 | 后台会话、会员菜单、CMS 不受影响 |
+
+### 10.4 复验命令
+
+```powershell
+# 后端 8080（关闭验证码）
+java -jar lx-boot\target\lingxiao.jar --lx.captcha.enabled=false
+node .local\member-check.mjs
+
+# 全仓单测
+mvn -q test
+```

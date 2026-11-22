@@ -194,7 +194,7 @@ curl "http://127.0.0.1:8080/api/portal/cms/sites/main/articles/batch?ids=1234567
 |---|---|
 | 首页 | `GET /sites/{siteKey}`、`/categories`、`/articles?pageNum=1&pageSize=7` |
 | 栏目列表 | `/categories`、`/articles?categoryKey=...&pageNum=...&pageSize=...` |
-| 文章详情 | `/articles/{articleId}`、`/categories`、同栏目 `/articles` |
+| 文章详情 | `/articles/{articleId}`、`/categories`、同栏目 `/articles`；会员评论 `/api/app/public/comments/articles/{articleId}` 与登录发表 |
 | 站内搜索 | `/search?keyword=...&pageNum=...&pageSize=...` |
 | 个人中心 · 我的收藏 | 会员 `/api/app/interactions/favorites` + `/articles/batch` 补标题 / 封面 |
 

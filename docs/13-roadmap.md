@@ -853,3 +853,35 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 
 **下一步**：评论 / 消息；会员资料完善（头像上传、手机号 / 邮箱换绑、会话管理）；
 标签页、sitemap / RSS 与缓存策略；随后进入工作流 / SaaS 规划。
+
+### 12.20 P1：v1.2 会员评论 + 后台审核（✅ 已完成，2026-11-22）
+
+**完成内容**：
+
+- 新增迁移 `V30__member_comment.sql`：`mem_comment` 只存会员 / 文章 ID、
+  纯文本内容与审核字段（待审 / 通过 / 拒绝、审核人 / 时间 / 备注），
+  逻辑删除；新增 `mem.comment.enabled`（configId 27）与菜单 4040~4042；
+- `MemberCommentService`：发表默认待审核、公开列表只出已通过、后台分页筛选、
+  通过 / 拒绝、逻辑删除；文章下线只影响门户可见性，不删评论记录；
+- `MemberCommentController`：公开读 `/api/app/public/comments/articles/{articleId}`
+  匿名可读，发表 `/api/app/comments/articles/{articleId}` 必须登录；
+- `MemberCommentAdminController`：`/api/admin/member/comment/**`
+  列表 / 审核 / 删除，权限码 `platform:member:comment:list|audit|remove`；
+- `MemberCommentEnabledInterceptor` 读 `mem.comment.enabled`：关闭后门户评论
+  读 / 写返回 `1003`，后台审核仍可查看与清理历史评论；
+- 后台新增「会员管理 → 评论管理」列表与通过 / 拒绝 / 删除操作；
+  「会员设置」新增评论设置分组，开关与其它 `mem.*` 参数一起批量保存；
+- 门户文章页新增评论区：匿名可读、登录后可发表、提交后提示待审核；
+  评论开关关闭时隐藏评论框并显示明确文案。
+
+**验收**：全仓 `mvn test` **218 项 / 36 类**，0 失败；Flyway V30 成功；
+`MemberCommentServiceTest` 7 项通过；`.local/member-comment-check.mjs`
+**25/25**（域隔离、审核流程、开关读写、删除与 1004）；`npm run build` 通过；
+浏览器完成门户发表 → 后台通过 / 拒绝 / 删除 → 门户可见性 → 设置页开关保存；
+带 Cookie 的 SSR **6/6**；控制台无错误。
+
+详见 `docs/30-member-embed-plan.md` §13、`docs/31-portal-frontend.md` §4.6、
+`docs/21-build-log.md` §61。
+
+**下一步**：消息通知；会员资料完善（头像上传、手机号 / 邮箱换绑、会话管理）；
+标签页、sitemap / RSS 与缓存策略；随后进入工作流 / SaaS 规划。

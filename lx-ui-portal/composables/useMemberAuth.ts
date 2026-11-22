@@ -1,5 +1,6 @@
 import type {
   MemberCaptcha,
+  MemberCommentItem,
   MemberFavoriteItem,
   MemberInteraction,
   MemberLoginForm,
@@ -270,6 +271,23 @@ export function useMemberAuth() {
     })
   }
 
+  // ==================== 评论 ====================
+
+  /** 公开读：只返回已审核通过的评论，匿名可读。 */
+  function fetchComments(articleId: string | number, pageNum = 1, pageSize = 5): Promise<PageResult<MemberCommentItem>> {
+    return request<PageResult<MemberCommentItem>>(`/public/comments/articles/${articleSegment(articleId)}`, {
+      query: { pageNum, pageSize }
+    })
+  }
+
+  /** 发表评论：必须登录；提交后进入待审核，不会立即出现在公开列表。 */
+  function submitComment(articleId: string | number, content: string): Promise<MemberCommentItem> {
+    return request<MemberCommentItem>(`/comments/articles/${articleSegment(articleId)}`, {
+      method: 'POST',
+      body: { content }
+    })
+  }
+
   const isLoggedIn = computed(() => Boolean(token.value))
 
   return {
@@ -289,6 +307,8 @@ export function useMemberAuth() {
     fetchInteraction,
     fetchFavorites,
     setFavorite,
-    setLike
+    setLike,
+    fetchComments,
+    submitComment
   }
 }

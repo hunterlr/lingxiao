@@ -61,6 +61,14 @@ Version **v1.0** ships the admin foundation. v1.1 is embedding CMS as an indepen
 - Logos and covers use a file-center image picker; selections store a `fileId`, external URLs still work
 - Public read-only portal API `/api/portal/cms/**`: sites, navigation tree, tags, article list / detail / search; published content only
 
+**Membership (v1.2 module)**
+
+- Standalone `lx-module-member`; member token `lx-member-token` is fully isolated from the admin `lx-platform-token`
+- Registration / sign-in / password reset / profile; captcha, password policy, lockout and rate limits are runtime configurable
+- Idempotent favorite and like writes; public stats are anonymous, signed-in members also get their own state
+- Comments are reviewed before publishing: portal submissions stay pending until approved; the comment switch takes effect at runtime in member settings
+- Clear business errors when the member or comment switch is off; the portal degrades without blank pages
+
 **Operations & tooling**
 
 - Scheduled jobs: Spring Task + database lock; create, enable/disable, run once, execution logs; no duplicate runs in a cluster
@@ -193,6 +201,8 @@ lingxiao/
 /api/admin/monitor/job/**               scheduled jobs and execution logs
 /api/admin/cms/site|category|article|tag content management (v1.1 module)
 /api/portal/cms/**                     public read-only portal API (sites / categories / articles / tags / search)
+/api/admin/member/**                    members / message channels / comment review (v1.2 module)
+/api/app/**                             member registration / sign-in / reset / profile / favorites / likes / comments
 /api/admin/tool/gen/**                  code generation
 /api/admin/file/**                      upload / dedup / list / rename / download
 /api/file/{fileId}                      public access (?size=thumb|medium)
@@ -224,7 +234,7 @@ Responses are uniform `{ code, msg, data }`: `0` success, `1xxx` general and val
 |---|---|---|
 | v1.0 | Admin foundation: permissions, files, jobs, monitoring, generator, deployment | ✅ Done |
 | v1.1 | i18n L1 (bilingual UI), CMS module (admin flows + portal API + media picker done) | 🚧 In progress |
-| v1.2 | Membership, Nuxt 3 portal | Planned |
+| v1.2 | Membership (accounts, profile, security, message channels, favorites, likes, comments with review) | ✅ Done |
 | v1.3 | Workflow (Flowable), SaaS multi-tenancy | Planned |
 
 ## Contributing

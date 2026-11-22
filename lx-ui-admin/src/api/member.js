@@ -55,3 +55,17 @@ export function updateMemberChannel(configId, data) {
 export function testMemberChannel(configId, target) {
   return http.post(`/admin/member/channel/${configId}/test`, { target })
 }
+
+/* ==================== 会员评论审核 ==================== */
+
+export function listMemberComments(params) {
+  return http.get('/admin/member/comment/list', { params })
+}
+
+export function auditMemberComment(commentId, data) {
+  return http.put(`/admin/member/comment/${commentId}/audit`, data)
+}
+
+export function deleteMemberComment(commentId) {
+  return http.delete(`/admin/member/comment/${commentId}`)
+}

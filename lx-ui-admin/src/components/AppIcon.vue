@@ -34,6 +34,7 @@ const ICON_MAP = {
   dict: 'Notebook',
   edit: 'Edit',
   message: 'Bell',
+  comment: 'ChatDotRound',
   online: 'Connection',
   logininfor: 'Key',
   form: 'Document',

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MemberInteraction } from '~/types/member'
+import type { MemberCommentItem, MemberInteraction } from '~/types/member'
 import { MemberApiError, memberErrorMessage } from '~/composables/useMemberAuth'
 
 definePageMeta({
@@ -10,7 +10,7 @@ const route = useRoute()
 const api = usePortalApi()
 const config = useRuntimeConfig()
 // 会员 composable 必须在首个 await 前初始化，避免异步 setup 丢上下文
-const { isLoggedIn, fetchInteraction, setFavorite, setLike } = useMemberAuth()
+const { isLoggedIn, fetchInteraction, setFavorite, setLike, fetchComments, submitComment } = useMemberAuth()
 
 const articleId = String(route.params.id || '')
 if (!/^\d+$/.test(articleId)) {
@@ -87,6 +87,91 @@ async function toggleLike() {
     handleInteractionError(error, '点赞失败，请稍后再试')
   } finally {
     interactionPending.value = false
+  }
+}
+
+// ==================== 评论 ====================
+
+const COMMENT_PAGE_SIZE = 5
+const comments = ref<MemberCommentItem[]>([])
+const commentTotal = ref(0)
+const commentPage = ref(0)
+const commentsLoading = ref(false)
+// 评论开关关闭或接口不可用时置为 false：隐藏评论框，只保留明确提示
+const commentsEnabled = ref(true)
+const commentsError = ref('')
+const commentContent = ref('')
+const commentSubmitting = ref(false)
+const commentFormError = ref('')
+const commentNotice = ref('')
+
+const commentHasMore = computed(() => comments.value.length < commentTotal.value)
+
+/**
+ * 读取公开评论。
+ *
+ * <p>首屏在 SSR 里加载，客户端复用同一份状态；「加载更多」在同一页内追加，
+ * 不改 URL，避免打开评论分页时把文章地址复制成一堆查询参数。</p>
+ */
+async function loadComments(reset = false) {
+  if (commentsLoading.value) return
+  commentsLoading.value = true
+  commentsError.value = ''
+  try {
+    const targetPage = reset ? 1 : commentPage.value + 1
+    const result = await fetchComments(articleId, targetPage, COMMENT_PAGE_SIZE)
+    comments.value = reset ? result.records : [...comments.value, ...result.records]
+    commentTotal.value = Number(result.total) || 0
+    commentPage.value = targetPage
+    commentsEnabled.value = true
+  } catch (error) {
+    // 评论开关关闭（1003）与网络异常都按“评论暂不可用”处理：
+    // 不展示评论框，只显示后端或兜底文案。
+    if (error instanceof MemberApiError && error.code === 1003) {
+      commentsEnabled.value = false
+    }
+    commentsError.value = memberErrorMessage(error, '评论暂不可用，请稍后再试')
+  } finally {
+    commentsLoading.value = false
+  }
+}
+
+await loadComments(true)
+
+async function handleSubmitComment() {
+  if (commentSubmitting.value) return
+  commentFormError.value = ''
+  commentNotice.value = ''
+
+  const content = commentContent.value.trim()
+  if (!content) {
+    commentFormError.value = '评论内容不能为空'
+    return
+  }
+  if (content.length > 1000) {
+    commentFormError.value = '评论内容不能超过 1000 个字符'
+    return
+  }
+  if (!(await ensureMember())) return
+
+  commentSubmitting.value = true
+  try {
+    await submitComment(articleId, content)
+    commentContent.value = ''
+    commentNotice.value = '评论已提交，审核通过后会展示在下方。'
+  } catch (error) {
+    if (error instanceof MemberApiError && error.code === 1002) {
+      navigateTo(loginTarget())
+      return
+    }
+    if (error instanceof MemberApiError && error.code === 1003) {
+      commentsEnabled.value = false
+      commentsError.value = memberErrorMessage(error, '评论功能已关闭')
+      return
+    }
+    commentFormError.value = memberErrorMessage(error, '评论提交失败，请稍后再试')
+  } finally {
+    commentSubmitting.value = false
   }
 }
 
@@ -214,6 +299,72 @@ useHead(() => {
     <p v-else-if="!isLoggedIn" class="form-hint interaction-hint">
       登录后可收藏与点赞，收藏内容可在个人中心查看。
     </p>
+
+    <section class="comments" aria-labelledby="comments-title">
+      <div class="section-head">
+        <h2 id="comments-title" class="section-title">
+          评论<span v-if="commentTotal" class="comments-total">{{ formatCount(commentTotal) }}</span>
+        </h2>
+      </div>
+
+      <p v-if="commentsError" class="form-alert error" role="alert">{{ commentsError }}</p>
+
+      <template v-if="commentsEnabled">
+        <ul v-if="comments.length" class="comment-list">
+          <li v-for="item in comments" :key="item.commentId" class="comment-item">
+            <span class="comment-avatar">
+              <img
+                v-if="mediaUrl(item.avatar, 'thumb')"
+                :src="mediaUrl(item.avatar, 'thumb')!"
+                :alt="item.nickname || '会员'"
+              />
+              <span v-else aria-hidden="true">{{ (item.nickname || '会').slice(0, 1) }}</span>
+            </span>
+            <div class="comment-body">
+              <div class="comment-meta">
+                <strong>{{ item.nickname || '会员' }}</strong>
+                <time v-if="item.createTime" :datetime="item.createTime">{{ formatDate(item.createTime) }}</time>
+              </div>
+              <p class="comment-content">{{ item.content }}</p>
+            </div>
+          </li>
+        </ul>
+        <p v-else-if="!commentsLoading" class="comment-empty">还没有评论，来写下第一条吧。</p>
+
+        <div v-if="commentHasMore" class="comment-more">
+          <button type="button" class="button ghost" :disabled="commentsLoading" @click="loadComments()">
+            {{ commentsLoading ? '加载中…' : '加载更多评论' }}
+          </button>
+        </div>
+
+        <form v-if="isLoggedIn" class="comment-form" @submit.prevent="handleSubmitComment">
+          <label class="comment-label" for="comment-content">发表评论</label>
+          <textarea
+            id="comment-content"
+            v-model="commentContent"
+            maxlength="1000"
+            rows="4"
+            placeholder="说点什么…（提交后需审核）"
+          />
+          <div class="comment-form-footer">
+            <span class="form-hint">{{ commentContent.length }} / 1000</span>
+            <button type="submit" class="button" :disabled="commentSubmitting">
+              {{ commentSubmitting ? '提交中…' : '提交评论' }}
+            </button>
+          </div>
+          <p v-if="commentFormError" class="form-alert error comment-feedback" role="alert">
+            {{ commentFormError }}
+          </p>
+          <p v-else-if="commentNotice" class="form-alert success comment-feedback" role="status">
+            {{ commentNotice }}
+          </p>
+        </form>
+        <p v-else class="form-hint comment-login-hint">
+          登录后可以发表评论。
+          <NuxtLink :to="loginTarget()">去登录</NuxtLink>
+        </p>
+      </template>
+    </section>
 
     <footer class="article-footer">
       <p v-if="article.source">

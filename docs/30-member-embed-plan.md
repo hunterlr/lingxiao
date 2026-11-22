@@ -102,6 +102,9 @@ POST /api/app/auth/reset-password
 
 # 公开只读：匿名可看总数，带会员 Token 时附带个人状态
 GET  /api/app/public/interactions/articles/{articleId}
+
+# 公开只读：只返回已审核通过的评论
+GET  /api/app/public/comments/articles/{articleId}?pageNum=&pageSize=
 ```
 
 ### 4.2 会员端（必须登录）
@@ -116,6 +119,8 @@ PUT    /api/app/interactions/articles/{articleId}/favorite
 DELETE /api/app/interactions/articles/{articleId}/favorite
 PUT    /api/app/interactions/articles/{articleId}/like
 DELETE /api/app/interactions/articles/{articleId}/like
+
+POST   /api/app/comments/articles/{articleId}
 ```
 
 ### 4.3 后台（`/api/admin/member`，平台域）
@@ -129,6 +134,10 @@ PUT    /api/admin/member/{memberId}
 PUT    /api/admin/member/{memberId}/status
 PUT    /api/admin/member/{memberId}/password
 DELETE /api/admin/member/{memberId}
+
+GET    /api/admin/member/comment/list
+PUT    /api/admin/member/comment/{commentId}/audit
+DELETE /api/admin/member/comment/{commentId}
 ```
 
 ---
@@ -144,11 +153,15 @@ DELETE /api/admin/member/{memberId}
 | `platform:member:user:status` | 启停会员 |
 | `platform:member:user:resetPwd` | 重置密码 |
 | `platform:member:user:remove` | 删除会员 |
+| `platform:member:comment:list` | 评论列表 |
+| `platform:member:comment:audit` | 通过 / 拒绝评论 |
+| `platform:member:comment:remove` | 删除评论 |
 
 菜单：`4000 member` → `4010 member:user`（`member/user/index`）→ `4011~4016` 按钮。
 `4020 member:channel`（`member/channel/index`）→ `4021~4022` 按钮；
 `4030 member:setting`（`member/setting/index`）→ `4031` 保存按钮，
-权限沿用 `platform:system:config:list|edit`（编辑的仍是 `sys_config`）。
+权限沿用 `platform:system:config:list|edit`（编辑的仍是 `sys_config`）；
+`4040 member:comment`（`member/comment/index`）→ `4041~4042` 审核 / 删除按钮。
 超管角色在迁移里自动授权。
 
 ---
@@ -182,6 +195,7 @@ DELETE /api/admin/member/{memberId}
 | `mem.account.loginRateLimitMinutes` | number | 10 | 登录限流窗口（分钟） |
 | `mem.register.resetRateLimitCount` | number | 5 | 找回 / 重置密码限流：单账号 / IP 窗口内请求数 |
 | `mem.register.resetRateLimitMinutes` | number | 10 | 找回 / 重置密码限流窗口（分钟） |
+| `mem.comment.enabled` | switch | true | 评论开关；关闭后门户评论读取 / 提交返回 1003，后台审核仍可用 |
 
 删除参数时模块回退代码里的默认值，不会出现空指针。
 
@@ -209,6 +223,8 @@ DELETE /api/admin/member/{memberId}
 - 停用 / 删除 / 重置密码都会踢掉该会员全部会话。
 - 多端登录默认关闭（新登录踢旧会话）；开启后同一账号可多端并存。
 - 会员验证码受总闸 `lx.captcha.enabled` 与参数 `mem.security.captchaEnabled` 双重控制。
+- 评论先审后发：公开接口只返回 `status=1`，待审 / 拒绝不对外；评论内容按纯文本保存，
+  门户用文本插值渲染，不二次 `v-html`。
 
 ---
 
@@ -219,7 +235,7 @@ DELETE /api/admin/member/{memberId}
 | 1 | 表结构、独立 StpLogic、注册 / 登录 / 找回密码、个人中心、后台 CRUD | v1.2 第一刀，已完成 |
 | 1.5 | 注册 / 登录 / 找回密码限流、验证码错误次数、短信 / 邮件通道接口与开发实现 | v1.2 第二刀，已完成 |
 | 2 | 会员等级升级任务、积分 / 成长值规则 | 待排期 |
-| 3 | 评论 / 收藏 / 点赞 / 消息 | 收藏 + 点赞已完成（2026-11-22），评论 / 消息待排期 |
+| 3 | 评论 / 收藏 / 点赞 / 消息 | 收藏 + 点赞已完成（2026-11-22）；评论 + 后台审核已完成（2026-11-22）；消息待排期 |
 | 4 | 第三方登录绑定（`mem_oauth`） | 待排期 |
 | 5 | 会员角色与细粒度权限 | 待排期 |
 
@@ -474,3 +490,98 @@ mvn -q -pl lx-modules/lx-module-member -am test -Dtest=MemberInteractionServiceT
 | 计数缓存 | 统计每次 `COUNT`，热门文章可加计数冗余或缓存 |
 | 文章下线清理 | 收藏关系保留，由门户按批量摘要结果隐藏 |
 | 批量上限 | 收藏页单页 6 条，批量接口上限 50 条 |
+
+---
+
+## 13. v1.2 第三刀（后半）：评论 + 后台审核（2026-11-22）
+
+评论是会员侧第一个“先审后发”的写入。本轮同时补上评论运行期开关，
+与已有会员总开关形成两级控制。
+
+### 13.1 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `db/migration/member/V30__member_comment.sql` | `mem_comment`；`mem.comment.enabled`（configId 27）；菜单 4040~4042 |
+| 实体 | `MemComment` | `member_id + article_id`、内容、审核状态 / 人 / 时间 / 备注、逻辑删除 |
+| Mapper | `MemCommentMapper` | 原生 `BaseMapper` |
+| 服务 | `MemberCommentService` | 发表默认待审、公开分页、后台筛选、审核、逻辑删除 |
+| 会员接口 | `MemberCommentController` | 公开读 + 登录发表 |
+| 后台接口 | `MemberCommentAdminController` | 列表 / 通过 / 拒绝 / 删除 |
+| 开关 | `MemberCommentEnabledInterceptor` | 只拦 `/api/app/comments/**` 与 `/api/app/public/comments/**` |
+| 后台页面 | `views/member/comment/index.vue`、`views/member/setting/index.vue` | 评论管理列表；评论设置分组 |
+| 门户 | `pages/article/[id].vue`、`useMemberAuth`、`types/member.ts` | 评论区、请求封装、DTO |
+| 单测 | `MemberCommentServiceTest` | 7 项 |
+
+### 13.2 数据模型
+
+`mem_comment` 关键字段：
+
+| 字段 | 说明 |
+|---|---|
+| `comment_id` | 主键 |
+| `article_id` / `member_id` | 只存 ID，不建跨模块外键 |
+| `content` | 纯文本，最多 1000 字；门户按文本渲染 |
+| `status` | `0` 待审核 / `1` 已通过 / `2` 已拒绝 |
+| `audit_by` / `audit_time` / `audit_remark` | 审核人、时间、备注；备注不展示给会员 |
+| `create_ip` | 提交 IP，用于排查与后续风控 |
+| `del_flag` | 后台删除为逻辑删除，保留审核痕迹 |
+
+索引：`(tenant_id, article_id, status, create_time)` 服务公开列表；
+`(tenant_id, status, create_time)` 服务后台待审列表；
+`(tenant_id, member_id, create_time)` 为后续“我的评论”预留。
+
+### 13.3 关键决策
+
+1. **先审后发，默认待审。**
+   门户提交成功只提示“审核通过后展示”，不做乐观插入；公开列表只查 `status=1`。
+   拒绝保留记录与备注，方便复核，也避免同一内容反复提交。
+2. **评论开关只关门户。**
+   关闭后 `/api/app/comments/**` 与 `/api/app/public/comments/**` 返回
+   `1003 评论功能已关闭`；后台审核接口不挂该拦截器，仍可处理历史评论。
+3. **开关放在会员设置页。**
+   `mem.comment.enabled` 与其它 `mem.*` 参数同页，修改后立即生效；
+   会员总开关仍在「系统管理 → 参数设置」，避免关闭后菜单隐藏导致无法再打开。
+4. **公开接口不返回账号信息。**
+   门户 DTO 不含 `memberId`、用户名、审核信息；后台 DTO 才带会员账号与备注。
+5. **评论与文章解耦。**
+   评论不查 CMS 表、不建外键。文章下线后评论仍在库中；是否展示由文章页是否存在
+   决定，CMS 恢复发布后评论自然回来。
+6. **删除只做逻辑删除。**
+   已删除评论不再出现在后台列表，审核返回 `1004`，不会“复活”。
+
+### 13.4 验证结果
+
+| 项 | 结果 |
+|---|---|
+| 编译 / 打包 | `mvn -q -DskipTests package` 通过 |
+| Flyway | `V30 - member comment` 成功，表、参数与菜单已落库 |
+| 全仓单测 | **218 项 / 36 类**，失败 0 错误 0 |
+| 评论单测 | `MemberCommentServiceTest` 7 项通过 |
+| 接口验收 | `.local/member-comment-check.mjs` **25/25** |
+| 门户构建 | `npm run build` 通过，文章页生成独立 chunk |
+| 浏览器 | 门户发表 → 待审不公开 → 后台通过 / 拒绝 / 删除 → 门户可见性 → 设置页开关保存与关闭提示 |
+| SSR | `.local/portal-comment-ssr.mjs` **6/6**：匿名 / 会员评论框、登录引导、已通过评论与昵称 |
+| 控制台 | 无脚本错误 |
+
+### 13.5 复验命令
+
+```powershell
+# 后端 8080（关闭验证码），门户 3000
+java -jar lx-boot\target\lingxiao.jar --lx.captcha.enabled=false
+node .local\member-comment-check.mjs
+node .local\portal-comment-ssr.mjs
+
+# 单测
+mvn -q -pl lx-modules/lx-module-member -am test -Dtest=MemberCommentServiceTest -DfailIfNoTests=false
+```
+
+### 13.6 遗留
+
+| 项 | 说明 |
+|---|---|
+| 消息 / 通知 | 评论通过 / 拒绝暂不通知会员，后续接站内信 |
+| 回复 / 盖楼 | 当前一级评论，未做 `parent_id` |
+| 敏感词 / 自动审核 | 仅人工审核，未接敏感词库 |
+| 评论防刷 | 未做频率限制，可复用会员限流服务 |
+| 我的评论 | 表已带会员索引，接口与页面留给后续切片 |

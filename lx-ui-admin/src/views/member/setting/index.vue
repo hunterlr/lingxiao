@@ -149,6 +149,12 @@ const GROUP_DEFS = [
       'mem.register.resetRateLimitCount',
       'mem.register.resetRateLimitMinutes'
     ]
+  },
+  {
+    key: 'comment',
+    titleKey: 'page.memberSetting.groupComment',
+    descriptionKey: 'page.memberSetting.groupCommentHint',
+    keys: ['mem.comment.enabled']
   }
 ]
 

@@ -94,3 +94,13 @@ export interface MemberFavoriteItem {
   articleId: string | number
   createTime?: string | null
 }
+
+/** 门户公开评论条目：只含展示字段，不含会员账号与审核信息。 */
+export interface MemberCommentItem {
+  commentId: string | number
+  articleId?: string | number
+  content: string
+  nickname?: string | null
+  avatar?: string | null
+  createTime?: string | null
+}

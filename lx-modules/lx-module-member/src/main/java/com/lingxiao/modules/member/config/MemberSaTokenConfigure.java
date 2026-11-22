@@ -4,6 +4,7 @@ import cn.dev33.satoken.SaManager;
 import cn.dev33.satoken.config.SaTokenConfig;
 import cn.dev33.satoken.interceptor.SaInterceptor;
 import com.lingxiao.common.security.util.StpMemberUtil;
+import com.lingxiao.modules.member.security.MemberCommentEnabledInterceptor;
 import com.lingxiao.modules.member.security.MemberEnabledInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
@@ -40,6 +41,7 @@ public class MemberSaTokenConfigure implements WebMvcConfigurer {
     private static final long MEMBER_ACTIVE_TIMEOUT = 2 * 60 * 60L;
 
     private final MemberEnabledInterceptor memberEnabledInterceptor;
+    private final MemberCommentEnabledInterceptor memberCommentEnabledInterceptor;
 
     @PostConstruct
     public void initTokenConfig() {
@@ -65,6 +67,11 @@ public class MemberSaTokenConfigure implements WebMvcConfigurer {
         // 后台会员管理接口同样受开关控制；菜单由 AuthService 同步隐藏。
         registry.addInterceptor(memberEnabledInterceptor)
                 .addPathPatterns("/api/app/**", "/api/admin/member/**");
+
+        // 评论开关只作用于门户评论接口；后台审核在开关关闭时仍可用。
+        // 必须在登录校验之前，匿名读评论关闭时也能直接得到明确提示。
+        registry.addInterceptor(memberCommentEnabledInterceptor)
+                .addPathPatterns("/api/app/comments/**", "/api/app/public/comments/**");
 
         registry.addInterceptor(new SaInterceptor(handler -> {
                     // 只对匹配到 Controller 的请求做登录校验；会员模块关闭时

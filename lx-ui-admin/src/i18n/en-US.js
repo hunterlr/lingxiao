@@ -227,6 +227,9 @@ export default {
     'cms:category': 'Categories',
     'cms:article': 'Articles',
     'cms:tag': 'Tags',
+    'cms:recycle': 'Recycle bin',
+    'cms:article:restore': 'Restore article',
+    'cms:article:purge': 'Delete permanently',
     'system:user:add': 'Add user',
     'system:user:edit': 'Edit user',
     'system:user:remove': 'Delete user',
@@ -412,7 +415,7 @@ export default {
         selectSiteFirst: 'Create a site in Site management first',
         publishConfirm: 'Publish "{title}"? It becomes visible on the portal.',
         offlineConfirm: 'Take "{title}" offline?',
-        deleteConfirm: 'Delete article "{title}"?',
+        deleteConfirm: 'Delete article "{title}"? It moves to the recycle bin and can be restored.',
         previewTitle: 'Preview shows the server-sanitized content',
         previewDesc: 'Content is sanitized with an HTML whitelist on write and read, so preview matches what the portal shows.',
         titleRequired: 'Enter the article title',
@@ -424,6 +427,22 @@ export default {
         coverPlaceholder: 'fileId or an image URL starting with https://',
         sourcePlaceholder: 'e.g. Original, Some News',
         sourceUrlPlaceholder: 'Link to the original post (optional)'
+      },
+      recycle: {
+        title: 'Recycle bin',
+        hint: 'Deleting an article only moves it to the recycle bin: tags are kept and restoring returns it as a draft. Permanent deletion removes the body and tag links and cannot be undone.',
+        keywordPlaceholder: 'Title or URL slug',
+        total: '{total} article(s) in the recycle bin',
+        statusBeforeDelete: 'Status before deletion',
+        deletedBy: 'Deleted by',
+        deletedAt: 'Deleted at',
+        restore: 'Restore',
+        purge: 'Delete permanently',
+        restoreConfirm: 'Restore "{title}"? It returns as a draft and must be published again before it appears on the portal.',
+        purgeConfirm: 'Permanently delete "{title}"? The body and tag links are removed and cannot be recovered.',
+        restoreSuccess: 'Restored as a draft',
+        purgeSuccess: 'Permanently deleted',
+        empty: 'The recycle bin is empty'
       }
     },
     notice: {

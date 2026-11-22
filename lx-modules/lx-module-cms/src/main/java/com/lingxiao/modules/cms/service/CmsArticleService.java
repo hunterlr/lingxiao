@@ -9,6 +9,7 @@ import com.lingxiao.common.core.enums.ErrorCode;
 import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.common.security.util.LoginHelper;
 import com.lingxiao.common.web.util.HtmlSanitizer;
+import com.lingxiao.modules.cms.dto.CmsArticleRecycleVO;
 import com.lingxiao.modules.cms.entity.CmsArticle;
 import com.lingxiao.modules.cms.entity.CmsCategory;
 import com.lingxiao.modules.cms.entity.CmsTag;
@@ -161,11 +162,71 @@ public class CmsArticleService {
                 .set(CmsArticle::getUpdateBy, LoginHelper.getUserId()));
     }
 
+    /**
+     * 删除文章：进回收站，不做物理删除。
+     *
+     * <p>标签关联保留，恢复后不用重新打标；只有“彻底删除”才清关联。
+     * 记录删除人昵称快照，避免以后用户改名 / 删号后审计信息丢失。</p>
+     */
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long articleId) {
         mustGet(articleId);
+        LocalDateTime now = LocalDateTime.now();
+        int updated = articleMapper.softDeleteById(articleId, currentUserId(),
+                currentOperatorName(), now);
+        if (updated == 0) {
+            throw new ServiceException(ErrorCode.NOT_FOUND, "文章不存在或已删除");
+        }
+    }
+
+    /** 回收站分页：标题 / slug 关键字，只查删除审计，不带正文。 */
+    public PageResult<CmsArticleRecycleVO> recyclePage(long pageNum, long pageSize,
+                                                       Long siteId, String keyword) {
+        long current = Math.max(pageNum, 1);
+        long size = Math.min(Math.max(pageSize, 1), 100);
+        Page<CmsArticleRecycleVO> page = new Page<>(current, size);
+        String pattern = likePattern(keyword);
+        Page<CmsArticleRecycleVO> result = articleMapper.selectRecyclePage(page, siteId, pattern);
+        return PageResult.of(result.getTotal(), result.getCurrent(), result.getSize(),
+                result.getRecords());
+    }
+
+    /**
+     * 恢复：回收站 → 草稿。
+     *
+     * <p>不按删除前状态恢复：一篇已发布文章恢复后立刻回门户，容易在运营
+     * 没准备好时曝光；统一落草稿，需要时再显式发布。publish_time 保留。</p>
+     *
+     * <p>恢复前二次校验：站点和栏目必须仍然存在（栏目已删则只能彻底删除），
+     * slug 不能与其它文章冲突。正常流程下 slug 唯一性已包含回收站，
+     * 这里是防历史数据 / 手工改库。</p>
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void restore(Long articleId) {
+        CmsArticle deleted = mustGetDeleted(articleId);
+        siteService.mustGet(deleted.getSiteId());
+        CmsCategory category = deleted.getCategoryId() == null
+                ? null : categoryMapper.selectById(deleted.getCategoryId());
+        if (category == null || !Objects.equals(category.getSiteId(), deleted.getSiteId())) {
+            throw new ServiceException(ErrorCode.BAD_REQUEST,
+                    "所属栏目已删除，无法恢复，请直接彻底删除该文章");
+        }
+        ensureSlugAvailableForRestore(deleted);
+        int updated = articleMapper.restoreById(articleId, currentUserId(), LocalDateTime.now());
+        if (updated == 0) {
+            throw new ServiceException(ErrorCode.NOT_FOUND, "回收站中不存在该文章");
+        }
+    }
+
+    /** 彻底删除：仅限回收站记录；先清标签关联，再物理删除正文。 */
+    @Transactional(rollbackFor = Exception.class)
+    public void purge(Long articleId) {
+        mustGetDeleted(articleId);
         articleTagMapper.deleteByArticleId(articleId);
-        articleMapper.hardDeleteById(articleId);
+        int removed = articleMapper.hardDeleteDeletedById(articleId);
+        if (removed == 0) {
+            throw new ServiceException(ErrorCode.NOT_FOUND, "回收站中不存在该文章");
+        }
     }
 
     // ==================== 内部方法 ====================
@@ -176,6 +237,62 @@ public class CmsArticleService {
             throw new ServiceException(ErrorCode.NOT_FOUND, "文章不存在");
         }
         return article;
+    }
+
+    private CmsArticle mustGetDeleted(Long articleId) {
+        CmsArticle article = articleId == null ? null : articleMapper.selectDeletedById(articleId);
+        if (article == null) {
+            throw new ServiceException(ErrorCode.NOT_FOUND, "回收站中不存在该文章");
+        }
+        return article;
+    }
+
+    /** 恢复前校验 slug：唯一性口径与新建 / 编辑一致，都包含回收站。 */
+    private void ensureSlugAvailableForRestore(CmsArticle deleted) {
+        if (!StringUtils.hasText(deleted.getSlug())) {
+            return;
+        }
+        long conflict = articleMapper.countBySlugIncludingDeleted(
+                deleted.getSiteId(), deleted.getSlug().trim(), deleted.getArticleId());
+        if (conflict > 0) {
+            throw new ServiceException(ErrorCode.BAD_REQUEST,
+                    "slug 已被其他文章占用，请先处理占用方再恢复");
+        }
+    }
+
+    /** 当前操作人 ID；单测无登录上下文时留空，真实请求已被权限拦截。 */
+    private Long currentUserId() {
+        try {
+            return LoginHelper.getUserId();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** 删除人昵称快照；取不到时退回用户名，再退回 system。 */
+    private String currentOperatorName() {
+        try {
+            String nickname = LoginHelper.getNickname();
+            if (StringUtils.hasText(nickname)) {
+                return nickname;
+            }
+            String username = LoginHelper.getUsername();
+            return StringUtils.hasText(username) ? username : "system";
+        } catch (Exception e) {
+            return "system";
+        }
+    }
+
+    /** 关键字转 LIKE 参数；截断 50 字符，避免超长 LIKE 拖慢后台列表。 */
+    private String likePattern(String keyword) {
+        if (!StringUtils.hasText(keyword)) {
+            return null;
+        }
+        String value = keyword.trim();
+        if (value.length() > 50) {
+            value = value.substring(0, 50);
+        }
+        return "%" + value + "%";
     }
 
     private CmsCategory mustCategory(Long categoryId, Long siteId) {
@@ -204,11 +321,9 @@ public class CmsArticleService {
         if (!StringUtils.hasText(slug)) {
             return;
         }
-        Long count = articleMapper.selectCount(new LambdaQueryWrapper<CmsArticle>()
-                .eq(CmsArticle::getSiteId, siteId)
-                .eq(CmsArticle::getSlug, slug.trim())
-                .ne(excludeId != null, CmsArticle::getArticleId, excludeId));
-        if (count != null && count > 0) {
+        // 唯一性口径包含回收站：回收中的 slug 不被新文章占用，恢复时才不会撞车。
+        long count = articleMapper.countBySlugIncludingDeleted(siteId, slug.trim(), excludeId);
+        if (count > 0) {
             throw new ServiceException(ErrorCode.BAD_REQUEST, "文章 slug 已存在：" + slug);
         }
     }

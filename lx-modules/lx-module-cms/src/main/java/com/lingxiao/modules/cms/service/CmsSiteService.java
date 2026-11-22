@@ -7,7 +7,6 @@ import com.lingxiao.common.core.domain.PageResult;
 import com.lingxiao.common.core.enums.ErrorCode;
 import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.common.security.util.LoginHelper;
-import com.lingxiao.modules.cms.entity.CmsArticle;
 import com.lingxiao.modules.cms.entity.CmsCategory;
 import com.lingxiao.modules.cms.entity.CmsSite;
 import com.lingxiao.modules.cms.mapper.CmsArticleMapper;
@@ -97,15 +96,17 @@ public class CmsSiteService {
 
     public void delete(Long siteId) {
         mustGet(siteId);
+        // 先查文章（含回收站）：栏目通常是文章的前置条件，先提示“还有文章”
+        // 才能让运营直接去回收站清理，而不是先删栏目再被文章拦住。
+        long articles = articleMapper.countBySiteIncludingDeleted(siteId);
+        if (articles > 0) {
+            throw new ServiceException(ErrorCode.BAD_REQUEST,
+                    "站点下还有文章（含回收站），请先处理后再删除");
+        }
         Long categories = categoryMapper.selectCount(new LambdaQueryWrapper<CmsCategory>()
                 .eq(CmsCategory::getSiteId, siteId));
         if (categories != null && categories > 0) {
             throw new ServiceException(ErrorCode.BAD_REQUEST, "站点下还有栏目，不能删除");
-        }
-        Long articles = articleMapper.selectCount(new LambdaQueryWrapper<CmsArticle>()
-                .eq(CmsArticle::getSiteId, siteId));
-        if (articles != null && articles > 0) {
-            throw new ServiceException(ErrorCode.BAD_REQUEST, "站点下还有文章，不能删除");
         }
         siteMapper.hardDeleteById(siteId);
     }

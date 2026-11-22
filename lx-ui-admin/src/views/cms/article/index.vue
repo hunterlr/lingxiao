@@ -57,6 +57,9 @@
           <el-button v-hasPerm="'platform:cms:article:add'" type="primary" :icon="Plus" :disabled="!sites.length" @click="openAdd">
             {{ t('page.cms.article.add') }}
           </el-button>
+          <el-button v-hasPerm="'platform:cms:article:recycle'" :icon="Delete" @click="goRecycle">
+            {{ t('page.cms.recycle.title') }}
+          </el-button>
           <el-button :icon="Refresh" @click="loadList">{{ t('common.refresh') }}</el-button>
         </div>
       </div>
@@ -251,8 +254,9 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Delete, Plus, Refresh, Search } from '@element-plus/icons-vue'
 import RichEditor from '@/components/RichEditor.vue'
 import MediaPicker from '@/components/MediaPicker.vue'
 import {
@@ -278,6 +282,7 @@ import {
  * 避免“改个错别字把下线文章又发出去”。</p>
  */
 const { t } = useI18n()
+const router = useRouter()
 
 const sites = ref([])
 const sitesLoading = ref(false)
@@ -381,6 +386,10 @@ function handleReset() {
 function handleSiteChange() {
   loadCategoryOptions()
   handleSearch()
+}
+
+function goRecycle() {
+  router.push('/cms/recycle')
 }
 
 onMounted(async () => {

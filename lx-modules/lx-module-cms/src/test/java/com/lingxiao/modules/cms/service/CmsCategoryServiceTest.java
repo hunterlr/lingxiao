@@ -110,7 +110,7 @@ class CmsCategoryServiceTest {
     void rejectsDeleteWhenArticlesExist() {
         when(categoryMapper.selectById(1L)).thenReturn(category(1L, 1L, 0L, "news"));
         when(categoryMapper.selectCount(any())).thenReturn(0L);
-        when(articleMapper.selectCount(any())).thenReturn(3L);
+        when(articleMapper.countByCategoryIncludingDeleted(1L)).thenReturn(3L);
 
         ServiceException error = catchThrowableOfType(() -> service.delete(1L), ServiceException.class);
 

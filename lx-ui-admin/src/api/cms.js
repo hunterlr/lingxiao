@@ -110,3 +110,17 @@ export function offlineArticle(articleId) {
 export function deleteArticle(articleId) {
   return http.delete(`/admin/cms/article/${articleId}`)
 }
+
+/* ==================== 文章回收站 ==================== */
+
+export function listRecycleArticles(params) {
+  return http.get('/admin/cms/article/recycle/list', { params })
+}
+
+export function restoreArticle(articleId) {
+  return http.put(`/admin/cms/article/${articleId}/restore`)
+}
+
+export function purgeArticle(articleId) {
+  return http.delete(`/admin/cms/article/${articleId}/purge`)
+}

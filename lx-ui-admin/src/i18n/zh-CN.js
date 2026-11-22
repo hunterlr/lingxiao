@@ -229,6 +229,9 @@ export default {
     'cms:category': '栏目管理',
     'cms:article': '文章管理',
     'cms:tag': '标签管理',
+    'cms:recycle': '回收站',
+    'cms:article:restore': '恢复文章',
+    'cms:article:purge': '彻底删除',
     'system:user:add': '用户新增',
     'system:user:edit': '用户修改',
     'system:user:remove': '用户删除',
@@ -414,7 +417,7 @@ export default {
         selectSiteFirst: '请先在「站点管理」创建站点',
         publishConfirm: '确认发布文章「{title}」吗？发布后门户可见。',
         offlineConfirm: '确认下线文章「{title}」吗？',
-        deleteConfirm: '确认删除文章「{title}」吗？',
+        deleteConfirm: '确认删除文章「{title}」吗？删除后进入回收站，可恢复。',
         previewTitle: '预览的是服务端清洗后的正文',
         previewDesc: '正文在写入与读取时都经过 HTML 白名单清洗，预览与门户看到的内容一致。',
         titleRequired: '请输入文章标题',
@@ -426,6 +429,22 @@ export default {
         coverPlaceholder: 'fileId 或 https:// 开头的图片地址',
         sourcePlaceholder: '如 本站原创、某某新闻',
         sourceUrlPlaceholder: '原文链接，可空'
+      },
+      recycle: {
+        title: '回收站',
+        hint: '删除文章只是移入回收站：标签关联保留，恢复后回到草稿状态；彻底删除才清空正文与标签关联，不可恢复。',
+        keywordPlaceholder: '标题或 URL 片段',
+        total: '回收站共 {total} 篇',
+        statusBeforeDelete: '删除前状态',
+        deletedBy: '删除人',
+        deletedAt: '删除时间',
+        restore: '恢复',
+        purge: '彻底删除',
+        restoreConfirm: '确认恢复文章「{title}」吗？恢复后为草稿，需要重新发布才会在门户可见。',
+        purgeConfirm: '确认彻底删除文章「{title}」吗？正文与标签关联将被清除，无法恢复。',
+        restoreSuccess: '已恢复为草稿',
+        purgeSuccess: '已彻底删除',
+        empty: '回收站是空的'
       }
     },
     notice: {

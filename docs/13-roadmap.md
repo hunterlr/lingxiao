@@ -605,7 +605,7 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 详见 `docs/20-cms-embed-plan.md` §14、`docs/21-build-log.md` §49、
 `lx-modules/lx-module-cms/README.md`。
 
-**下一步**：门户 API `/api/portal/cms/**`、素材选择器、内容版本 / 回收站；
+**下一步**：门户 API `/api/portal/cms/**`、素材选择器、内容版本 / 定时发布；
 随后进入 v1.2 会员体系。
 
 ### 12.9 P1：v1.1 CMS 门户 API（✅ 已完成，2026-11-22）
@@ -624,7 +624,7 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 
 详见 `docs/20-cms-embed-plan.md` §15、`docs/21-build-log.md` §50、`docs/29-portal-api.md`。
 
-**下一步**：素材选择器（见 §12.10）、内容版本 / 回收站、v1.3 门户工程；
+**下一步**：素材选择器（见 §12.10）、内容版本 / 定时发布、v1.3 门户工程；
 随后进入 v1.2 会员体系。
 
 ### 12.10 P1：v1.1 CMS 素材选择器（✅ 已完成，2026-11-22）
@@ -643,3 +643,23 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 站点 Logo 经选择器保存后，后台详情与门户接口都返回同一个 `fileId`。
 
 详见 `docs/21-build-log.md` §51、`lx-modules/lx-module-cms/README.md`。
+
+### 12.11 P1：v1.1 CMS 文章回收站（✅ 已完成，2026-11-22）
+
+**完成内容**：
+
+- 新增迁移 `V22__cms_article_recycle.sql`：`cms_article` 增加删除人 / 删除时间快照列与
+  `(del_flag, delete_time)` 索引；新增「回收站」菜单 3050 与恢复 / 彻底删除按钮 3051 / 3052，
+  默认授权超管；
+- 文章删除改为逻辑删除：标签关联保留，记录删除人 ID + 昵称快照；后台列表与门户自动不可见；
+- 新增回收站接口：`GET /api/admin/cms/article/recycle/list`（站点 + 关键字）、
+  `PUT /{id}/restore`、`DELETE /{id}/purge`，权限码分别 `recycle / restore / purge`；
+- 恢复统一回草稿并保留 `publish_time`；恢复前校验站点 / 栏目仍存在、slug 未被占用；
+- slug 唯一性与站点 / 栏目删除保护都包含回收站文章，避免“回收中的内容占着坑”；
+- 前端新增回收站页面与文章页入口，中英文文案补齐。
+
+**验收**：CMS 单测 29 项；全仓 141 项 / 28 类，JDK 8 / 11 均通过；
+真实接口 33/33；浏览器 12/12；`vite build`、i18n 键检查（1039/1039）通过。
+
+详见 `docs/20-cms-embed-plan.md` §16、`docs/21-build-log.md` §52、
+`lx-modules/lx-module-cms/README.md`。

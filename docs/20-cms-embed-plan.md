@@ -251,7 +251,7 @@ export const modules = {
 ```text
 platform:cms:site:list|add|edit|remove
 platform:cms:category:list|add|edit|remove
-platform:cms:article:list|add|edit|remove|publish|offline
+platform:cms:article:list|add|edit|remove|publish|offline|recycle|restore|purge
 platform:cms:tag:list|add|edit|remove
 ```
 
@@ -268,7 +268,9 @@ platform:cms:tag:list|add|edit|remove
 | 栏目闭包与成环校验 | ✅ 已完成 | 变更后按站点全量重建 |
 | 标签聚合查询 | ✅ 已完成（后台筛选 + 门户按标签筛选） | 门户聚合页 UI 后置 |
 | 门户 API `/api/portal/cms/**` | ✅ 已完成 | 只读、只出已发布内容（§15） |
-| 内容版本 / 回收站 / 定时发布 | ⏳ 未开始 | 表与页面均未建 |
+| 文章回收站 | ✅ 已完成（2026-11-22） | 软删除 + 恢复回草稿 + 彻底删除（§16） |
+| 定时发布 | ⏳ 未开始 | 依赖 `publish_time`，任务扫描后置 |
+| 内容版本 | ⏳ 未开始 | 表与页面均未建 |
 | `cms_content_ext` 自定义字段 | ⏳ 未开始 | 避免过早固定内容模型 |
 | 素材选择器 | ✅ 已完成（2026-11-22） | 站点 Logo / 栏目封面 / 文章封面接文件中心；仍兼容 URL 手填 |
 | 内容级多语言 | ⏳ 未开始 | 走后续 `i18n_*` 内容翻译阶段 |
@@ -460,7 +462,7 @@ CMS 开工前先把“关掉模块还会漏菜单 / 漏迁移 / 漏权限”的�
 - Logo / 封面已接文件中心素材选择器，选中写 `fileId`；手填 `https://` 外链仍兼容。
   浏览素材需要 `platform:file:list`，上传需要 `platform:file:upload`；没有文件权限的
   CMS 编辑仍可手填外链，不会被完全卡死。
-- 没有内容版本与回收站，删除是物理删除（有引用保护）。
+- 没有内容版本；文章回收站已补齐（§16），站点 / 栏目 / 标签仍是物理删除 + 引用保护。
 - CMS 菜单默认只授权给超管角色（`role_id=1`），其它角色需在角色管理里分配。
 
 ### 14.5 复验命令
@@ -529,7 +531,8 @@ cd .local\uitest; node cms-disabled.mjs
 - 无缓存、无限流：每次请求直查数据库，详情阅读量可被脚本刷高。
 - 手工改库把栏目改成停用后，闭包表不会自动同步；需要走一次后台栏目编辑触发重建，
   否则列表的“祖先停用”判断可能失效。
-- 内容版本、回收站、定时发布、内容级多语言仍未实现，门户读不到。
+- 内容版本、定时发布、内容级多语言仍未实现，门户读不到；回收站已实现（§16），
+  回收中的文章不会被门户返回。
 - 素材选择器已在后台完成（§14）；门户只返回 `fileId` / URL 原值，消费端负责解析。
 - 门户工程（Nuxt3）、sitemap / RSS / Open Graph、ES 搜索、CDN 属 v1.3。
 
@@ -542,4 +545,75 @@ node .local\portal-api-check.mjs
 # 关闭态
 java -jar lx-boot\target\lingxiao.jar --lx.captcha.enabled=false --lx.module.modules.cms.enabled=false
 node .local\portal-disabled.mjs
+```
+
+---
+
+## 16. v1.1 CMS 文章回收站（2026-11-22）
+
+内容生命周期的第一刀：把文章删除从物理删除改为逻辑删除，补上后台可操作的回收站。
+本批只做**文章**——站点 / 栏目 / 标签已有引用保护，误删概率低；文章是高频内容，
+且删除后需要能找回标签、发布时间等上下文。
+
+### 16.1 代码落点
+
+| 层 | 文件 |
+|---|---|
+| 迁移 | `db/migration/cms/V22__cms_article_recycle.sql`（3 列 + 索引 + 菜单 3050~3052） |
+| 实体 | `CmsArticle` 增加 `deleteBy` / `deleteByName` / `deleteTime`（`@TableField(select=false)`） |
+| Mapper | `CmsArticleMapper`：软删除 / 恢复 / 回收站物理删除 / 读回收站记录 / 回收站分页 / 含回收站的 slug·站点·栏目计数 |
+| Service | `CmsArticleService`：`delete` 改软删除，新增 `recyclePage` / `restore` / `purge` |
+| Controller | `CmsArticleController`：`GET /recycle/list`、`PUT /{id}/restore`、`DELETE /{id}/purge` |
+| 前端接口 | `lx-ui-admin/src/api/cms.js`：`listRecycleArticles` / `restoreArticle` / `purgeArticle` |
+| 前端页面 | `lx-ui-admin/src/views/cms/recycle/index.vue`；文章页工具栏加入口 |
+| 单测 | `CmsArticleServiceTest`（12 项）、`CmsSiteServiceTest` / `CmsCategoryServiceTest` 改断言 |
+
+### 16.2 关键决策
+
+1. **软删除保留标签关联。**
+   进回收站只改 `del_flag` 与删除审计，`cms_article_tag` 不动；恢复后标签立即可用。
+   只有彻底删除才先清关联、再物理删正文。
+2. **删除人存快照，不跨模块 JOIN。**
+   `delete_by` + `delete_by_name` + `delete_time` 一次写入；昵称取 Session，
+   取不到回退用户名，再回退 `system`。CMS 不依赖 system 模块的表。
+3. **恢复一律回草稿，保留 `publish_time`。**
+   不该“恢复即重新对外发布”；`publish_time` 是首次发布时间，重新发布沿用。
+4. **slug 唯一性与删除保护都包含回收站。**
+   回收中的 slug 不允许新文章占用，否则恢复时撞车；站点 / 栏目下只要还有回收站文章
+   也不允许删除，避免恢复目标消失。
+5. **恢复前二次校验。**
+   站点必须存在、栏目必须仍属于该站点；slug 不能与其它文章冲突。栏目被删时提示
+   直接彻底删除，不留“恢复一半”的状态。
+6. **回收站列表不返回正文。**
+   只查标题、slug、站点 / 栏目名、删除前状态与删除审计；站点 / 栏目用 LEFT JOIN，
+   栏目被手工删掉也不至于整行消失。
+7. **权限拆三档。**
+   `platform:cms:article:recycle` 进入页面，`restore` 恢复，`purge` 物理删除；
+   可以只给主编恢复权限，不开放彻底删除。
+
+### 16.3 验证结果
+
+| 项 | 结果 |
+|---|---|
+| 编译 / 打包 | `mvn -q -DskipTests package` 通过 |
+| Flyway | `V22 - cms article recycle` 成功；菜单 3050 / 3051 / 3052 与超管授权已落库 |
+| 单测 | CMS 29 项（文章 12 项）；全仓 141 项 / 28 类，JDK 8 与 JDK 11 各跑一遍全部通过 |
+| 接口验收 | `.local/cms-recycle-check.mjs` 33/33：软删除、门户隐藏、列表字段、关键字、删除保护含回收站、slug 占用、恢复回草稿并保留标签 / 发布时间、重新发布、彻底删除、slug 复用、清理 |
+| 浏览器验收 | `.local/uitest/cms-recycle.mjs` 12/12：菜单、列表字段、搜索 / 空态、恢复、文章页删除进回收站、跳转、彻底删除、后台与门户双端消失 |
+| 前端 | `check-i18n-keys.mjs` zh=1039、en=1039，无 missing / dotted-leaf；`npm run build` 通过 |
+| 关闭模块 | 不新增外部依赖；关闭 CMS 时回收站接口随 `/api/admin/cms/**` 一起 404 |
+
+### 16.4 当前限制
+
+- 回收站只覆盖文章；站点 / 栏目 / 标签仍是物理删除 + 引用保护。
+- 没有保留期与自动清理：进回收站的内容会一直占库，需要运营手动彻底删除。
+- 回收站查询暂未接数据范围（CMS 列表当前都未接），后续权限细化时一起做。
+- 恢复不判断栏目祖先是否停用——恢复结果是草稿，重新发布会走既有的栏目校验链路。
+
+### 16.5 复验命令
+
+```powershell
+# 后端 8080（关闭验证码）+ 前端 5173
+node .local\cms-recycle-check.mjs
+cd .local\uitest; node cms-recycle.mjs
 ```

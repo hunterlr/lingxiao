@@ -2,7 +2,7 @@
 
 > 本文回答两个问题：**哪些逻辑必须用单测锁住？没有数据库的机器上怎么自动验证？**
 >
-> 结论：v1.0 基线 + v1.1 CMS 共 134 个单测（28 个测试类），
+> 结论：v1.0 基线 + v1.1 CMS 共 141 个单测（28 个测试类），
 > 完全不依赖 MySQL / Redis，`mvn test` 一条命令跑完；
 > 再用 GitHub Actions 覆盖 JDK 8/11/17 与前端构建。
 
@@ -68,7 +68,7 @@ mvn -B -ntp -DskipTests package
 
 ---
 
-## 3. 当前测试清单（134 项 / 28 个类）
+## 3. 当前测试清单（141 项 / 28 个类）
 
 | 模块 | 测试类 | 项数 | 锁住什么 |
 |---|---|---|---|
@@ -95,13 +95,13 @@ mvn -B -ntp -DskipTests package
 | `lx-framework` | `ModuleRegistryTest` | 5 | 基座模块永远启用、显式关闭 / 未配置按关闭、空 `module_code` 兼容、列表排序、列表与 `isEnabled` 一致 |
 | `lx-framework` | `ModuleMigrationLocationsTest` | 3 | system / file 固定参与、启用模块排序、目录不存在时跳过 |
 | `lx-module-system` | `StpInterfaceImplTest` | 5 | 非 platform 域为空、超管全权限、关闭模块权限过滤、无注册表全放行、空权限码 |
-| `lx-module-cms` | `CmsCategoryServiceTest` | 4 | 闭包深度（自身 0 / 父 1 / 祖父 2）、跨站点父级拒绝、有子栏目 / 文章时拒绝删除 |
-| `lx-module-cms` | `CmsArticleServiceTest` | 5 | 读取侧清洗、删除先清标签关联、跨站点栏目拒绝、slug 重复拒绝、文章不存在 |
-| `lx-module-cms` | `CmsSiteServiceTest` | 3 | 有栏目 / 文章时拒绝删除、空站点物理删除 |
+| `lx-module-cms` | `CmsCategoryServiceTest` | 4 | 闭包深度（自身 0 / 父 1 / 祖父 2）、跨站点父级拒绝、有子栏目 / 文章（含回收站）时拒绝删除 |
+| `lx-module-cms` | `CmsArticleServiceTest` | 12 | 读取侧清洗、删除进回收站且保留标签、回收站分页筛选、恢复回草稿 / 栏目缺失 / slug 冲突、彻底删除顺序与权限、跨站点栏目拒绝、slug 重复、文章不存在 |
+| `lx-module-cms` | `CmsSiteServiceTest` | 3 | 有栏目 / 文章（含回收站）时拒绝删除、空站点物理删除 |
 | `lx-module-cms` | `CmsTagServiceTest` | 2 | 被文章引用时拒绝删除、未引用物理删除 |
 | `lx-module-cms` | `CmsPortalServiceTest` | 8 | 草稿 / 跨站点 / 停用栏目 / 停用祖先按不存在处理、正文清洗与阅读量、导航树剔除与提升、空 slug、站点字段白名单 |
 
-合计：**Tests run: 134, Failures: 0, Errors: 0, Skipped: 0**（2026-11-22 在 JDK 8 / JDK 11 各 `clean test` 一遍均通过；126 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，112 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，99 项基线于 2026-11-21 在 JDK 8 跑通，66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
+合计：**Tests run: 141, Failures: 0, Errors: 0, Skipped: 0**（2026-11-22 在 JDK 8 / JDK 11 各 `clean test` 一遍均通过；134 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，126 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，112 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，99 项基线于 2026-11-21 在 JDK 8 跑通，66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
 
 ---
 

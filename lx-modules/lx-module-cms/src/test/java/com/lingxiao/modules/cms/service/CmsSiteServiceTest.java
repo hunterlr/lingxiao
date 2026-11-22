@@ -57,7 +57,7 @@ class CmsSiteServiceTest {
     void rejectsDeleteWhenArticlesExist() {
         when(siteMapper.selectById(1L)).thenReturn(site(1L, "main"));
         when(categoryMapper.selectCount(any())).thenReturn(0L);
-        when(articleMapper.selectCount(any())).thenReturn(5L);
+        when(articleMapper.countBySiteIncludingDeleted(1L)).thenReturn(5L);
 
         ServiceException error = catchThrowableOfType(() -> service.delete(1L), ServiceException.class);
 
@@ -71,7 +71,7 @@ class CmsSiteServiceTest {
     void deletesEmptySite() {
         when(siteMapper.selectById(1L)).thenReturn(site(1L, "main"));
         when(categoryMapper.selectCount(any())).thenReturn(0L);
-        when(articleMapper.selectCount(any())).thenReturn(0L);
+        when(articleMapper.countBySiteIncludingDeleted(1L)).thenReturn(0L);
 
         service.delete(1L);
 

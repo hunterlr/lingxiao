@@ -78,6 +78,16 @@ public class CmsArticle extends BaseEntity {
     @Size(max = 500, message = "{valid.remark.max}")
     private String remark;
 
+    /** 回收站审计：删除人 ID / 昵称快照 / 删除时间；正常查询不返回 */
+    @TableField(select = false)
+    private Long deleteBy;
+
+    @TableField(select = false)
+    private String deleteByName;
+
+    @TableField(select = false)
+    private LocalDateTime deleteTime;
+
     /** 编辑时提交的标签；详情接口也会回填，不是表字段 */
     @TableField(exist = false)
     private List<Long> tagIds = new ArrayList<>();

@@ -5,6 +5,7 @@ import com.lingxiao.common.core.domain.R;
 import com.lingxiao.common.log.annotation.Log;
 import com.lingxiao.common.log.enums.BusinessType;
 import com.lingxiao.common.security.annotation.RequiresPermission;
+import com.lingxiao.modules.cms.dto.CmsArticleRecycleVO;
 import com.lingxiao.modules.cms.entity.CmsArticle;
 import com.lingxiao.modules.cms.service.CmsArticleService;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,17 @@ public class CmsArticleController {
                                           @RequestParam(required = false) String keyword,
                                           @RequestParam(required = false) String status) {
         return R.ok(articleService.page(pageNum, pageSize, siteId, categoryId, tagId, keyword, status));
+    }
+
+    /** 回收站列表：只读删除审计，不返回正文；需要独立权限，避免所有编辑都能看删除内容。 */
+    @RequiresPermission("platform:cms:article:recycle")
+    @GetMapping("/recycle/list")
+    public R<PageResult<CmsArticleRecycleVO>> recycleList(
+            @RequestParam(defaultValue = "1") long pageNum,
+            @RequestParam(defaultValue = "20") long pageSize,
+            @RequestParam(required = false) Long siteId,
+            @RequestParam(required = false) String keyword) {
+        return R.ok(articleService.recyclePage(pageNum, pageSize, siteId, keyword));
     }
 
     @RequiresPermission("platform:cms:article:list")
@@ -89,6 +101,22 @@ public class CmsArticleController {
     @DeleteMapping("/{articleId}")
     public R<Void> remove(@PathVariable Long articleId) {
         articleService.delete(articleId);
+        return R.ok();
+    }
+
+    @RequiresPermission("platform:cms:article:restore")
+    @Log(title = "CMS 文章恢复", businessType = BusinessType.UPDATE)
+    @PutMapping("/{articleId}/restore")
+    public R<Void> restore(@PathVariable Long articleId) {
+        articleService.restore(articleId);
+        return R.ok();
+    }
+
+    @RequiresPermission("platform:cms:article:purge")
+    @Log(title = "CMS 文章彻底删除", businessType = BusinessType.DELETE)
+    @DeleteMapping("/{articleId}/purge")
+    public R<Void> purge(@PathVariable Long articleId) {
+        articleService.purge(articleId);
         return R.ok();
     }
 }

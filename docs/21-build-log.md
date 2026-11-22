@@ -4992,4 +4992,142 @@ ext IN ('jpg','jpeg','png','gif','bmp','webp','svg')
 | 文件引用计数 | 选择器只写 `fileId`，不做引用登记；删除文件仍可能留下悬空引用 |
 | 上传权限耦合 | 无 `platform:file:upload` 的编辑只能手填外链，属预期取舍 |
 | 图片裁剪 / 尺寸建议 | 未做；站点 Logo 与文章封面的推荐尺寸只能靠文档约定 |
+
+---
+
+## 52. CMS 文章回收站（2026-11-22）
+
+### 52.1 背景与范围
+
+素材选择器收口后，进入内容生命周期：**回收站 → 定时发布 → 内容版本**。
+第一刀做回收站，范围限定为**文章**：
+
+- 站点 / 栏目 / 标签已有一层引用保护，误删会先被拦下；
+- 文章是高频内容，删掉后需要能找回标签、发布时间与归属；
+- 复用 `BaseEntity.delFlag`（已经是 `@TableLogic`），不引入第二套删除标记。
+
+交付目标：后台删除文章进回收站、可恢复为草稿、可彻底删除；回收中的文章后台列表与门户
+都不可见；站点 / 栏目 / slug 的各种唯一性与删除保护把回收站文章也算进去。
+
+### 52.2 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `V22__cms_article_recycle.sql` | 3 个审计列、`(del_flag, delete_time)` 索引、菜单 3050 + 按钮 3051 / 3052 |
+| 实体 | `CmsArticle` | `deleteBy` / `deleteByName` / `deleteTime`，`select=false` 不污染普通查询 |
+| VO | `dto/CmsArticleRecycleVO` | 回收站行：标题、slug、站点 / 栏目名、删除前状态、删除人、删除时间 |
+| Mapper | `CmsArticleMapper` | `softDeleteById` / `restoreById` / `hardDeleteDeletedById` / `selectDeletedById` / `selectRecyclePage` / 三个含回收站的计数 |
+| Service | `CmsArticleService` | `delete` 改软删除；新增 `recyclePage` / `restore` / `purge`；slug 唯一性换口径 |
+| Service | `CmsSiteService` / `CmsCategoryService` | 删除保护改用含回收站的计数；站点先查文章再查栏目 |
+| Controller | `CmsArticleController` | `GET /recycle/list`、`PUT /{id}/restore`、`DELETE /{id}/purge` |
+| 前端 | `api/cms.js` | 三个新方法 |
+| 前端 | `views/cms/recycle/index.vue` | 回收站页面；站点筛选、关键字、恢复 / 彻底删除 |
+| 前端 | `views/cms/article/index.vue` | 工具栏「回收站」入口；删除确认文案说明会进回收站 |
+| 单测 | `CmsArticleServiceTest` 等 | 12 / 4 / 3 项，覆盖软删除、恢复、彻底删除与计数口径 |
+
+迁移里的菜单插入统一写成 `INSERT ... SELECT ... WHERE NOT EXISTS`，不用
+`INSERT IGNORE` / `ON DUPLICATE KEY`，MySQL / PostgreSQL / 达梦 / 金仓都能执行。
+
+### 52.3 关键决策
+
+1. **软删除保留标签关联。**
+   `delete` 只写 `del_flag='1'` 与删除审计；恢复后标签不用重打。彻底删除时才
+   `deleteByArticleId` + 物理删正文，顺序固定。
+2. **删除人快照落库。**
+   `delete_by` / `delete_by_name` / `delete_time` 一次写完；昵称取 Session，
+   取不到回退用户名，再回退 `system`。回收站不跨模块 JOIN `sys_user`。
+3. **恢复一律回草稿。**
+   保留 `publish_time`（首次发布时间），但不恢复发布状态；避免回收站一恢复就对外曝光。
+4. **唯一性 / 删除保护包含回收站。**
+   slug 在回收期间仍被占用；站点 / 栏目下存在回收站文章时拒绝删除。否则恢复时
+   可能撞 slug 或找不到归属。
+5. **恢复前二次校验。**
+   站点必须存在、栏目必须仍属于该站点、slug 不能撞其它文章；栏目已删则提示直接彻底删除。
+6. **回收站列表不查正文。**
+   站点 / 栏目 `LEFT JOIN` 取名字，栏目被手工删掉时仍能显示行；关键字在 Service 里
+   转 `%kw%`，SQL 不拼 `CONCAT`。
+7. **权限三档。**
+   进入回收站 `recycle`、恢复 `restore`、彻底删除 `purge`；角色可以只给恢复不给物理删除。
+
+### 52.4 施工步骤
+
+1. **数据库**
+   - `cms_article` 增列 `delete_by` / `delete_by_name` / `delete_time`；
+   - 建 `idx_cms_article_del (del_flag, delete_time)`；
+   - 插菜单 3050（`/cms/recycle`，组件 `cms/recycle/index`）与按钮 3051 / 3052，
+     `module_code='cms'`，并给 `role_id=1` 补齐授权。
+2. **后端**
+   - `CmsArticle` 增加三个字段并标记 `select=false`；
+   - Mapper 写显式 SQL：软删除、恢复、仅回收站可物理删除、按 ID 读回收站记录、
+     回收站分页、含回收站的 slug / 站点 / 栏目计数；
+   - Service：`delete` 改软删；`restore` 校验站点 / 栏目 / slug 后回草稿；
+     `purge` 先清标签再物理删；`recyclePage` 做分页上限与关键字截断；
+   - `ensureSlugUnique` 改用 `countBySlugIncludingDeleted`；
+   - 站点 / 栏目删除保护改用含回收站计数，站点删除先提示文章、再提示栏目。
+3. **前端**
+   - `api/cms.js` 增加回收站列表、恢复、彻底删除；
+   - 新页面展示站点 / 栏目 / 标题 / 删除前状态 / 删除人 / 删除时间，恢复与彻底删除分开权限；
+   - 文章页工具栏加入口，删除确认文案改为“进入回收站，可恢复”；
+   - 中英文 `page.cms.recycle.*` 与 `menu.cms:recycle` / `menu.cms:article:restore` /
+     `menu.cms:article:purge` 补齐。
+
+### 52.5 验证
+
+**A. 后端**
+
+- `mvn -q -pl lx-modules/lx-module-cms -am test` 通过；
+- 全仓 `mvn clean test`：JDK 8 / JDK 11 各一遍，**141 项 / 28 类**，0 失败 0 错误；
+- `mvn -q -DskipTests package` 通过，jar 重新打包后后台启动正常。
+
+**B. 接口 33/33**
+
+`.local/cms-recycle-check.mjs`：
+
+- 发布后门户可见 → 删除 → 后台列表 total=0、门户 by-slug 404；
+- 回收站列表返回文章，含站点 / 栏目名、删除人、删除时间、删除前状态；
+- 关键字命中 / 未命中；
+- 站点、栏目删除都被“含回收站文章”拦下；
+- 回收期间新文章不能用同一 slug；
+- 恢复后为草稿、保留 `publish_time` 与标签、门户仍不可见；重新发布后恢复可见；
+- 彻底删除后回收站清空、详情 404、标签可删、slug 可复用；
+- 清理站点 / 栏目。
+
+**C. 浏览器 12/12**
+
+`.local/uitest/cms-recycle.mjs`：
+
+- 管理员登录，侧边栏出现「回收站」；
+- 回收站列表展示站点 / 栏目 / 删除人 / 删除前状态；
+- 关键字搜索保留行，未命中显示空态；
+- 恢复后行消失；文章列表里该文章为草稿；
+- 文章页删除 → 行从列表消失，确认框提示进入回收站；
+- 工具栏「回收站」跳转正确；
+- 彻底删除后行消失，后台详情与门户都 404。
+
+截图：`.local/uitest/cms-recycle.png`（回收站列表与操作列）。
+
+**D. 前端**
+
+- `node scripts/check-i18n-keys.mjs`：zh=1039、en=1039，无 missing / 单边 / dotted-leaf；
+- `npm run build` 通过。
+
+### 52.6 踩坑
+
+| 问题 | 处理 |
+|---|---|
+| `@TableLogic` 自动过滤，`selectById` 读不到回收站记录 | 回收站读 / 分页 / 恢复 / 计数全部写自定义 SQL，显式 `del_flag='1'` |
+| 站点删除总先报“还有栏目” | 删除校验改为文章优先，验收能直接看到回收站提示；栏目校验保留在后 |
+| 浏览器脚本中途重新登录导致页面 401 | 单会话模式会踢掉浏览器 Token；恢复后的状态先在页面断言，API 回读放到流程末尾 |
+| Element Plus 2.8 下拉结构变化 | 不再找 `.el-input__inner`，改点 `.el-select__wrapper` 再选可见 option |
+| 确认框默认按钮不是“确定” | 先按文案找按钮，找不到再点 `.el-button--primary / --danger` |
+| 截图时状态标签像空白 | 实际是截图落在重绘瞬间；单独截行元素确认 `草稿` 标签存在，非缺陷 |
+
+### 52.7 遗留
+
+| 项 | 说明 |
+|---|---|
+| 回收站覆盖范围 | 仅文章；站点 / 栏目 / 标签仍物理删除 + 引用保护 |
+| 保留期 / 自动清理 | 未做；回收站内容需手动彻底删除，后续可加定时清理 |
+| 数据范围 | 回收站列表未接数据范围，与当前 CMS 其它列表一致，权限细化时统一处理 |
+| 内容生命周期后续 | 定时发布（`publish_time` 扫描）、内容版本仍待做 |
 | 门户解析 | 门户仍原样返回 `fileId` / URL，消费端按 `docs/29` 约定拼接 |

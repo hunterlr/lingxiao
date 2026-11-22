@@ -5,7 +5,6 @@ import com.lingxiao.common.core.constant.CommonConstants;
 import com.lingxiao.common.core.enums.ErrorCode;
 import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.common.security.util.LoginHelper;
-import com.lingxiao.modules.cms.entity.CmsArticle;
 import com.lingxiao.modules.cms.entity.CmsCategory;
 import com.lingxiao.modules.cms.mapper.CmsArticleMapper;
 import com.lingxiao.modules.cms.mapper.CmsCategoryClosureMapper;
@@ -148,10 +147,10 @@ public class CmsCategoryService {
         if (childCount != null && childCount > 0) {
             throw new ServiceException(ErrorCode.BAD_REQUEST, "存在下级栏目，请先删除下级栏目");
         }
-        Long articleCount = articleMapper.selectCount(new LambdaQueryWrapper<CmsArticle>()
-                .eq(CmsArticle::getCategoryId, categoryId));
+        Long articleCount = articleMapper.countByCategoryIncludingDeleted(categoryId);
         if (articleCount != null && articleCount > 0) {
-            throw new ServiceException(ErrorCode.BAD_REQUEST, "栏目下还有 " + articleCount + " 篇文章，请先移走或删除");
+            throw new ServiceException(ErrorCode.BAD_REQUEST,
+                    "栏目下还有 " + articleCount + " 篇文章（含回收站），请先移走、恢复或彻底删除");
         }
         categoryMapper.hardDeleteById(categoryId);
         closureMapper.deleteByCategoryId(categoryId);

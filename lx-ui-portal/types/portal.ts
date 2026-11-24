@@ -13,6 +13,8 @@ export interface PortalSite {
   seoTitle?: string | null
   seoKeywords?: string | null
   seoDescription?: string | null
+  /** 门户主题编码：default / magazine / minimal */
+  theme?: string | null
 }
 
 export interface PortalTag {
@@ -59,6 +61,8 @@ export interface PortalArticleDetail extends PortalArticleSummary {
   content?: string | null
   sourceUrl?: string | null
   category?: PortalCategory | null
+  /** 详情模板编码：detail.default / detail.news / detail.gallery */
+  template?: string | null
   /** 模型扩展字段，值形态由字段类型决定 */
   ext?: Record<string, unknown> | null
 }
@@ -119,9 +123,15 @@ export interface PortalBanner {
 }
 
 export interface PortalPreview {
+  /** article / page / category */
   targetType: string
+  /** 票据覆盖的模板编码；空值回退目标自身模板 */
+  template?: string | null
   article?: PortalArticleDetail | null
   page?: PortalPage | null
+  /** targetType=category 时的栏目与已发布文章 */
+  category?: PortalCategory | null
+  articles?: PortalArticleSummary[] | null
 }
 
 export interface PageResult<T> {

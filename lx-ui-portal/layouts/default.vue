@@ -11,6 +11,7 @@ const { data: nav } = await useAsyncData('portal-nav-main', () => api.fetchNav('
 await ensureProfile()
 
 const siteName = computed(() => site.value?.siteName || '凌霄门户')
+const theme = computed(() => site.value?.theme || 'default')
 const logo = computed(() => mediaUrl(site.value?.logo))
 const navItems = computed(() => {
   const items = nav.value?.items || []
@@ -47,10 +48,11 @@ function submitSearch() {
   return navigateTo({ path: '/search', query: { keyword: text } })
 }
 
-useHead({
+useHead(() => ({
   titleTemplate: (titleChunk) =>
-    titleChunk ? `${titleChunk} · ${siteName.value}` : site.value?.seoTitle || siteName.value
-})
+    titleChunk ? `${titleChunk} · ${siteName.value}` : site.value?.seoTitle || siteName.value,
+  htmlAttrs: { 'data-theme': theme.value }
+}))
 
 useSeoMeta({
   description: () => site.value?.seoDescription || '',
@@ -61,7 +63,7 @@ useSeoMeta({
 </script>
 
 <template>
-  <div class="portal-shell">
+  <div class="portal-shell" :data-theme="theme">
     <a class="skip-link" href="#main">跳到主要内容</a>
 
     <header class="site-header">

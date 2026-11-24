@@ -11,6 +11,7 @@ import com.lingxiao.modules.cms.mapper.CmsArticleMapper;
 import com.lingxiao.modules.cms.mapper.CmsCategoryClosureMapper;
 import com.lingxiao.modules.cms.mapper.CmsCategoryMapper;
 import com.lingxiao.modules.cms.mapper.CmsModelMapper;
+import com.lingxiao.modules.cms.support.CmsTemplates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -95,6 +96,7 @@ public class CmsCategoryService {
         category.setSort(category.getSort() == null ? 0 : category.getSort());
         category.setVisible(defaultIfBlank(category.getVisible(), CommonConstants.STATUS_NORMAL));
         category.setStatus(defaultIfBlank(category.getStatus(), CommonConstants.STATUS_NORMAL));
+        category.setTemplate(CmsTemplates.normalizeListTemplate(category.getTemplate()));
         categoryMapper.insert(category);
 
         rebuildClosure(siteId);
@@ -130,7 +132,7 @@ public class CmsCategoryService {
                 ? existing.getModelId() : validateModel(siteId, category.getModelId()));
         existing.setSlug(category.getSlug());
         existing.setPath(category.getPath());
-        existing.setTemplate(category.getTemplate());
+        existing.setTemplate(CmsTemplates.normalizeListTemplate(category.getTemplate()));
         existing.setIcon(category.getIcon());
         existing.setCover(category.getCover());
         existing.setSeoTitle(category.getSeoTitle());

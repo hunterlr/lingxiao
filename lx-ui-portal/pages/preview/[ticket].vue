@@ -1,4 +1,11 @@
 <script setup lang="ts">
+/**
+ * 草稿 / 模板预览页。
+ *
+ * <p>票据一次性且 10 分钟内有效；预览页按票据覆盖的模板渲染，
+ * 没有覆盖模板时使用目标自身的模板编码（文章详情由栏目列表模板推导）。
+ * 预览页不渲染互动与评论，也不被搜索引擎收录。</p>
+ */
 const route = useRoute()
 const api = usePortalApi()
 
@@ -11,48 +18,44 @@ if (!preview.value) {
 
 const article = computed(() => preview.value?.article || null)
 const page = computed(() => preview.value?.page || null)
-const cover = computed(() => mediaUrl(article.value?.cover || page.value?.cover, 'medium'))
+const category = computed(() => preview.value?.category || null)
+const articles = computed(() => preview.value?.articles || [])
+const previewTemplate = computed(() => preview.value?.template || '')
+const detailTemplate = computed(() => resolveDetailTemplate(previewTemplate.value || article.value?.template))
+const pageTemplate = computed(() => resolvePageTemplate(previewTemplate.value || page.value?.template))
+const listTemplate = computed(() => resolveListTemplate(previewTemplate.value || category.value?.template))
 
 useSeoMeta({
-  title: () => article.value?.title || page.value?.pageName || '内容预览',
+  title: () => article.value?.title || page.value?.pageName || category.value?.categoryName || '内容预览',
   robots: 'noindex, nofollow'
 })
 </script>
 
 <template>
-  <article v-if="article" class="article-page">
+  <div v-if="article" class="preview-page">
     <div class="preview-banner" role="status">草稿预览 · 票据仅可使用一次，关闭后需重新生成</div>
-    <header class="article-header">
-      <p v-if="article.category" class="eyebrow">{{ article.category.categoryName }}</p>
-      <h1 class="article-title">{{ article.title }}</h1>
-      <p v-if="article.summary" class="article-summary">{{ article.summary }}</p>
-      <div class="article-meta">
-        <span v-if="article.authorName">{{ article.authorName }}</span>
-        <time v-if="article.publishTime" :datetime="article.publishTime">{{ formatDate(article.publishTime) }}</time>
-      </div>
-    </header>
+    <component :is="detailTemplate" :article="article" />
+  </div>
 
-    <figure v-if="cover" class="article-cover">
-      <img :src="cover" :alt="article.title" />
-    </figure>
-
-    <div class="article-content" v-html="article.content" />
-  </article>
-
-  <article v-else-if="page" class="simple-page">
+  <div v-else-if="page" class="preview-page">
     <div class="preview-banner" role="status">草稿预览 · 票据仅可使用一次，关闭后需重新生成</div>
+    <component :is="pageTemplate" :page="page" />
+  </div>
+
+  <div v-else-if="category" class="preview-page list-page">
+    <div class="preview-banner" role="status">模板预览 · 票据仅可使用一次，关闭后需重新生成</div>
     <header class="page-head">
-      <p class="eyebrow">单页</p>
-      <h1 class="page-title">{{ page.title || page.pageName }}</h1>
-      <p v-if="page.summary" class="page-description">{{ page.summary }}</p>
+      <p class="eyebrow">栏目模板预览</p>
+      <h1 class="page-title">{{ category.categoryName }}</h1>
+      <p class="page-count">展示最近 {{ articles.length }} 篇已发布文章（最多 9 篇）</p>
     </header>
 
-    <figure v-if="cover" class="article-cover">
-      <img :src="cover" :alt="page.title || page.pageName" />
-    </figure>
-
-    <div class="article-content" v-html="page.content" />
-  </article>
+    <component :is="listTemplate" v-if="articles.length" :category="category" :articles="articles" />
+    <EmptyState v-else>
+      <template #title>该栏目暂无已发布文章</template>
+      <template #description>草稿文章请使用文章预览票据；这里只展示已发布内容。</template>
+    </EmptyState>
+  </div>
 </template>
 
 <style scoped>

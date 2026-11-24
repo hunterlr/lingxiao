@@ -6,8 +6,10 @@ import com.lingxiao.common.core.enums.ErrorCode;
 import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.common.web.util.HtmlSanitizer;
 import com.lingxiao.modules.cms.dto.portal.PortalArticleDetailVO;
+import com.lingxiao.modules.cms.dto.portal.PortalArticleSummaryVO;
 import com.lingxiao.modules.cms.dto.portal.PortalBannerVO;
 import com.lingxiao.modules.cms.dto.portal.PortalBlockVO;
+import com.lingxiao.modules.cms.dto.portal.PortalCategoryVO;
 import com.lingxiao.modules.cms.dto.portal.PortalNavItemVO;
 import com.lingxiao.modules.cms.dto.portal.PortalNavVO;
 import com.lingxiao.modules.cms.dto.portal.PortalPageVO;
@@ -32,6 +34,7 @@ import com.lingxiao.modules.cms.mapper.CmsNavItemMapper;
 import com.lingxiao.modules.cms.mapper.CmsNavMapper;
 import com.lingxiao.modules.cms.mapper.CmsPageMapper;
 import com.lingxiao.modules.cms.mapper.CmsTagMapper;
+import com.lingxiao.modules.cms.support.CmsTemplates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -170,7 +173,7 @@ public class CmsPortalContentService {
         return result;
     }
 
-    /** 草稿预览：消费一次性票据后返回文章或单页。 */
+    /** 草稿 / 模板预览：消费一次性票据后返回文章、单页或栏目列表。 */
     public PortalPreviewVO preview(String ticket) {
         CmsPreviewTicket row = previewTicketService.consume(ticket);
         CmsSite site = siteService.mustGet(row.getSiteId());
@@ -181,13 +184,26 @@ public class CmsPortalContentService {
             if (article == null || !Objects.equals(site.getSiteId(), article.getSiteId())) {
                 throw ServiceException.keyed(ErrorCode.NOT_FOUND, "cms.article.notfound");
             }
-            vo.setArticle(toPreviewArticle(article));
+            PortalArticleDetailVO articleVo = toPreviewArticle(article);
+            vo.setArticle(articleVo);
+            // 票据指定模板时优先使用，否则按栏目列表模板推导详情模板
+            vo.setTemplate(row.getTemplate() != null ? row.getTemplate() : articleVo.getTemplate());
         } else if (CmsPreviewTicketService.TARGET_PAGE.equals(row.getTargetType())) {
             CmsPage page = pageMapper.selectById(row.getTargetId());
             if (page == null || !Objects.equals(site.getSiteId(), page.getSiteId())) {
                 throw ServiceException.keyed(ErrorCode.NOT_FOUND, "cms.page.notfound");
             }
-            vo.setPage(toPageVO(page));
+            PortalPageVO pageVo = toPageVO(page);
+            vo.setPage(pageVo);
+            vo.setTemplate(row.getTemplate() != null ? row.getTemplate() : pageVo.getTemplate());
+        } else if (CmsPreviewTicketService.TARGET_CATEGORY.equals(row.getTargetType())) {
+            CmsCategory category = categoryMapper.selectById(row.getTargetId());
+            if (category == null || !Objects.equals(site.getSiteId(), category.getSiteId())) {
+                throw ServiceException.keyed(ErrorCode.NOT_FOUND, "cms.category.notfound");
+            }
+            vo.setCategory(CmsPortalService.toCategoryNode(category));
+            vo.setArticles(latestPublished(category));
+            vo.setTemplate(row.getTemplate() != null ? row.getTemplate() : category.getTemplate());
         } else {
             throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "cms.preview.target.missing");
         }
@@ -233,10 +249,46 @@ public class CmsPortalContentService {
         if (category != null && Objects.equals(article.getSiteId(), category.getSiteId())) {
             vo.setCategory(CmsPortalService.toCategoryNode(category));
         }
+        vo.setTemplate(CmsTemplates.resolveDetailTemplate(
+                category == null ? null : category.getTemplate()));
         vo.setTags(loadTags(article.getSiteId(),
                 articleTagMapper.selectTagIds(article.getArticleId())));
         vo.setExt(extService.load("article", article.getArticleId()));
         return vo;
+    }
+
+    /**
+     * 栏目模板预览数据：只取该栏目下最近 9 篇已发布文章（不含正文），
+     * 不累加阅读量；草稿文章要预览请走文章预览票据。
+     */
+    private List<PortalArticleSummaryVO> latestPublished(CmsCategory category) {
+        List<CmsArticle> articles = articleMapper.selectList(new LambdaQueryWrapper<CmsArticle>()
+                .eq(CmsArticle::getCategoryId, category.getCategoryId())
+                .eq(CmsArticle::getStatus, CmsArticleService.STATUS_PUBLISHED)
+                .orderByDesc(CmsArticle::getSort)
+                .orderByDesc(CmsArticle::getPublishTime)
+                .orderByDesc(CmsArticle::getArticleId)
+                .last("LIMIT 9"));
+        List<PortalArticleSummaryVO> result = new ArrayList<>(articles.size());
+        for (CmsArticle article : articles) {
+            PortalArticleSummaryVO summary = new PortalArticleSummaryVO();
+            summary.setArticleId(article.getArticleId());
+            summary.setTitle(article.getTitle());
+            summary.setSlug(article.getSlug());
+            summary.setSummary(article.getSummary());
+            summary.setCover(article.getCover());
+            summary.setAuthorName(article.getAuthorName());
+            summary.setSource(article.getSource());
+            summary.setPublishTime(article.getPublishTime());
+            summary.setViewCount(article.getViewCount() == null ? 0L : article.getViewCount());
+            summary.setCategoryId(article.getCategoryId());
+            summary.setCategoryKey(category.getCategoryKey());
+            summary.setCategoryName(category.getCategoryName());
+            summary.setTags(loadTags(article.getSiteId(),
+                    articleTagMapper.selectTagIds(article.getArticleId())));
+            result.add(summary);
+        }
+        return result;
     }
 
     private List<PortalNavItemVO> buildNavTree(Long siteId, List<CmsNavItem> items) {

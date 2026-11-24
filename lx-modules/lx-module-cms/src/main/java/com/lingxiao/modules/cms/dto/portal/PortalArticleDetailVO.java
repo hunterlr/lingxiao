@@ -41,6 +41,9 @@ public class PortalArticleDetailVO {
 
     private Long viewCount;
 
+    /** 详情模板编码，由所属栏目的 list 模板推导，门户按它选择版式 */
+    private String template;
+
     private PortalCategoryVO category;
 
     private List<PortalTagVO> tags = new ArrayList<>();

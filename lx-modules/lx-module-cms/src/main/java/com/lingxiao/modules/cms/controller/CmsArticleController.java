@@ -74,8 +74,10 @@ public class CmsArticleController {
     /** 生成一次性预览票据；草稿 / 已下线文章可凭票在门户预览。 */
     @RequiresPermission("platform:cms:article:preview")
     @PostMapping("/{articleId}/preview-ticket")
-    public R<CmsPreviewTicketVO> previewTicket(@PathVariable Long articleId) {
-        return R.ok(previewTicketService.issue(CmsPreviewTicketService.TARGET_ARTICLE, articleId));
+    public R<CmsPreviewTicketVO> previewTicket(@PathVariable Long articleId,
+                                               @RequestParam(required = false) String template) {
+        return R.ok(previewTicketService.issue(
+                CmsPreviewTicketService.TARGET_ARTICLE, articleId, template));
     }
 
     /** 历史版本列表：只出摘要，正文按版本详情单独读取。 */

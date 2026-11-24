@@ -219,4 +219,75 @@ class CmsPortalContentServiceTest {
         org.mockito.Mockito.verify(articleMapper, org.mockito.Mockito.never())
                 .increaseViewCount(any());
     }
+
+    @Test
+    @DisplayName("预览：栏目模板票据返回栏目、模板与最近已发布文章")
+    void previewReturnsCategoryTemplate() {
+        CmsPreviewTicket ticket = new CmsPreviewTicket();
+        ticket.setSiteId(1L);
+        ticket.setTargetType(CmsPreviewTicketService.TARGET_CATEGORY);
+        ticket.setTargetId(9L);
+        ticket.setTemplate("list.news");
+        when(previewTicketService.consume("abc")).thenReturn(ticket);
+
+        CmsCategory category = new CmsCategory();
+        category.setCategoryId(9L);
+        category.setSiteId(1L);
+        category.setCategoryKey("news");
+        category.setCategoryName("新闻");
+        category.setStatus("0");
+        when(categoryMapper.selectById(9L)).thenReturn(category);
+
+        CmsArticle article = new CmsArticle();
+        article.setArticleId(5L);
+        article.setSiteId(1L);
+        article.setCategoryId(9L);
+        article.setTitle("已发布");
+        article.setStatus(CmsArticleService.STATUS_PUBLISHED);
+        when(articleMapper.selectList(any()))
+                .thenReturn(Collections.singletonList(article));
+        when(articleTagMapper.selectTagIds(5L)).thenReturn(Collections.emptyList());
+
+        PortalPreviewVO vo = service.preview("abc");
+
+        assertThat(vo.getTargetType()).isEqualTo("category");
+        assertThat(vo.getTemplate()).isEqualTo("list.news");
+        assertThat(vo.getCategory().getCategoryKey()).isEqualTo("news");
+        assertThat(vo.getArticles()).hasSize(1);
+        assertThat(vo.getArticles().get(0).getTitle()).isEqualTo("已发布");
+        assertThat(vo.getArticles().get(0).getCategoryName()).isEqualTo("新闻");
+    }
+
+    @Test
+    @DisplayName("预览：文章详情模板由栏目列表模板推导")
+    void previewArticleResolvesDetailTemplate() {
+        CmsPreviewTicket ticket = new CmsPreviewTicket();
+        ticket.setSiteId(1L);
+        ticket.setTargetType(CmsPreviewTicketService.TARGET_ARTICLE);
+        ticket.setTargetId(5L);
+        when(previewTicketService.consume("abc")).thenReturn(ticket);
+
+        CmsArticle article = new CmsArticle();
+        article.setArticleId(5L);
+        article.setSiteId(1L);
+        article.setCategoryId(9L);
+        article.setTitle("图集文章");
+        article.setStatus(CmsArticleService.STATUS_DRAFT);
+        when(articleMapper.selectById(5L)).thenReturn(article);
+
+        CmsCategory category = new CmsCategory();
+        category.setCategoryId(9L);
+        category.setSiteId(1L);
+        category.setCategoryKey("gallery");
+        category.setTemplate("list.gallery");
+        category.setStatus("0");
+        when(categoryMapper.selectById(9L)).thenReturn(category);
+        when(articleTagMapper.selectTagIds(5L)).thenReturn(Collections.emptyList());
+        when(extService.load("article", 5L)).thenReturn(Collections.emptyMap());
+
+        PortalPreviewVO vo = service.preview("abc");
+
+        assertThat(vo.getArticle().getTemplate()).isEqualTo("detail.gallery");
+        assertThat(vo.getTemplate()).isEqualTo("detail.gallery");
+    }
 }

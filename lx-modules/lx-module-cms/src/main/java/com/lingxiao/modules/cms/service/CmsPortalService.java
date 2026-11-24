@@ -22,6 +22,7 @@ import com.lingxiao.modules.cms.mapper.CmsArticleTagMapper;
 import com.lingxiao.modules.cms.mapper.CmsCategoryClosureMapper;
 import com.lingxiao.modules.cms.mapper.CmsCategoryMapper;
 import com.lingxiao.modules.cms.mapper.CmsTagMapper;
+import com.lingxiao.modules.cms.support.CmsTemplates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -254,6 +255,7 @@ public class CmsPortalService {
         vo.setPublishTime(article.getPublishTime());
         vo.setViewCount((article.getViewCount() == null ? 0L : article.getViewCount()) + 1);
         vo.setCategory(toCategoryNode(category));
+        vo.setTemplate(CmsTemplates.resolveDetailTemplate(category.getTemplate()));
         vo.setTags(loadTags(site.getSiteId(), articleTagMapper.selectTagIds(article.getArticleId())));
         vo.setExt(extService.load("article", article.getArticleId()));
         return vo;
@@ -510,6 +512,7 @@ public class CmsPortalService {
         vo.setSeoTitle(site.getSeoTitle());
         vo.setSeoKeywords(site.getSeoKeywords());
         vo.setSeoDescription(site.getSeoDescription());
+        vo.setTheme(site.getTheme());
         return vo;
     }
 

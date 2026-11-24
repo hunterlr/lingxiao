@@ -137,7 +137,13 @@ remark       varchar(500) default null        comment '备注'
 > v1.3 CMS 第三刀已落地：`cms_model`（含 `built_in` 标记）、`cms_model_field`、
 > `cms_content_ext`、`cms_page`、`cms_nav` / `cms_nav_item`、`cms_block`、`cms_banner`、
 > `cms_preview_ticket`，`cms_category` 增加 `model_id`；`cms_static_task` 仍规划在 P6。
-> 排期见 `docs/20-cms-embed-plan.md` §21，落地记录见 §22。
+> v1.4 CMS 第四刀（`V37__cms_template_theme.sql` / `V38__cms_category_preview_menu.sql`）：
+> `cms_site` 增加 `theme varchar(32) not null default 'default'`（门户主题编码）；
+> `cms_preview_ticket` 增加 `template varchar(64) null`（预览覆盖的模板编码）；
+> `cms_category.template` 只存列表模板（`list.*`），`cms_page.template` 存单页模板（`page.*`），
+> 两者由服务端白名单校验，未知编码写入被拒绝；`V38` 仅补按钮权限
+> `platform:cms:category:preview`，无新增菜单节点。
+> 排期见 `docs/20-cms-embed-plan.md` §21，落地记录见 §22 / §23。
 
 ### 2.5 会员 `mem_`
 

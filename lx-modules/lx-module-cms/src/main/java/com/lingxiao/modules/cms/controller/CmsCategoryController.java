@@ -4,8 +4,10 @@ import com.lingxiao.common.core.domain.R;
 import com.lingxiao.common.log.annotation.Log;
 import com.lingxiao.common.log.enums.BusinessType;
 import com.lingxiao.common.security.annotation.RequiresPermission;
+import com.lingxiao.modules.cms.dto.CmsPreviewTicketVO;
 import com.lingxiao.modules.cms.entity.CmsCategory;
 import com.lingxiao.modules.cms.service.CmsCategoryService;
+import com.lingxiao.modules.cms.service.CmsPreviewTicketService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -34,6 +36,7 @@ import java.util.List;
 public class CmsCategoryController {
 
     private final CmsCategoryService categoryService;
+    private final CmsPreviewTicketService previewTicketService;
 
     @RequiresPermission("platform:cms:category:list")
     @GetMapping("/tree")
@@ -76,5 +79,18 @@ public class CmsCategoryController {
     public R<Void> remove(@PathVariable Long categoryId) {
         categoryService.delete(categoryId);
         return R.ok();
+    }
+
+    /**
+     * 栏目模板预览票据：按指定 list 模板打开门户预览页。
+     *
+     * <p>{@code template} 为空时沿用栏目自身模板；只接受 list.* 编码。</p>
+     */
+    @RequiresPermission("platform:cms:category:preview")
+    @PostMapping("/{categoryId}/preview-ticket")
+    public R<CmsPreviewTicketVO> previewTicket(@PathVariable Long categoryId,
+                                               @RequestParam(required = false) String template) {
+        return R.ok(previewTicketService.issue(
+                CmsPreviewTicketService.TARGET_CATEGORY, categoryId, template));
     }
 }

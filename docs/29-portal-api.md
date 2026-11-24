@@ -2,6 +2,7 @@
 
 > 状态：v1.1 第一版已落地（2026-11-22），只读、只出已发布内容。
 > v1.3 门户第一刀已按本契约接入（Nuxt3，见 `docs/31-portal-frontend.md`）；
+> v1.4 第四刀补充 `theme` / `template` 字段、栏目模板预览与标签独立页。
 > 本文仍是门户侧唯一需要遵守的接口契约。
 > 后台维护接口在 `/api/admin/cms/**`，门户**禁止**调用。
 
@@ -106,7 +107,11 @@
 
 ### 4.1 站点
 
-`siteKey / siteName / domain / logo / seoTitle / seoKeywords / seoDescription`
+`siteKey / siteName / domain / logo / seoTitle / seoKeywords / seoDescription / theme`
+
+`theme` 是门户主题编码（`default` / `magazine` / `minimal`），门户用
+`:root[data-theme=...]` 切换配色与排版变量；未知编码按 `default` 渲染。
+主题只影响样式，不改变 URL、字段与内容可见性。
 
 `logo` 兼容两种值：
 
@@ -124,6 +129,9 @@
 
 `content` 是 `HtmlSanitizer` 清洗后的 HTML；`category` 是完整栏目节点（含 SEO 与封面）；
 `tags` 只含启用标签。`viewCount` 是本次访问累加后的值。
+`template` 是**详情模板编码**，由服务端按所属栏目的列表模板推导：
+`list.gallery → detail.gallery`、`list.news → detail.news`，其余为 `detail.default`；
+门户遇到未知编码一律回退 `detail.default`。
 
 ### 4.4 批量摘要
 
@@ -150,16 +158,47 @@
 - **轮播**：`bannerId / bannerGroup / title / image / linkUrl / sort`。
   `groupKey` 默认 `home`。
 
-### 4.6 草稿预览
+### 4.6 草稿 / 模板预览
 
 `GET /api/portal/cms/preview/{ticket}` 不需要 `siteKey`：票据本身绑定站点与目标。
-返回 `targetType`（`article` / `page`）以及 `article` 或 `page` 对象，字段与正式接口一致。
-票据由后台接口 `POST /api/admin/cms/article/{id}/preview-ticket` 或
-`POST /api/admin/cms/page/{id}/preview-ticket` 生成，TTL 10 分钟，只能消费一次；
-无效 / 过期 / 已使用统一按参数错误处理。预览不校验发布状态，也不累加阅读量。
+返回 `targetType`（`article` / `page` / `category`）、`template`（票据覆盖的模板编码，
+可为空）以及对应对象：
+
+- `targetType=article`：`article` 对象，字段与正式详情接口一致；
+- `targetType=page`：`page` 对象，字段与正式单页接口一致；
+- `targetType=category`：`category` 栏目节点 + `articles`（该栏目最近 9 篇已发布文章摘要）；
+  草稿文章不在此列表，仍需文章预览票据。
+
+票据由后台接口生成，TTL 10 分钟，只能消费一次：
+
+| 后台接口 | 用途 |
+|---|---|
+| `POST /api/admin/cms/article/{id}/preview-ticket?template=detail.news` | 文章预览，可覆盖详情模板 |
+| `POST /api/admin/cms/page/{id}/preview-ticket?template=page.about` | 单页预览，可覆盖单页模板 |
+| `POST /api/admin/cms/category/{id}/preview-ticket?template=list.gallery` | 栏目列表模板预览 |
+
+`template` 必须属于目标类型对应的白名单（文章 `detail.*`、单页 `page.*`、
+栏目 `list.*`），否则按参数错误拒绝。无效 / 过期 / 已使用统一按参数错误处理。
+预览不校验发布状态，也不累加阅读量。
 
 **阅读量**：详情接口每调用一次 `view_count = view_count + 1`（单条 UPDATE 自增，
 不先查后写）。当前没有防刷策略，门户上线前需要按 IP / 会话做限流或改异步统计。
+
+### 4.7 标签独立页与订阅入口
+
+门户不新增后端端点，直接复用公开接口：
+
+| 门户路由 | 使用的接口 | 说明 |
+|---|---|---|
+| `/tag/{tagKey}` | `/tags` + `/articles?tagKey=...&pageNum=...&pageSize=...` | 标签不存在或停用时 404 |
+| `/sitemap.xml` | `/categories`、`/tags`、`/articles?pageNum=1..10&pageSize=50` | 首页 / 栏目 / 标签 / 已发布文章；单页暂无列表接口，未枚举 |
+| `/robots.txt` | 无（读取 `siteUrl` 配置） | 禁止抓取 `/preview/`、账号与登录页，并给出 sitemap 地址 |
+| `/rss.xml` | `/` + `/articles?pageNum=1&pageSize=30` | RSS 2.0，只含最近 30 篇摘要 |
+
+`sitemap.xml` / `robots.txt` / `rss.xml` 由 Nuxt Nitro 路由在服务端直接访问
+Spring Boot 门户接口并输出 XML / 文本，带 `charset=utf-8` 与 5 分钟缓存；
+不改后端接口、不读数据库。站点对外地址取 `NUXT_PUBLIC_SITE_URL`，
+站点标识取 `NUXT_PUBLIC_SITE_KEY`。
 
 ---
 
@@ -233,21 +272,26 @@ curl http://127.0.0.1:8080/api/portal/cms/preview/9f2c1a7b4e
 
 ---
 
-## 8. 门户接入状态（2026-11-22）
+## 8. 门户接入状态（2026-11-24）
 
-`lx-ui-portal` 已按本契约完成第一、二、三刀：
+`lx-ui-portal` 已按本契约完成第一至第四刀：
 
 | 页面 | 使用的接口 |
 |---|---|
 | 首页 | `GET /sites/{siteKey}`、`/categories`、`/articles?pageNum=1&pageSize=7` |
-| 栏目列表 | `/categories`、`/articles?categoryKey=...&pageNum=...&pageSize=...` |
-| 文章详情 | `/articles/{articleId}`、`/categories`、同栏目 `/articles`；会员评论 `/api/app/public/comments/articles/{articleId}` 与登录发表 |
+| 栏目列表 | `/categories`、`/articles?categoryKey=...&pageNum=...&pageSize=...`；按 `category.template` 选择列表模板 |
+| 文章详情 | `/articles/{articleId}`、`/categories`、同栏目 `/articles`；会员评论 `/api/app/public/comments/articles/{articleId}` 与登录发表；按详情 `template` 选择版式 |
+| 单页 | `/pages/{pageKey}`；按 `template` 选择版式 |
+| 标签页 | `/tags`、`/articles?tagKey=...&pageNum=...&pageSize=...` |
+| 草稿 / 模板预览 | `/preview/{ticket}`（`article` / `page` / `category`，`noindex`） |
 | 站内搜索 | `/search?keyword=...&pageNum=...&pageSize=...` |
+| sitemap / robots / RSS | `/sitemap.xml`、`/robots.txt`、`/rss.xml`（Nitro 服务端聚合） |
 | 个人中心 · 我的收藏 | 会员 `/api/app/interactions/favorites` + `/articles/batch` 补标题 / 封面 |
 
 - 浏览器与 SSR 都请求同源 `/api/**`，由 Nitro 代理到 Spring Boot；
 - `1004` 统一转 404，其它异常转 502；
 - 正文直接使用详情接口返回的已清洗 HTML；
-- 封面 / Logo 兼容 `fileId`、`/api/file/{id}` 与 http(s) 外链。
+- 封面 / Logo 兼容 `fileId`、`/api/file/{id}` 与 http(s) 外链；
+- 模板编码 → 组件映射集中在 `utils/templates.ts`，未知编码回退默认版式。
 
 详见 `docs/31-portal-frontend.md` 与 `lx-ui-portal/README.md`。

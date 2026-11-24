@@ -25,6 +25,8 @@ const { data: result } = await useAsyncData(`category-${categoryKey}-${page}`, (
 
 const articles = computed(() => result.value?.records || [])
 const total = computed(() => Number(result.value?.total) || 0)
+// 栏目未设置模板或编码未知时回退 list.default，保证旧数据可访问
+const listTemplate = computed(() => resolveListTemplate(category.template))
 
 useSeoMeta({
   title: () => category.seoTitle || category.categoryName,
@@ -56,9 +58,7 @@ useHead({
       <p class="page-count">共 {{ total }} 篇文章</p>
     </header>
 
-    <div v-if="articles.length" class="article-grid">
-      <ArticleCard v-for="article in articles" :key="article.articleId" :article="article" />
-    </div>
+    <component :is="listTemplate" v-if="articles.length" :category="category" :articles="articles" />
     <EmptyState v-else>
       <template #title>该栏目暂无文章</template>
       <template #description>内容发布后会按时间倒序出现在这里。</template>

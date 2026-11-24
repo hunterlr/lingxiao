@@ -25,6 +25,7 @@ import com.lingxiao.modules.cms.mapper.CmsModelMapper;
 import com.lingxiao.modules.cms.mapper.CmsNavMapper;
 import com.lingxiao.modules.cms.mapper.CmsPageMapper;
 import com.lingxiao.modules.cms.mapper.CmsSiteMapper;
+import com.lingxiao.modules.cms.support.CmsTemplates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -92,6 +93,7 @@ public class CmsSiteService {
         site.setSiteName(site.getSiteName().trim());
         ensureKeyUnique(site.getSiteKey(), null);
         site.setStatus(defaultStatus(site.getStatus()));
+        site.setTheme(CmsTemplates.normalizeTheme(site.getTheme()));
         site.setCreateBy(LoginHelper.getUserId());
         siteMapper.insert(site);
         return site.getSiteId();
@@ -108,6 +110,7 @@ public class CmsSiteService {
         existing.setSeoTitle(site.getSeoTitle());
         existing.setSeoKeywords(site.getSeoKeywords());
         existing.setSeoDescription(site.getSeoDescription());
+        existing.setTheme(CmsTemplates.normalizeTheme(site.getTheme()));
         existing.setStatus(defaultStatus(site.getStatus()));
         existing.setRemark(site.getRemark());
         existing.setUpdateBy(LoginHelper.getUserId());

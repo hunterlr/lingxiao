@@ -93,7 +93,9 @@ public class CmsPageController {
     /** 生成一次性预览票据，门户凭票打开草稿。 */
     @RequiresPermission("platform:cms:page:preview")
     @PostMapping("/{pageId}/preview-ticket")
-    public R<CmsPreviewTicketVO> previewTicket(@PathVariable Long pageId) {
-        return R.ok(previewTicketService.issue(CmsPreviewTicketService.TARGET_PAGE, pageId));
+    public R<CmsPreviewTicketVO> previewTicket(@PathVariable Long pageId,
+                                               @RequestParam(required = false) String template) {
+        return R.ok(previewTicketService.issue(
+                CmsPreviewTicketService.TARGET_PAGE, pageId, template));
     }
 }

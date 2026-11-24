@@ -166,7 +166,29 @@
           </el-col>
           <el-col :span="12">
             <el-form-item :label="t('page.cms.category.template')">
-              <el-input v-model="form.template" maxlength="100" :placeholder="t('page.cms.category.templatePlaceholder')" />
+              <div class="template-field">
+                <el-select
+                  v-model="form.template"
+                  clearable
+                  :placeholder="t('page.cms.category.templatePlaceholder')"
+                >
+                  <el-option
+                    v-for="item in templateOptions"
+                    :key="item.code"
+                    :label="templateOptionLabel(item)"
+                    :value="item.code"
+                  />
+                </el-select>
+                <el-button
+                  v-hasPerm="'platform:cms:category:preview'"
+                  :disabled="!isEdit"
+                  :loading="previewLoading"
+                  @click="openTemplatePreview"
+                >
+                  {{ t('page.cms.category.previewTemplate') }}
+                </el-button>
+              </div>
+              <p class="template-hint">{{ t('page.cms.category.previewHint') }}</p>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -220,9 +242,11 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import {
   addCategory,
+  createCategoryPreviewTicket,
   deleteCategory,
   getCategory,
   getCategoryTree,
+  getTemplateOptions,
   listModelOptions,
   listSiteOptions,
   updateCategory
@@ -235,12 +259,18 @@ import MediaPicker from '@/components/MediaPicker.vue'
  * <p>树表直接用后端返回的 children；父栏目下拉复用同一棵树，
  * 只额外加一个“根栏目(0)”节点。成环与跨站点由后端校验。</p>
  */
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+/** 模板接口同时返回中英文名称，后台按当前语言展示。 */
+function templateOptionLabel(item) {
+  return String(locale.value).startsWith('en') ? item.nameEn : item.name
+}
 
 const sites = ref([])
 const sitesLoading = ref(false)
 const siteId = ref(null)
 const modelOptions = ref([])
+const templateOptions = ref([])
 const loading = ref(false)
 const rows = ref([])
 const expandAll = ref(true)
@@ -299,8 +329,19 @@ function handleSiteChange() {
 onMounted(async () => {
   await loadSites()
   await loadModelOptions()
+  await loadTemplateOptions()
   await loadTree()
 })
+
+/** 模板下拉：失败时保持空列表，表单仍可提交空模板（回退默认版式）。 */
+async function loadTemplateOptions() {
+  try {
+    const data = await getTemplateOptions()
+    templateOptions.value = data.listTemplates || []
+  } catch (e) {
+    templateOptions.value = []
+  }
+}
 
 /* ==================== 新增 / 编辑 ==================== */
 const dialogVisible = ref(false)
@@ -424,6 +465,26 @@ async function submitForm() {
   })
 }
 
+/* ==================== 模板预览 ==================== */
+
+const previewLoading = ref(false)
+
+/**
+ * 栏目模板预览：票据携带当前选择的模板，不要求先保存。
+ * 预览页只展示最近 9 篇已发布文章，草稿文章请走文章预览。
+ */
+async function openTemplatePreview() {
+  if (!editingId.value) return
+  previewLoading.value = true
+  try {
+    const ticket = await createCategoryPreviewTicket(editingId.value, form.template || undefined)
+    const base = String(import.meta.env.VITE_PORTAL_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
+    window.open(`${base}/preview/${encodeURIComponent(ticket.ticket)}`, '_blank')
+  } finally {
+    previewLoading.value = false
+  }
+}
+
 async function handleDelete(row) {
   try {
     await ElMessageBox.confirm(
@@ -442,4 +503,21 @@ async function handleDelete(row) {
 
 <style scoped>
 /* 封面字段的布局由 MediaPicker 自己负责，本页不再重复样式。 */
+.template-field {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.template-field .el-select {
+  flex: 1;
+}
+
+.template-hint {
+  width: 100%;
+  margin: 4px 0 0;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
 </style>

@@ -2,9 +2,11 @@ package com.lingxiao.modules.cms.service;
 
 import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.modules.cms.dto.CmsPreviewTicketVO;
+import com.lingxiao.modules.cms.entity.CmsCategory;
 import com.lingxiao.modules.cms.entity.CmsPage;
 import com.lingxiao.modules.cms.entity.CmsPreviewTicket;
 import com.lingxiao.modules.cms.mapper.CmsArticleMapper;
+import com.lingxiao.modules.cms.mapper.CmsCategoryMapper;
 import com.lingxiao.modules.cms.mapper.CmsPageMapper;
 import com.lingxiao.modules.cms.mapper.CmsPreviewTicketMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +32,7 @@ class CmsPreviewTicketServiceTest {
     private CmsPreviewTicketMapper ticketMapper;
     private CmsArticleMapper articleMapper;
     private CmsPageMapper pageMapper;
+    private CmsCategoryMapper categoryMapper;
     private CmsPreviewTicketService service;
 
     @BeforeEach
@@ -37,7 +40,8 @@ class CmsPreviewTicketServiceTest {
         ticketMapper = mock(CmsPreviewTicketMapper.class);
         articleMapper = mock(CmsArticleMapper.class);
         pageMapper = mock(CmsPageMapper.class);
-        service = new CmsPreviewTicketService(ticketMapper, articleMapper, pageMapper);
+        categoryMapper = mock(CmsCategoryMapper.class);
+        service = new CmsPreviewTicketService(ticketMapper, articleMapper, pageMapper, categoryMapper);
     }
 
     @Test
@@ -64,6 +68,43 @@ class CmsPreviewTicketServiceTest {
                 ServiceException.class);
 
         assertThat(error.getMessageKey()).isEqualTo("cms.article.notfound");
+        verify(ticketMapper, never()).insert(any());
+    }
+
+    @Test
+    @DisplayName("生成：栏目模板预览票据携带模板覆盖")
+    void issuesTicketForCategoryWithTemplate() {
+        CmsCategory category = new CmsCategory();
+        category.setCategoryId(9L);
+        category.setSiteId(1L);
+        when(categoryMapper.selectById(9L)).thenReturn(category);
+        when(ticketMapper.insert(any())).thenAnswer(invocation -> {
+            CmsPreviewTicket row = invocation.getArgument(0);
+            assertThat(row.getTemplate()).isEqualTo("list.news");
+            assertThat(row.getTargetType()).isEqualTo(CmsPreviewTicketService.TARGET_CATEGORY);
+            return 1;
+        });
+
+        CmsPreviewTicketVO ticket = service.issue(
+                CmsPreviewTicketService.TARGET_CATEGORY, 9L, "list.news");
+
+        assertThat(ticket.getTicket()).isNotBlank();
+        verify(ticketMapper).insert(any());
+    }
+
+    @Test
+    @DisplayName("生成：预览模板与目标类型不匹配时拒绝")
+    void rejectsTemplateMismatch() {
+        CmsPage page = new CmsPage();
+        page.setPageId(50L);
+        page.setSiteId(1L);
+        when(pageMapper.selectById(50L)).thenReturn(page);
+
+        ServiceException error = catchThrowableOfType(
+                () -> service.issue(CmsPreviewTicketService.TARGET_PAGE, 50L, "list.news"),
+                ServiceException.class);
+
+        assertThat(error.getMessageKey()).isEqualTo("cms.preview.template.invalid");
         verify(ticketMapper, never()).insert(any());
     }
 

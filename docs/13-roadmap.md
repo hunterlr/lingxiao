@@ -975,7 +975,7 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 
 详见 `docs/20-cms-embed-plan.md` §22；原规划见 §21.4。
 
-### 12.25 P2：v1.4 CMS 第四刀 — 轻量模板与 SEO 收口（待开工，2026-11-23 制定）
+### 12.25 P2：v1.4 CMS 第四刀 — 轻量模板与 SEO 收口（✅ 已完成，2026-11-24）
 
 **范围**：
 
@@ -984,11 +984,27 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
   未知编码回退默认版式；
 - 后台按模板预览；门户补标签独立页、`sitemap.xml`、`robots.txt`、RSS、404。
 
-**前置**：CMS 第三刀。
+**落地**：
 
-**不做**：在线编辑 HTML 模板、服务端模板引擎。
+- 迁移 `V37__cms_template_theme.sql`：`cms_site.theme`（默认 `default`）、
+  `cms_preview_ticket.template`；迁移 `V38__cms_category_preview_menu.sql` 只补按钮
+  `platform:cms:category:preview`，无新增菜单。
+- 模板编码：主题 `default / magazine / minimal`；列表 `list.*`；详情 `detail.*`；
+  单页 `page.*`。白名单集中在 `support/CmsTemplates.java`，保存时校验，未知编码回退默认。
+- 文章详情模板由栏目列表模板推导，栏目只存列表模板；门户 `utils/templates.ts` 统一映射组件。
+- 后台：站点主题下拉、栏目 / 单页模板下拉、栏目「预览模板」按钮；
+  `POST /admin/cms/category/{id}/preview-ticket?template=...` 支持 `targetType=category`。
+- 门户：`/tag/{tagKey}` 标签独立页；`sitemap.xml` / `robots.txt` / `rss.xml` 由 Nitro
+  服务端聚合公开接口；预览页支持文章 / 单页 / 栏目三类目标并输出 `noindex`。
 
-详见 `docs/20-cms-embed-plan.md` §21.5。
+**验收**：`mvn -o -q -pl lx-modules/lx-module-cms test` 通过；Flyway `V37` / `V38` 实跑成功；
+`.local/cms-template-check.mjs` 35/35，`--off` 7/7；后台与门户 `npm run build` 通过；
+后台与门户新页面浏览器走查无控制台错误；CMS 关闭时接口 404、菜单不下发。
+
+**已有约束**：模板为仓库内固定组件，不支持在线编辑 HTML；主题只提供内置三套变量；
+sitemap 最多 500 篇文章且不含单页；RSS 只出最近 30 篇摘要。
+
+详见 `docs/20-cms-embed-plan.md` §23；原规划见 §21.5。
 
 ### 12.26 P2：P6 模板管理与静态化（暂缓，2026-11-23 制定）
 

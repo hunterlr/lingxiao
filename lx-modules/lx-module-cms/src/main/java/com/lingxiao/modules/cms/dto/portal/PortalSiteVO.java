@@ -25,4 +25,7 @@ public class PortalSiteVO {
     private String seoKeywords;
 
     private String seoDescription;
+
+    /** 门户主题编码，前端据此切换 CSS 变量 */
+    private String theme;
 }

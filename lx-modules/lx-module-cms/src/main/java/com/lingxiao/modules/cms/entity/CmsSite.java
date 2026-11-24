@@ -49,6 +49,10 @@ public class CmsSite extends BaseEntity {
     @Size(max = 500, message = "{valid.cms.seo.description.max}")
     private String seoDescription;
 
+    /** 门户主题编码：default / magazine / minimal，空值回退 default */
+    @Size(max = 32, message = "{valid.cms.site.theme.max}")
+    private String theme;
+
     /** 0 启用 / 1 停用 */
     private String status;
 

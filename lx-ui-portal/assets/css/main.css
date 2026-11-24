@@ -2035,3 +2035,303 @@ a.pager-link:hover {
     scroll-behavior: auto !important;
   }
 }
+
+/* =====================================================================
+   站点主题（cms_site.theme）
+   - 主题只覆盖 CSS 变量与少量装饰，不改接口字段与 URL；
+   - 后台未设置或编码未知时回退 default，由门户直接忽略未知编码。
+   ===================================================================== */
+
+:root[data-theme='magazine'] {
+  --paper: #f7f2e9;
+  --surface: #fffdf8;
+  --ink: #241d16;
+  --ink-soft: #5b4a3a;
+  --muted: #8a7761;
+  --line: #e3d8c6;
+  --accent: #b3452b;
+  --accent-strong: #7d2d1b;
+  --accent-soft: #f6e6de;
+  --warm: #b3452b;
+  --radius: 4px;
+  --shadow: 0 12px 30px rgba(80, 52, 30, 0.12);
+}
+
+:root[data-theme='magazine'] .page-title,
+:root[data-theme='magazine'] .article-title,
+:root[data-theme='magazine'] .section-title,
+:root[data-theme='magazine'] .news-title {
+  letter-spacing: 0.02em;
+}
+
+:root[data-theme='magazine'] .article-summary,
+:root[data-theme='magazine'] .news-summary {
+  font-family: var(--font-serif);
+  font-size: 18px;
+}
+
+:root[data-theme='magazine'] .article-content {
+  font-family: var(--font-serif);
+  font-size: 17.5px;
+}
+
+:root[data-theme='minimal'] {
+  --paper: #ffffff;
+  --surface: #ffffff;
+  --ink: #171717;
+  --ink-soft: #444444;
+  --muted: #7a7a7a;
+  --line: #e6e6e6;
+  --accent: #111111;
+  --accent-strong: #000000;
+  --accent-soft: #f3f3f3;
+  --warm: #444444;
+  --radius: 0;
+  --shadow: none;
+}
+
+:root[data-theme='minimal'] .page-main {
+  max-width: 960px;
+}
+
+:root[data-theme='minimal'] .article-title,
+:root[data-theme='minimal'] .page-title {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+:root[data-theme='minimal'] .article-card,
+:root[data-theme='minimal'] .gallery-card,
+:root[data-theme='minimal'] .news-item {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* ==================== 列表模板 ==================== */
+
+/* list.news：日期制表符 + 紧凑正文 */
+.news-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.news-item {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 22px;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.news-date {
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.news-title {
+  margin: 0 0 8px;
+  font-family: var(--font-serif);
+  font-size: clamp(20px, 2.2vw, 26px);
+  line-height: 1.35;
+}
+
+.news-title a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.news-title a:hover {
+  color: var(--accent);
+}
+
+.news-summary {
+  margin: 0 0 12px;
+  color: var(--ink-soft);
+  font-size: 15.5px;
+  line-height: 1.75;
+}
+
+.news-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* list.gallery：封面优先的网格 */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.gallery-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.gallery-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+
+.gallery-media {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--accent-soft);
+}
+
+.gallery-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gallery-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--accent);
+  font-family: var(--font-serif);
+  font-size: 40px;
+}
+
+.gallery-caption {
+  padding: 16px 18px 20px;
+}
+
+.gallery-caption h2 {
+  margin: 0 0 8px;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.gallery-caption p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* ==================== 详情模板 ==================== */
+
+.detail-news .article-title {
+  font-size: clamp(28px, 3.4vw, 42px);
+}
+
+.detail-news .article-summary {
+  padding-left: 16px;
+  border-left: 3px solid var(--accent);
+}
+
+.detail-news .article-content {
+  max-width: 44em;
+}
+
+.detail-gallery .article-cover {
+  margin-top: 0;
+}
+
+/* 图集扩展字段：images 存 fileId 或外链 */
+.gallery-ext {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 24px 0 8px;
+}
+
+.gallery-ext img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: calc(var(--radius) / 2);
+  display: block;
+}
+
+/* ==================== 单页模板 ==================== */
+
+.about-page {
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+.about-page .page-head {
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.about-page .about-lead {
+  margin: 28px 0 0;
+  padding: 18px 22px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink-soft);
+  font-family: var(--font-serif);
+  font-size: 17px;
+  line-height: 1.85;
+}
+
+.about-page .article-content {
+  margin-top: 28px;
+}
+
+/* ==================== 标签页 ==================== */
+
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.tag-cloud a {
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.tag-cloud a:hover,
+.tag-cloud a.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+@media (max-width: 900px) {
+  .gallery-grid,
+  .gallery-ext {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .news-item {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .gallery-grid,
+  .gallery-ext {
+    grid-template-columns: 1fr;
+  }
+}

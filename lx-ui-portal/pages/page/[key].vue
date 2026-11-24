@@ -9,7 +9,6 @@ const config = useRuntimeConfig()
 
 const pageKey = String(route.params.key || '')
 const siteUrl = String(config.public.siteUrl).replace(/\/$/, '')
-
 const { data: site } = await useAsyncData('portal-site', api.fetchSite)
 const { data: page } = await useAsyncData(`page-${pageKey}`, () => api.fetchPage(pageKey))
 
@@ -17,7 +16,7 @@ if (!page.value) {
   throw createError({ statusCode: 404, statusMessage: '页面不存在或尚未发布' })
 }
 
-const cover = computed(() => mediaUrl(page.value?.cover, 'medium'))
+const pageTemplate = computed(() => resolvePageTemplate(page.value?.template))
 
 useSeoMeta({
   title: () => page.value?.seoTitle || page.value?.pageName || '单页',
@@ -40,17 +39,6 @@ useHead({
       <span>{{ page.pageName }}</span>
     </nav>
 
-    <header class="page-head">
-      <p class="eyebrow">单页</p>
-      <h1 class="page-title">{{ page.title || page.pageName }}</h1>
-      <p v-if="page.summary" class="page-description">{{ page.summary }}</p>
-    </header>
-
-    <figure v-if="cover" class="article-cover">
-      <img :src="cover" :alt="page.title || page.pageName" />
-    </figure>
-
-    <!-- 正文已由后端 HtmlSanitizer 按白名单清洗 -->
-    <div class="article-content" v-html="page.content" />
+    <component :is="pageTemplate" :page="page" />
   </article>
 </template>

@@ -13,6 +13,7 @@ import com.lingxiao.modules.cms.entity.CmsModel;
 import com.lingxiao.modules.cms.entity.CmsPage;
 import com.lingxiao.modules.cms.mapper.CmsNavItemMapper;
 import com.lingxiao.modules.cms.mapper.CmsPageMapper;
+import com.lingxiao.modules.cms.support.CmsTemplates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -82,6 +83,7 @@ public class CmsPageService {
         page.setPageName(page.getPageName().trim());
         page.setModelId(model.getModelId());
         page.setContent(HtmlSanitizer.clean(page.getContent()));
+        page.setTemplate(CmsTemplates.normalizePageTemplate(page.getTemplate()));
         page.setStatus(STATUS_DRAFT);
         page.setPublishTime(null);
         page.setSort(page.getSort() == null ? 0 : page.getSort());
@@ -108,7 +110,7 @@ public class CmsPageService {
         existing.setSummary(page.getSummary());
         existing.setCover(page.getCover());
         existing.setContent(HtmlSanitizer.clean(page.getContent()));
-        existing.setTemplate(page.getTemplate());
+        existing.setTemplate(CmsTemplates.normalizePageTemplate(page.getTemplate()));
         existing.setSeoTitle(page.getSeoTitle());
         existing.setSeoKeywords(page.getSeoKeywords());
         existing.setSeoDescription(page.getSeoDescription());

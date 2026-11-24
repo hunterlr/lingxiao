@@ -1002,13 +1002,15 @@ mvn -q test
 
 数据边界不变：文件只存 `fileId`，CMS 不 import 会员类，跨模块不建外键。
 
-### 21.5 第四刀落点（规划）
+### 21.5 第四刀落点（✅ 已落地，2026-11-24）
 
 - 站点级主题字段（`cms_site.theme` 或等价配置）+ 模板编码白名单；
 - 栏目 `template` 增加白名单校验；门户建立 `templates/` 映射表与默认回退；
 - 后台模板预览：用草稿 / 指定模板打开门户预览地址，带一次性预览票据；
 - 门户补标签独立页、`sitemap.xml`、`robots.txt`、RSS、404 页；
 - 权限码补主题 / 模板相关按钮；菜单 SQL 继续幂等。
+
+实际落点见 §23。
 
 ### 21.6 P6 静态化（暂缓，不排入当前版本）
 
@@ -1153,4 +1155,73 @@ docs/05 表、docs/29 接口），最后 git commit & push。完成后列出验�
 - 字段删除不级联清理 `cms_content_ext`，历史 JSON 中可能留下无定义键（读取时仍原样返回）。
 - 导航只做树结构与目标校验，不做拖拽排序；排序仍靠 `sort` 数字。
 - 门户预览票据只能单次使用，刷新预览页会失效，需要重新生成。
-- 模板编码、门户组件映射、sitemap / RSS 与静态化仍属于第四刀 / P6。
+- 模板编码、门户组件映射、sitemap / RSS 已在第四刀落地，见 §23；静态化仍属 P6。
+
+---
+
+## 23. v1.4 CMS 第四刀落地（2026-11-24）
+
+第四刀目标：把第三刀留下的模板编码落到站点、栏目与单页，后台能按模板预览，
+门户补齐标签独立页与订阅入口。本轮仍不做在线编辑 HTML 模板，也不做服务端模板引擎。
+
+### 23.1 代码落点
+
+| 层 | 落点 | 说明 |
+|---|---|---|
+| 迁移 | `V37__cms_template_theme.sql` | `cms_site.theme`（默认 `default`）、`cms_preview_ticket.template`，并更新栏目 / 单页 `template` 字段注释 |
+| 迁移 | `V38__cms_category_preview_menu.sql` | 仅补按钮 `3024` / `platform:cms:category:preview`，`INSERT IGNORE` 幂等，无新增菜单节点 |
+| 支持类 | `support/CmsTemplates.java` | 主题与列表 / 详情 / 单页模板编码白名单、未知编码回退、详情模板推导、后台下拉选项 |
+| 后台接口 | `GET /api/admin/cms/template/options` | 主题、列表、详情、单页四组编码与中英文名称 |
+| 后台接口 | `POST /api/admin/cms/category/{id}/preview-ticket?template=list.news` | 栏目模板预览，票据可覆盖模板；文章 / 单页票据同样接受 `template` |
+| 门户接口 | `GET /sites/{siteKey}` / `/articles/{id}` / `/pages/{key}` / `/preview/{ticket}` | 增加 `theme` / `template`；预览增加 `targetType=category` 与 `articles` |
+| 门户页面 | `components/templates/*`、`utils/templates.ts` | 9 个模板组件与编码 → 组件映射，未知编码回退默认版式 |
+| 门户页面 | `pages/tag/[key].vue`、`server/routes/sitemap.xml.ts`、`robots.txt.ts`、`rss.xml.ts` | 标签页与订阅入口；Nitro 服务端聚合，不新增后端端点 |
+| 后台页面 | `views/cms/site`、`category`、`page`、`api/cms.js`、i18n | 主题下拉、模板下拉与「预览模板」按钮 |
+
+模板编码：
+
+- 主题：`default` / `magazine` / `minimal`；
+- 列表：`list.default` / `list.news` / `list.gallery`；
+- 详情：`detail.default` / `detail.news` / `detail.gallery`；
+- 单页：`page.default` / `page.about`。
+
+### 23.2 关键决策
+
+1. **编码白名单只有一个来源**：`CmsTemplates` 同时服务保存校验、详情推导与后台下拉，
+   避免后台选项与门户映射各写一份。
+2. **主题只影响样式**：`cms_site.theme` 经门户 `:root[data-theme=...]` 输出 CSS 变量，
+   不改 URL、接口字段与内容可见性；未知主题按 `default`。
+3. **栏目只存列表模板**：`cms_category.template` 仅接受 `list.*`；文章详情模板由服务端
+   按栏目推导（`list.gallery → detail.gallery`、`list.news → detail.news`、其余
+   `detail.default`），避免为每篇文章单独选详情模板。
+4. **模板只接管内容版式**：面包屑、分页、互动、评论与相关阅读留在页面级，
+   切换模板不丢 SEO、翻页状态与会员互动。
+5. **预览票据可覆盖模板**：栏目预览只展示该栏目最近 9 篇已发布文章，
+   草稿文章仍走文章预览；票据一次性和 10 分钟 TTL 规则不变。
+6. **sitemap / robots / RSS 用 Nitro 路由**：服务端直接访问 Spring Boot 公开接口，
+   带 `charset=utf-8` 与 5 分钟缓存，不新增后端端点、不读数据库。
+7. **单页暂不进 sitemap**：公开接口没有单页列表，无法枚举；单页仍可经导航与站内链接访问，
+   后续如需要再评估是否补只读列表接口。
+
+### 23.3 验证结果
+
+- 后端：`mvn -o -q -pl lx-modules/lx-module-cms test` 通过（新增 `CmsTemplatesTest`，
+  补充栏目模板预览、详情模板推导、票据模板校验用例）。
+- Flyway：启动后端后 `V37` / `V38` 成功执行，`cms_site.theme` 与 `cms_preview_ticket.template`
+  落库，按钮权限幂等插入。
+- 接口脚本：`.local/cms-template-check.mjs` 35 项全通过（主题、四组模板选项、非法编码拒绝、
+  详情模板推导、单页模板、栏目 / 单页 / 文章预览与票据一次性）；
+  `--off` 7 项全通过（接口 404、菜单不下发）。
+- 构建：后台 `npm run build`、门户 `npm run build` 通过。
+- 浏览器：后台站点 / 栏目 / 单页与门户栏目 / 文章 / 单页 / 标签 / 预览 / sitemap / robots / RSS 走查，
+  无控制台错误。
+- 关闭态：`lx.module.modules.cms.enabled=false` 时后台模板接口、栏目预览票据、
+  门户站点与预览接口均 404，CMS 菜单不下发。
+
+### 23.4 当前限制
+
+- 主题只提供三套内置配色 / 排版变量，不提供后台可视化调色。
+- 模板是仓库内固定组件，运营只能选编码，不能在线编辑 HTML 或上传模板。
+- 栏目模板只覆盖列表版式，同一栏目下的文章共用推导出的详情模板。
+- `sitemap.xml` 最多枚举 500 篇文章；单页未纳入。
+- RSS 只输出最近 30 篇摘要，不做全文与分类订阅。

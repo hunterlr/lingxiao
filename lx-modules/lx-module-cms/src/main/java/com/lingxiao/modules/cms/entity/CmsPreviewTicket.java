@@ -32,6 +32,9 @@ public class CmsPreviewTicket extends BaseEntity {
 
     private Long targetId;
 
+    /** 预览时覆盖的模板编码；空值沿用目标自身模板 */
+    private String template;
+
     private LocalDateTime expireTime;
 
     /** 0 未使用 / 1 已使用 */

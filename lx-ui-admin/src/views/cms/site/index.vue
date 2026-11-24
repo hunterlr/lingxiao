@@ -145,6 +145,18 @@
               <el-input v-model="form.seoDescription" type="textarea" :rows="2" maxlength="500" show-word-limit />
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item :label="t('page.cms.site.theme')">
+              <el-select v-model="form.theme" style="width: 100%" :placeholder="t('page.cms.site.themePlaceholder')">
+                <el-option
+                  v-for="item in themeOptions"
+                  :key="item.code"
+                  :label="templateOptionLabel(item)"
+                  :value="item.code"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
           <el-col :span="24">
             <el-form-item :label="t('common.remark')">
               <el-input v-model="form.remark" maxlength="500" />
@@ -167,7 +179,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
-import { addSite, deleteSite, getSite, listSites, updateSite } from '@/api/cms'
+import { addSite, deleteSite, getSite, getTemplateOptions, listSites, updateSite } from '@/api/cms'
 import MediaPicker from '@/components/MediaPicker.vue'
 import { resolveAssetUrl } from '@/utils/asset'
 
@@ -177,11 +189,17 @@ import { resolveAssetUrl } from '@/utils/asset'
  * <p>站点是内容根节点，删除前必须先清空栏目与文章；后端会拦截，
  * 前端只负责提示，不做“级联删除”这种危险操作。</p>
  */
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+/** 模板接口同时返回中英文名称，后台按当前语言展示。 */
+function templateOptionLabel(item) {
+  return String(locale.value).startsWith('en') ? item.nameEn : item.name
+}
 
 const loading = ref(false)
 const rows = ref([])
 const total = ref(0)
+const themeOptions = ref([])
 const query = reactive({ pageNum: 1, pageSize: 10, keyword: '', status: '' })
 
 async function loadList() {
@@ -211,7 +229,17 @@ function handleReset() {
   handleSearch()
 }
 
-onMounted(loadList)
+onMounted(() => {
+  loadList()
+  getTemplateOptions()
+    .then((data) => {
+      themeOptions.value = data.themes || []
+    })
+    .catch(() => {
+      // CMS 关闭或权限不足时保持空列表，表单仍可保存默认主题
+      themeOptions.value = []
+    })
+})
 
 /* ==================== 新增 / 编辑 ==================== */
 const dialogVisible = ref(false)
@@ -228,6 +256,7 @@ const emptyForm = () => ({
   seoTitle: '',
   seoKeywords: '',
   seoDescription: '',
+  theme: 'default',
   status: '0',
   remark: ''
 })
@@ -262,6 +291,7 @@ async function openEdit(row) {
     seoTitle: row.seoTitle || '',
     seoKeywords: row.seoKeywords || '',
     seoDescription: row.seoDescription || '',
+    theme: row.theme || 'default',
     status: row.status || '0',
     remark: row.remark || ''
   })
@@ -276,6 +306,7 @@ async function openEdit(row) {
       seoTitle: detail.seoTitle || '',
       seoKeywords: detail.seoKeywords || '',
       seoDescription: detail.seoDescription || '',
+      theme: detail.theme || 'default',
       status: detail.status || '0',
       remark: detail.remark || ''
     })
@@ -299,6 +330,7 @@ async function submitForm() {
         seoTitle: form.seoTitle || null,
         seoKeywords: form.seoKeywords || null,
         seoDescription: form.seoDescription || null,
+        theme: form.theme || 'default',
         status: form.status,
         remark: form.remark || null
       }

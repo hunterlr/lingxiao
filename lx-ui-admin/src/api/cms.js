@@ -299,12 +299,30 @@ export function deleteBanner(bannerId) {
   return http.delete(`/admin/cms/banner/${bannerId}`)
 }
 
-/* ==================== 草稿预览票据 ==================== */
+/* ==================== 模板 / 主题 ==================== */
 
-export function createArticlePreviewTicket(articleId) {
-  return http.post(`/admin/cms/article/${articleId}/preview-ticket`)
+/** 主题与三类模板编码：后台不重复维护编码表，下拉直接用接口返回。 */
+export function getTemplateOptions() {
+  return http.get('/admin/cms/template/options')
 }
 
-export function createPagePreviewTicket(pageId) {
-  return http.post(`/admin/cms/page/${pageId}/preview-ticket`)
+/* ==================== 草稿预览票据 ==================== */
+
+export function createArticlePreviewTicket(articleId, template) {
+  return http.post(`/admin/cms/article/${articleId}/preview-ticket`, null, {
+    params: template ? { template } : undefined
+  })
+}
+
+export function createPagePreviewTicket(pageId, template) {
+  return http.post(`/admin/cms/page/${pageId}/preview-ticket`, null, {
+    params: template ? { template } : undefined
+  })
+}
+
+/** 栏目模板预览：template 为空时沿用栏目自身模板。 */
+export function createCategoryPreviewTicket(categoryId, template) {
+  return http.post(`/admin/cms/category/${categoryId}/preview-ticket`, null, {
+    params: template ? { template } : undefined
+  })
 }

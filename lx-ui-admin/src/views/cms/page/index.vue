@@ -120,7 +120,14 @@
           </el-col>
           <el-col :span="8">
             <el-form-item :label="t('page.cms.page.template')">
-              <el-input v-model="form.template" maxlength="100" :placeholder="t('page.cms.page.templatePlaceholder')" />
+              <el-select v-model="form.template" clearable style="width: 100%" :placeholder="t('page.cms.page.templatePlaceholder')">
+                <el-option
+                  v-for="item in templateOptions"
+                  :key="item.code"
+                  :label="templateOptionLabel(item)"
+                  :value="item.code"
+                />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="4">
@@ -192,6 +199,7 @@ import {
   createPagePreviewTicket,
   deletePage,
   getPage,
+  getTemplateOptions,
   listModelFields,
   listModelOptions,
   listPages,
@@ -205,13 +213,19 @@ import {
  * CMS 单页管理：page_key 是门户 URL 的稳定键，改名不影响引用。
  * 新建一律草稿，发布后才能被门户与导航目标读取。
  */
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+/** 模板接口同时返回中英文名称，后台按当前语言展示。 */
+function templateOptionLabel(item) {
+  return String(locale.value).startsWith('en') ? item.nameEn : item.name
+}
 
 const sites = ref([])
 const siteId = ref(null)
 const loading = ref(false)
 const rows = ref([])
 const total = ref(0)
+const templateOptions = ref([])
 const query = reactive({ pageNum: 1, pageSize: 10, keyword: '', status: '' })
 
 function statusLabel(status) {
@@ -264,6 +278,13 @@ function handleReset() {
 onMounted(async () => {
   await loadSites()
   await loadList()
+  try {
+    const options = await getTemplateOptions()
+    templateOptions.value = options.pageTemplates || []
+  } catch (e) {
+    // 权限不足或 CMS 关闭时保持空列表，模板留空即回退默认版式
+    templateOptions.value = []
+  }
 })
 
 /* ==================== 新增 / 编辑 ==================== */

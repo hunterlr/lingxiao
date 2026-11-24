@@ -184,7 +184,7 @@ const { data: related } = await useAsyncData(`article-related-${articleId}`, asy
 })
 
 const cover = computed(() => mediaUrl(article.value?.cover, 'medium'))
-const tags = computed(() => article.value?.tags || [])
+const detailTemplate = computed(() => resolveDetailTemplate(article.value?.template))
 const trail = computed(() =>
   article.value?.category ? findCategoryTrail(categories.value || [], article.value.category.categoryKey) : []
 )
@@ -246,28 +246,8 @@ useHead(() => {
       </template>
     </nav>
 
-    <header class="article-header">
-      <p v-if="article.category" class="eyebrow">
-        <NuxtLink :to="`/category/${article.category.categoryKey}`">{{ article.category.categoryName }}</NuxtLink>
-      </p>
-      <h1 class="article-title">{{ article.title }}</h1>
-      <p v-if="article.summary" class="article-summary">{{ article.summary }}</p>
-      <div class="article-meta">
-        <span v-if="article.authorName">{{ article.authorName }}</span>
-        <time v-if="article.publishTime" :datetime="article.publishTime">{{ formatDate(article.publishTime) }}</time>
-        <span v-if="article.viewCount != null">阅读 {{ formatCount(article.viewCount) }}</span>
-      </div>
-      <ul v-if="tags.length" class="tag-list" aria-label="文章标签">
-        <li v-for="tag in tags" :key="tag.tagId" class="tag">{{ tag.tagName }}</li>
-      </ul>
-    </header>
-
-    <figure v-if="cover" class="article-cover">
-      <img :src="cover" :alt="article.title" />
-    </figure>
-
-    <!-- 正文已由后端 HtmlSanitizer 按白名单清洗，门户不再二次解析 -->
-    <div class="article-content" v-html="article.content" />
+    <!-- 标题 / 封面 / 正文由模板组件渲染；互动、评论与相关阅读留在页面级 -->
+    <component :is="detailTemplate" :article="article" />
 
     <div class="interaction-bar" aria-label="文章互动">
       <button

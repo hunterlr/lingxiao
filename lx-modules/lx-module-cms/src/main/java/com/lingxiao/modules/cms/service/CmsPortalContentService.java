@@ -289,8 +289,9 @@ public class CmsPortalContentService {
                     || !CommonConstants.STATUS_NORMAL.equals(category.getStatus())) {
                 return null;
             }
-            return StringUtils.hasText(category.getPath())
-                    ? category.getPath() : "/category/" + category.getCategoryKey();
+            // 门户栏目路由固定为 /category/{categoryKey}；cms_category.path 允许运营填自定义值，
+            // 历史种子数据仅存 "news" 这类相对值，直接透出会拼出 /news 死链，因此统一按稳定键生成。
+            return "/category/" + category.getCategoryKey();
         }
         if (TARGET_PAGE.equals(item.getTargetType())) {
             CmsPage page = item.getTargetId() == null

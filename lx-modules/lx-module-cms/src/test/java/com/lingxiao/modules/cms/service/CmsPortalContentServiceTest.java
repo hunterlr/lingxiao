@@ -143,6 +143,38 @@ class CmsPortalContentServiceTest {
     }
 
     @Test
+    @DisplayName("导航：栏目目标固定输出 /category/{key}，不直接透出相对 path")
+    void resolvesCategoryUrlByStableKey() {
+        CmsNav nav = new CmsNav();
+        nav.setNavId(1L);
+        nav.setSiteId(1L);
+        nav.setNavKey("main");
+        nav.setNavName("主导航");
+        when(navMapper.selectOne(any())).thenReturn(nav);
+        CmsNavItem item = new CmsNavItem();
+        item.setItemId(10L);
+        item.setNavId(1L);
+        item.setSiteId(1L);
+        item.setParentId(0L);
+        item.setItemName("新闻");
+        item.setTargetType("category");
+        item.setTargetId(9L);
+        when(navItemMapper.selectList(any())).thenReturn(Collections.singletonList(item));
+        CmsCategory category = new CmsCategory();
+        category.setCategoryId(9L);
+        category.setSiteId(1L);
+        category.setCategoryKey("news");
+        category.setPath("news");
+        category.setStatus("0");
+        when(categoryMapper.selectById(9L)).thenReturn(category);
+
+        PortalNavVO vo = service.nav("main", "main");
+
+        assertThat(vo.getItems()).hasSize(1);
+        assertThat(vo.getItems().get(0).getUrl()).isEqualTo("/category/news");
+    }
+
+    @Test
     @DisplayName("区块：正文清洗后返回")
     void blockSanitizesContent() {
         CmsBlock block = new CmsBlock();

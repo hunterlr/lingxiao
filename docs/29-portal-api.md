@@ -142,7 +142,8 @@
   `content` 同样经过 `HtmlSanitizer`，`ext` 为 page 模型扩展字段。
 - **导航**：`navId / navKey / navName / position / items[]`；每个导航项包含
   `itemId / itemName / targetType / targetId / url / icon / sort / children[]`。
-  `url` 由服务端解析好：栏目优先用 `path`，否则 `/category/{categoryKey}`；
+  `url` 由服务端解析好：栏目固定 `/category/{categoryKey}`（`cms_category.path` 允许运营填自定义值，
+  但门户路由以稳定键为准，不直接透出，避免相对 path 拼出 `/news` 死链）；
   单页为 `/page/{pageKey}`；外链原样返回。
 - **区块**：`blockId / blockKey / blockName / blockType / content / cover / linkUrl / sort`。
   `blockType=html` 时 `content` 已清洗；`blockType=image` 用 `cover` + `linkUrl`。

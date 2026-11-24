@@ -953,25 +953,27 @@ CMS 一关闭就会“菜单还在、接口 404、迁移照跑”。
 `.local/member-contact-ui-check.mjs` 15/15；图形验证码开启时门户实测通过；
 后端、门户、后台构建通过。
 
-### 12.24 P1：v1.3 CMS 第三刀 — 内容模型、单页、导航、区块与预览（待开工，2026-11-23 制定）
+### 12.24 P1：v1.3 CMS 第三刀 — 内容模型、单页、导航、区块与预览（✅ 已完成，2026-11-24）
 
 **为什么现在做**：文章只有固定字段，后台无法定义内容结构；门户页脚 / 关于我们 /
 首页推荐位没有数据来源，模板与静态化也缺前置。
 
-**范围**：
+**落地**：
 
-- 模型 / 字段最小集（文章、图集、单页三种内置模型）+ `cms_content_ext` 自定义字段；
-- 单页（`cms_page`）、导航（`cms_nav` / `cms_nav_item`）、区块与轮播
-  （`cms_block` / `cms_banner`），内容编辑按模型动态表单；
-- 草稿预览（一次性预览票据），门户补单页 / 导航 / 区块渲染；
-- 权限码与菜单幂等；迁移从 `V35` 起放 `db/migration/cms/`。
+- 迁移 `V35__cms_model_page_nav.sql`：`cms_model` / `cms_model_field` / `cms_content_ext` /
+  `cms_page` / `cms_nav` / `cms_nav_item` / `cms_block` / `cms_banner` / `cms_preview_ticket`，
+  `cms_category` 增加 `model_id`；播种文章 / 图集 / 单页三个内置模型并回填旧栏目。
+- 迁移 `V36__cms_model_menu.sql`：`3056`、`3060~3103` 菜单与按钮权限，`INSERT IGNORE` 幂等。
+- 后台：模型 / 字段设计器、单页、导航树、区块、轮播页面；文章与单页按模型渲染动态字段。
+- 门户：`/pages/{pageKey}`、`/navs/{navKey}`、`/blocks/{blockKey}`、`/banners` 只读接口；
+  布局导航、首页轮播 / 区块、单页与一次性票据预览页。
+- 预览：后台生成 10 分钟一次性票据，门户 `/preview/{ticket}` 消费后返回草稿。
 
-**前置**：现有 CMS 第一刀（站点 / 栏目 / 文章 / 标签 / 发布 / 回收站 / 版本）。
+**验收**：`mvn -o -q -pl lx-modules/lx-module-cms test` 通过；Flyway `V35` / `V36` 实跑成功；
+`.local/cms-model-check.mjs` 全通过；后台与门户 `npm run build` 通过；
+后台 / 门户新页面浏览器走查无控制台错误；CMS 关闭时接口 404、菜单不下发。
 
-**验收口径**：单测 + Flyway 实跑 + `.local/cms-model-check.mjs` + 后台与门户构建 +
-浏览器走查；CMS 关闭时接口 404、菜单不下发。
-
-详见 `docs/20-cms-embed-plan.md` §21.4；开工提示词与自检见 §21.8。
+详见 `docs/20-cms-embed-plan.md` §22；原规划见 §21.4。
 
 ### 12.25 P2：v1.4 CMS 第四刀 — 轻量模板与 SEO 收口（待开工，2026-11-23 制定）
 

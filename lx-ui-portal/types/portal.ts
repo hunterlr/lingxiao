@@ -59,6 +59,69 @@ export interface PortalArticleDetail extends PortalArticleSummary {
   content?: string | null
   sourceUrl?: string | null
   category?: PortalCategory | null
+  /** 模型扩展字段，值形态由字段类型决定 */
+  ext?: Record<string, unknown> | null
+}
+
+export interface PortalPage {
+  pageId: string
+  pageKey: string
+  pageName: string
+  title?: string | null
+  summary?: string | null
+  cover?: string | null
+  content?: string | null
+  template?: string | null
+  seoTitle?: string | null
+  seoKeywords?: string | null
+  seoDescription?: string | null
+  publishTime?: string | null
+  ext?: Record<string, unknown> | null
+}
+
+export interface PortalNavItem {
+  itemId: string
+  itemName: string
+  targetType: string
+  targetId?: string | null
+  url: string
+  icon?: string | null
+  sort?: number | null
+  children?: PortalNavItem[]
+}
+
+export interface PortalNav {
+  navId: string
+  navKey: string
+  navName: string
+  position?: string | null
+  items: PortalNavItem[]
+}
+
+export interface PortalBlock {
+  blockId: string
+  blockKey: string
+  blockName: string
+  blockType: string
+  content?: string | null
+  cover?: string | null
+  linkUrl?: string | null
+  sort?: number | null
+}
+
+export interface PortalBanner {
+  bannerId: string
+  bannerGroup: string
+  title?: string | null
+  image?: string | null
+  linkUrl?: string | null
+  sort?: number | null
+}
+
+export interface PortalPreview {
+  targetType: string
+  article?: PortalArticleDetail | null
+  page?: PortalPage | null
 }
 
 export interface PageResult<T> {

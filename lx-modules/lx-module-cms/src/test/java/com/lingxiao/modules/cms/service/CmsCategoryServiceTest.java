@@ -5,6 +5,7 @@ import com.lingxiao.modules.cms.entity.CmsCategory;
 import com.lingxiao.modules.cms.mapper.CmsArticleMapper;
 import com.lingxiao.modules.cms.mapper.CmsCategoryClosureMapper;
 import com.lingxiao.modules.cms.mapper.CmsCategoryMapper;
+import com.lingxiao.modules.cms.mapper.CmsModelMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ class CmsCategoryServiceTest {
     private CmsCategoryClosureMapper closureMapper;
     private CmsArticleMapper articleMapper;
     private CmsSiteService siteService;
+    private CmsModelMapper modelMapper;
     private CmsCategoryService service;
 
     @BeforeEach
@@ -43,7 +45,9 @@ class CmsCategoryServiceTest {
         closureMapper = mock(CmsCategoryClosureMapper.class);
         articleMapper = mock(CmsArticleMapper.class);
         siteService = mock(CmsSiteService.class);
-        service = new CmsCategoryService(categoryMapper, closureMapper, articleMapper, siteService);
+        modelMapper = mock(CmsModelMapper.class);
+        service = new CmsCategoryService(categoryMapper, closureMapper, articleMapper,
+                siteService, modelMapper);
     }
 
     @Test

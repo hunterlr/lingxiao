@@ -198,6 +198,7 @@
                 check-strictly
                 :render-after-expand="false"
                 style="width: 100%"
+                @change="handleFormCategoryChange"
               />
             </el-form-item>
           </el-col>
@@ -251,6 +252,10 @@
             <el-form-item :label="t('page.cms.article.content')" prop="content">
               <RichEditor v-model="form.content" height="340px" :placeholder="t('page.cms.article.contentPlaceholder')" />
             </el-form-item>
+          </el-col>
+          <el-col v-if="formModelFields.length" :span="24">
+            <el-divider content-position="left">{{ t('page.cms.model.extFields') }}</el-divider>
+            <CmsExtFields v-model="form.ext" :fields="formModelFields" />
           </el-col>
           <el-col :span="24">
             <el-form-item :label="t('common.remark')">
@@ -421,6 +426,14 @@
         style="margin-bottom: 16px"
       />
       <div class="article-preview" v-html="previewContent"></div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="previewVisible = false">{{ t('common.close') }}</el-button>
+          <el-button type="primary" :loading="previewTicketLoading" @click="openPortalPreview">
+            {{ t('page.cms.article.openPortalPreview') }}
+          </el-button>
+        </div>
+      </template>
     </el-drawer>
   </div>
 </template>
@@ -433,15 +446,18 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Plus, Refresh, Search } from '@element-plus/icons-vue'
 import RichEditor from '@/components/RichEditor.vue'
 import MediaPicker from '@/components/MediaPicker.vue'
+import CmsExtFields from '@/components/CmsExtFields.vue'
 import {
   addArticle,
   cancelScheduleArticle,
+  createArticlePreviewTicket,
   deleteArticle,
   getArticle,
   getArticleVersion,
   getCategoryTree,
   listArticles,
   listArticleVersions,
+  listModelFields,
   listSiteOptions,
   listTagOptions,
   offlineArticle,
@@ -588,6 +604,7 @@ const editingId = ref('')
 const formRef = ref(null)
 const formCategoryTree = ref([])
 const formTags = ref([])
+const formModelFields = ref([])
 
 const emptyForm = () => ({
   siteId: siteId.value,
@@ -601,7 +618,8 @@ const emptyForm = () => ({
   source: '',
   sourceUrl: '',
   sort: 0,
-  remark: ''
+  remark: '',
+  ext: {}
 })
 
 const form = reactive(emptyForm())
@@ -625,6 +643,7 @@ const rules = {
 async function loadFormOptions(targetSiteId) {
   formCategoryTree.value = []
   formTags.value = []
+  formModelFields.value = []
   if (!targetSiteId) return
   const [tree, tagList] = await Promise.all([
     getCategoryTree({ siteId: targetSiteId }),
@@ -632,6 +651,29 @@ async function loadFormOptions(targetSiteId) {
   ])
   formCategoryTree.value = tree || []
   formTags.value = tagList || []
+}
+
+/** 在栏目树里找当前节点，拿它绑定的模型。 */
+function findCategoryNode(nodes, categoryId) {
+  for (const node of nodes || []) {
+    if (String(node.categoryId) === String(categoryId)) return node
+    const found = findCategoryNode(node.children, categoryId)
+    if (found) return found
+  }
+  return null
+}
+
+/** 栏目切换后加载对应模型的扩展字段；旧值保留，后端会按新模型过滤。 */
+async function loadFormModelFields(categoryId) {
+  formModelFields.value = []
+  const node = findCategoryNode(formCategoryTree.value, categoryId)
+  if (!node || !node.modelId) return
+  const fields = await listModelFields(node.modelId).catch(() => [])
+  formModelFields.value = fields || []
+}
+
+function handleFormCategoryChange(value) {
+  loadFormModelFields(value)
 }
 
 function handleFormSiteChange(value) {
@@ -687,8 +729,10 @@ async function openEdit(row) {
       source: detail.source || '',
       sourceUrl: detail.sourceUrl || '',
       sort: detail.sort || 0,
-      remark: detail.remark || ''
+      remark: detail.remark || '',
+      ext: detail.ext || {}
     })
+    await loadFormModelFields(detail.categoryId)
   } finally {
     dialogLoading.value = false
   }
@@ -715,7 +759,8 @@ async function submitForm() {
         source: form.source || null,
         sourceUrl: form.sourceUrl || null,
         sort: form.sort || 0,
-        remark: form.remark || null
+        remark: form.remark || null,
+        ext: form.ext || {}
       }
       if (isEdit.value) {
         await updateArticle(editingId.value, payload)
@@ -915,13 +960,29 @@ async function handleRollback(row) {
 const previewVisible = ref(false)
 const previewTitle = ref('')
 const previewContent = ref('')
+const previewArticleId = ref('')
+const previewTicketLoading = ref(false)
 
 async function openPreview(row) {
+  previewArticleId.value = row.articleId
   previewTitle.value = row.title
   previewContent.value = ''
   previewVisible.value = true
   const detail = await getArticle(row.articleId).catch(() => null)
   previewContent.value = (detail && detail.content) || `<p>${t('page.cms.article.noContent')}</p>`
+}
+
+/** 生成一次性票据后在新窗口打开门户预览；票据 10 分钟内有效且只能用一次。 */
+async function openPortalPreview() {
+  if (!previewArticleId.value) return
+  previewTicketLoading.value = true
+  try {
+    const ticket = await createArticlePreviewTicket(previewArticleId.value)
+    const base = String(import.meta.env.VITE_PORTAL_BASE_URL || 'http://localhost:3000').replace(/\/$/, '')
+    window.open(`${base}/preview/${encodeURIComponent(ticket.ticket)}`, '_blank')
+  } finally {
+    previewTicketLoading.value = false
+  }
 }
 </script>
 

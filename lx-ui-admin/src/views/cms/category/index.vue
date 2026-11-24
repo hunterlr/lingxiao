@@ -3,7 +3,7 @@
     <div class="page-card">
       <el-form :inline="true" :model="query" class="search-form" @submit.prevent>
         <el-form-item :label="t('page.cms.common.site')">
-          <el-select v-model="siteId" :placeholder="t('page.cms.common.selectSite')" style="width: 200px" @change="loadTree">
+          <el-select v-model="siteId" :placeholder="t('page.cms.common.selectSite')" style="width: 200px" @change="handleSiteChange">
             <el-option v-for="site in sites" :key="site.siteId" :label="site.siteName" :value="site.siteId" />
           </el-select>
         </el-form-item>
@@ -148,6 +148,13 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
+            <el-form-item :label="t('page.cms.model.model')">
+              <el-select v-model="form.modelId" clearable style="width: 100%" :placeholder="t('page.cms.model.defaultModel')">
+                <el-option v-for="item in modelOptions" :key="item.modelId" :label="item.modelName" :value="item.modelId" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
             <el-form-item :label="t('page.cms.category.slug')">
               <el-input v-model="form.slug" maxlength="100" :placeholder="t('page.cms.category.slugPlaceholder')" />
             </el-form-item>
@@ -216,6 +223,7 @@ import {
   deleteCategory,
   getCategory,
   getCategoryTree,
+  listModelOptions,
   listSiteOptions,
   updateCategory
 } from '@/api/cms'
@@ -232,6 +240,7 @@ const { t } = useI18n()
 const sites = ref([])
 const sitesLoading = ref(false)
 const siteId = ref(null)
+const modelOptions = ref([])
 const loading = ref(false)
 const rows = ref([])
 const expandAll = ref(true)
@@ -251,6 +260,12 @@ async function loadSites() {
   } finally {
     sitesLoading.value = false
   }
+}
+
+async function loadModelOptions() {
+  modelOptions.value = []
+  if (!siteId.value) return
+  modelOptions.value = (await listModelOptions(siteId.value)) || []
 }
 
 async function loadTree() {
@@ -276,8 +291,14 @@ function handleReset() {
   loadTree()
 }
 
+function handleSiteChange() {
+  loadModelOptions()
+  loadTree()
+}
+
 onMounted(async () => {
   await loadSites()
+  await loadModelOptions()
   await loadTree()
 })
 
@@ -290,6 +311,7 @@ const formRef = ref(null)
 
 const emptyForm = () => ({
   parentId: 0,
+  modelId: null,
   categoryKey: '',
   categoryName: '',
   slug: '',
@@ -328,6 +350,7 @@ async function openEdit(row) {
   editingId.value = row.categoryId
   Object.assign(form, {
     parentId: row.parentId || 0,
+    modelId: row.modelId || null,
     categoryKey: row.categoryKey || '',
     categoryName: row.categoryName || '',
     slug: row.slug || '',
@@ -345,6 +368,7 @@ async function openEdit(row) {
   if (detail) {
     Object.assign(form, {
       parentId: detail.parentId || 0,
+      modelId: detail.modelId || null,
       categoryKey: detail.categoryKey || '',
       categoryName: detail.categoryName || '',
       slug: detail.slug || '',
@@ -372,6 +396,7 @@ async function submitForm() {
       const payload = {
         siteId: siteId.value,
         parentId: form.parentId || 0,
+        modelId: form.modelId || 0,
         categoryKey: form.categoryKey.trim(),
         categoryName: form.categoryName.trim(),
         slug: form.slug || null,

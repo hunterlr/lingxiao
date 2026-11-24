@@ -4,7 +4,9 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 门户文章详情。
@@ -42,4 +44,7 @@ public class PortalArticleDetailVO {
     private PortalCategoryVO category;
 
     private List<PortalTagVO> tags = new ArrayList<>();
+
+    /** 模型扩展字段（图集 images 等） */
+    private Map<String, Object> ext = new LinkedHashMap<>();
 }

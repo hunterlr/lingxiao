@@ -14,6 +14,7 @@ import com.lingxiao.modules.cms.dto.CmsArticleVersionVO;
 import com.lingxiao.modules.cms.entity.CmsArticle;
 import com.lingxiao.modules.cms.entity.CmsArticleVersion;
 import com.lingxiao.modules.cms.entity.CmsCategory;
+import com.lingxiao.modules.cms.entity.CmsModel;
 import com.lingxiao.modules.cms.entity.CmsTag;
 import com.lingxiao.modules.cms.mapper.CmsArticleMapper;
 import com.lingxiao.modules.cms.mapper.CmsArticleTagMapper;
@@ -34,6 +35,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
@@ -76,6 +78,8 @@ public class CmsArticleService {
     private final CmsTagMapper tagMapper;
     private final CmsSiteService siteService;
     private final CmsCategoryService categoryService;
+    private final CmsModelService modelService;
+    private final CmsContentExtService extService;
 
     /** 每篇文章保留的版本数；Spring 注入，单测直接使用默认值 */
     @Value("${lx.cms.version-keep:30}")
@@ -112,6 +116,7 @@ public class CmsArticleService {
         if (article.getTagIds() == null) {
             article.setTagIds(new ArrayList<>());
         }
+        article.setExt(extService.load("article", articleId));
         return article;
     }
 
@@ -135,6 +140,7 @@ public class CmsArticleService {
         articleMapper.insert(article);
 
         replaceTags(article.getArticleId(), article.getSiteId(), article.getTagIds());
+        saveExt(article, category);
         snapshot(article, VERSION_CREATE);
         return article.getArticleId();
     }
@@ -161,6 +167,7 @@ public class CmsArticleService {
         articleMapper.updateById(existing);
 
         replaceTags(articleId, siteId, article.getTagIds());
+        saveExt(existing, category);
         snapshot(existing, VERSION_EDIT);
     }
 
@@ -324,6 +331,7 @@ public class CmsArticleService {
         mustGetDeleted(articleId);
         articleTagMapper.deleteByArticleId(articleId);
         versionMapper.deleteByArticleId(articleId);
+        extService.deleteByOwner("article", articleId);
         int removed = articleMapper.hardDeleteDeletedById(articleId);
         if (removed == 0) {
             throw new ServiceException(ErrorCode.NOT_FOUND, "回收站中不存在该文章");
@@ -399,6 +407,15 @@ public class CmsArticleService {
     }
 
     // ==================== 内部方法 ====================
+
+    /** 按栏目绑定的模型校验扩展字段并落库；只保留模型已定义字段。 */
+    private void saveExt(CmsArticle article, CmsCategory category) {
+        CmsModel model = modelService.resolveForCategory(category);
+        Map<String, Object> ext = modelService.validateExt(
+                model.getModelId(), article.getExt(), true);
+        extService.save("article", article.getArticleId(), article.getSiteId(),
+                model.getModelId(), ext);
+    }
 
     private CmsArticle mustGet(Long articleId) {
         CmsArticle article = articleId == null ? null : articleMapper.selectById(articleId);

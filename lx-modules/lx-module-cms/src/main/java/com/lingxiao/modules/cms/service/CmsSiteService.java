@@ -1,20 +1,34 @@
 package com.lingxiao.modules.cms.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.lingxiao.common.core.constant.CommonConstants;
 import com.lingxiao.common.core.domain.PageResult;
 import com.lingxiao.common.core.enums.ErrorCode;
 import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.common.security.util.LoginHelper;
+import com.lingxiao.modules.cms.entity.CmsBanner;
+import com.lingxiao.modules.cms.entity.CmsBlock;
 import com.lingxiao.modules.cms.entity.CmsCategory;
+import com.lingxiao.modules.cms.entity.CmsModel;
+import com.lingxiao.modules.cms.entity.CmsNav;
+import com.lingxiao.modules.cms.entity.CmsPage;
 import com.lingxiao.modules.cms.entity.CmsSite;
 import com.lingxiao.modules.cms.mapper.CmsArticleMapper;
+import com.lingxiao.modules.cms.mapper.CmsBannerMapper;
+import com.lingxiao.modules.cms.mapper.CmsBlockMapper;
 import com.lingxiao.modules.cms.mapper.CmsCategoryMapper;
+import com.lingxiao.modules.cms.mapper.CmsModelFieldMapper;
+import com.lingxiao.modules.cms.mapper.CmsModelMapper;
+import com.lingxiao.modules.cms.mapper.CmsNavMapper;
+import com.lingxiao.modules.cms.mapper.CmsPageMapper;
 import com.lingxiao.modules.cms.mapper.CmsSiteMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
@@ -33,6 +47,12 @@ public class CmsSiteService {
     private final CmsSiteMapper siteMapper;
     private final CmsCategoryMapper categoryMapper;
     private final CmsArticleMapper articleMapper;
+    private final CmsPageMapper pageMapper;
+    private final CmsNavMapper navMapper;
+    private final CmsBlockMapper blockMapper;
+    private final CmsBannerMapper bannerMapper;
+    private final CmsModelMapper modelMapper;
+    private final CmsModelFieldMapper modelFieldMapper;
 
     public PageResult<CmsSite> page(long pageNum, long pageSize, String keyword, String status) {
         Page<CmsSite> page = new Page<>(Math.max(pageNum, 1), Math.min(Math.max(pageSize, 1), 100));
@@ -94,6 +114,7 @@ public class CmsSiteService {
         siteMapper.updateById(existing);
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long siteId) {
         mustGet(siteId);
         // 先查文章（含回收站）：栏目通常是文章的前置条件，先提示“还有文章”
@@ -108,7 +129,34 @@ public class CmsSiteService {
         if (categories != null && categories > 0) {
             throw new ServiceException(ErrorCode.BAD_REQUEST, "站点下还有栏目，不能删除");
         }
+        // 单页 / 导航 / 区块 / 轮播 / 自定义模型同样要求先清理，避免站点删除后留下孤儿配置。
+        if (countSite(pageMapper, CmsPage::getSiteId, siteId) > 0) {
+            throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "cms.site.delete.pages");
+        }
+        if (countSite(navMapper, CmsNav::getSiteId, siteId) > 0) {
+            throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "cms.site.delete.navs");
+        }
+        if (countSite(blockMapper, CmsBlock::getSiteId, siteId) > 0) {
+            throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "cms.site.delete.blocks");
+        }
+        if (countSite(bannerMapper, CmsBanner::getSiteId, siteId) > 0) {
+            throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "cms.site.delete.banners");
+        }
+        Long customModels = modelMapper.selectCount(new LambdaQueryWrapper<CmsModel>()
+                .eq(CmsModel::getSiteId, siteId)
+                .eq(CmsModel::getBuiltIn, "0"));
+        if (customModels != null && customModels > 0) {
+            throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "cms.site.delete.models");
+        }
+        // 内置模型随站点创建，站点删除时一并物理清理，避免 cms_model 遗留孤儿定义。
+        modelFieldMapper.hardDeleteBySiteId(siteId);
+        modelMapper.hardDeleteBySiteId(siteId);
         siteMapper.hardDeleteById(siteId);
+    }
+
+    private <T> long countSite(BaseMapper<T> mapper, SFunction<T, Long> column, Long siteId) {
+        Long count = mapper.selectCount(new LambdaQueryWrapper<T>().eq(column, siteId));
+        return count == null ? 0 : count;
     }
 
     public CmsSite mustGet(Long siteId) {

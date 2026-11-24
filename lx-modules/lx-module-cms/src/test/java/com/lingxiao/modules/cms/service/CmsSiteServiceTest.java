@@ -3,7 +3,13 @@ package com.lingxiao.modules.cms.service;
 import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.modules.cms.entity.CmsSite;
 import com.lingxiao.modules.cms.mapper.CmsArticleMapper;
+import com.lingxiao.modules.cms.mapper.CmsBannerMapper;
+import com.lingxiao.modules.cms.mapper.CmsBlockMapper;
 import com.lingxiao.modules.cms.mapper.CmsCategoryMapper;
+import com.lingxiao.modules.cms.mapper.CmsModelFieldMapper;
+import com.lingxiao.modules.cms.mapper.CmsModelMapper;
+import com.lingxiao.modules.cms.mapper.CmsNavMapper;
+import com.lingxiao.modules.cms.mapper.CmsPageMapper;
 import com.lingxiao.modules.cms.mapper.CmsSiteMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -29,6 +35,12 @@ class CmsSiteServiceTest {
     private CmsSiteMapper siteMapper;
     private CmsCategoryMapper categoryMapper;
     private CmsArticleMapper articleMapper;
+    private CmsPageMapper pageMapper;
+    private CmsNavMapper navMapper;
+    private CmsBlockMapper blockMapper;
+    private CmsBannerMapper bannerMapper;
+    private CmsModelMapper modelMapper;
+    private CmsModelFieldMapper modelFieldMapper;
     private CmsSiteService service;
 
     @BeforeEach
@@ -36,7 +48,14 @@ class CmsSiteServiceTest {
         siteMapper = mock(CmsSiteMapper.class);
         categoryMapper = mock(CmsCategoryMapper.class);
         articleMapper = mock(CmsArticleMapper.class);
-        service = new CmsSiteService(siteMapper, categoryMapper, articleMapper);
+        pageMapper = mock(CmsPageMapper.class);
+        navMapper = mock(CmsNavMapper.class);
+        blockMapper = mock(CmsBlockMapper.class);
+        bannerMapper = mock(CmsBannerMapper.class);
+        modelMapper = mock(CmsModelMapper.class);
+        modelFieldMapper = mock(CmsModelFieldMapper.class);
+        service = new CmsSiteService(siteMapper, categoryMapper, articleMapper,
+                pageMapper, navMapper, blockMapper, bannerMapper, modelMapper, modelFieldMapper);
     }
 
     @Test
@@ -67,6 +86,21 @@ class CmsSiteServiceTest {
     }
 
     @Test
+    @DisplayName("站点下还有单页：拒绝删除")
+    void rejectsDeleteWhenPagesExist() {
+        when(siteMapper.selectById(1L)).thenReturn(site(1L, "main"));
+        when(categoryMapper.selectCount(any())).thenReturn(0L);
+        when(articleMapper.countBySiteIncludingDeleted(1L)).thenReturn(0L);
+        when(pageMapper.selectCount(any())).thenReturn(1L);
+
+        ServiceException error = catchThrowableOfType(() -> service.delete(1L), ServiceException.class);
+
+        assertThat(error).isNotNull();
+        assertThat(error.getMessageKey()).isEqualTo("cms.site.delete.pages");
+        verify(siteMapper, never()).hardDeleteById(any());
+    }
+
+    @Test
     @DisplayName("站点没有内容：物理删除")
     void deletesEmptySite() {
         when(siteMapper.selectById(1L)).thenReturn(site(1L, "main"));
@@ -75,6 +109,8 @@ class CmsSiteServiceTest {
 
         service.delete(1L);
 
+        verify(modelFieldMapper).hardDeleteBySiteId(1L);
+        verify(modelMapper).hardDeleteBySiteId(1L);
         verify(siteMapper).hardDeleteById(1L);
     }
 

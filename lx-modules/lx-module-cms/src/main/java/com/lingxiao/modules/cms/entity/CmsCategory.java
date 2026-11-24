@@ -36,6 +36,9 @@ public class CmsCategory extends BaseEntity {
     /** 0 表示根栏目 */
     private Long parentId;
 
+    /** 绑定的内容模型；空值回退站点内置文章模型 */
+    private Long modelId;
+
     /** 站点内稳定键：门户路径 / 内容导入按它定位，改名不影响引用 */
     @NotBlank(message = "{valid.cms.category.key.required}")
     @Size(max = 64, message = "{valid.cms.category.key.max}")

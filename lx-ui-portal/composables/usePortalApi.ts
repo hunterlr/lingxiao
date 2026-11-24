@@ -3,7 +3,12 @@ import type {
   PageResult,
   PortalArticleDetail,
   PortalArticleSummary,
+  PortalBanner,
+  PortalBlock,
   PortalCategory,
+  PortalNav,
+  PortalPage,
+  PortalPreview,
   PortalSite,
   PortalTag
 } from '~/types/portal'
@@ -28,9 +33,13 @@ export function usePortalApi() {
   const base = `/api/portal/cms/sites/${encodeURIComponent(siteKey)}`
 
   async function request<T>(path: string, query?: Record<string, unknown>): Promise<T> {
+    return requestUrl<T>(base + path, query)
+  }
+
+  async function requestUrl<T>(url: string, query?: Record<string, unknown>): Promise<T> {
     let response: ApiEnvelope<T>
     try {
-      response = await requestFetch<ApiEnvelope<T>>(base + path, { query })
+      response = await requestFetch<ApiEnvelope<T>>(url, { query })
     } catch (cause) {
       const statusCode = (cause as { statusCode?: number })?.statusCode || 502
       throw createError({ statusCode, statusMessage: '内容服务暂时不可用' })
@@ -60,6 +69,17 @@ export function usePortalApi() {
       return request<PortalArticleSummary[]>('/articles/batch', { ids: ids.join(',') })
     },
     search: (query: ArticleQuery = {}) =>
-      request<PageResult<PortalArticleSummary>>('/search', query as Record<string, unknown>)
+      request<PageResult<PortalArticleSummary>>('/search', query as Record<string, unknown>),
+    fetchPage: (pageKey: string) =>
+      request<PortalPage>(`/pages/${encodeURIComponent(pageKey)}`),
+    fetchNav: (navKey: string) =>
+      request<PortalNav>(`/navs/${encodeURIComponent(navKey)}`),
+    fetchBlock: (blockKey: string) =>
+      request<PortalBlock>(`/blocks/${encodeURIComponent(blockKey)}`),
+    fetchBanners: (groupKey = 'home') =>
+      request<PortalBanner[]>('/banners', { groupKey }),
+    /** 预览不经过 siteKey 路径：票据自身绑定站点与目标。 */
+    fetchPreview: (ticket: string) =>
+      requestUrl<PortalPreview>(`/api/portal/cms/preview/${encodeURIComponent(ticket)}`)
   }
 }

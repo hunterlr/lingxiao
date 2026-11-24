@@ -7,8 +7,16 @@ const { data: categories } = await useAsyncData('portal-categories', api.fetchCa
 const { data: latest } = await useAsyncData('portal-home-latest', () =>
   api.fetchArticles({ pageNum: 1, pageSize: 7 })
 )
+// 轮播与首页区块是可选的：后台没配就不渲染
+const { data: banners } = await useAsyncData('portal-home-banners', () =>
+  api.fetchBanners('home').catch(() => [])
+)
+const { data: homeBlock } = await useAsyncData('portal-home-block', () =>
+  api.fetchBlock('home-hero').catch(() => null)
+)
 
 const records = computed(() => latest.value?.records || [])
+const bannerList = computed(() => banners.value || [])
 const hero = computed(() => records.value[0] || null)
 const rest = computed(() => records.value.slice(1))
 const heroCover = computed(() => mediaUrl(hero.value?.cover, 'medium'))
@@ -31,6 +39,22 @@ useHead({
 
 <template>
   <div class="home">
+    <section v-if="bannerList.length" class="banner-strip" aria-label="轮播">
+      <component
+        :is="banner.linkUrl ? 'a' : 'div'"
+        v-for="banner in bannerList"
+        :key="banner.bannerId"
+        :href="banner.linkUrl || undefined"
+        class="banner-card"
+      >
+        <img v-if="banner.image" :src="mediaUrl(banner.image, 'medium')" :alt="banner.title || '轮播图'" />
+        <span v-else class="banner-fallback">{{ banner.title || '轮播图' }}</span>
+        <span v-if="banner.title" class="banner-title">{{ banner.title }}</span>
+      </component>
+    </section>
+
+    <section v-if="homeBlock && homeBlock.content" class="home-block" v-html="homeBlock.content"></section>
+
     <section v-if="hero" class="hero">
       <div class="hero-copy">
         <p class="eyebrow">最新发布</p>
@@ -86,3 +110,55 @@ useHead({
     </EmptyState>
   </div>
 </template>
+
+<style scoped>
+.banner-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(280px, 1fr);
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 24px;
+}
+
+.banner-card {
+  position: relative;
+  display: block;
+  min-height: 160px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--lx-surface, #f2f4f8);
+  color: inherit;
+  text-decoration: none;
+}
+
+.banner-card img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+}
+
+.banner-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 180px;
+  font-weight: 600;
+}
+
+.banner-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 14px;
+  color: #fff;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.6));
+}
+
+.home-block {
+  margin-bottom: 24px;
+}
+</style>

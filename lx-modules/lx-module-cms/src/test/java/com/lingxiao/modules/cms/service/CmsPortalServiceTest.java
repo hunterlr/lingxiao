@@ -46,6 +46,7 @@ class CmsPortalServiceTest {
     private CmsTagMapper tagMapper;
     private CmsArticleTagMapper articleTagMapper;
     private CmsCategoryClosureMapper closureMapper;
+    private CmsContentExtService extService;
     private CmsPortalService service;
 
     @BeforeEach
@@ -56,8 +57,9 @@ class CmsPortalServiceTest {
         tagMapper = mock(CmsTagMapper.class);
         articleTagMapper = mock(CmsArticleTagMapper.class);
         closureMapper = mock(CmsCategoryClosureMapper.class);
+        extService = mock(CmsContentExtService.class);
         service = new CmsPortalService(siteService, categoryMapper, articleMapper,
-                tagMapper, articleTagMapper, closureMapper);
+                tagMapper, articleTagMapper, closureMapper, extService);
         when(siteService.detailByKey("main")).thenReturn(site(1L, "main"));
     }
 

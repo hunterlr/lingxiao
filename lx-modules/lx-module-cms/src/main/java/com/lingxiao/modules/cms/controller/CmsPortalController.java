@@ -4,9 +4,15 @@ import com.lingxiao.common.core.domain.PageResult;
 import com.lingxiao.common.core.domain.R;
 import com.lingxiao.modules.cms.dto.portal.PortalArticleDetailVO;
 import com.lingxiao.modules.cms.dto.portal.PortalArticleSummaryVO;
+import com.lingxiao.modules.cms.dto.portal.PortalBannerVO;
+import com.lingxiao.modules.cms.dto.portal.PortalBlockVO;
 import com.lingxiao.modules.cms.dto.portal.PortalCategoryVO;
+import com.lingxiao.modules.cms.dto.portal.PortalNavVO;
+import com.lingxiao.modules.cms.dto.portal.PortalPageVO;
+import com.lingxiao.modules.cms.dto.portal.PortalPreviewVO;
 import com.lingxiao.modules.cms.dto.portal.PortalSiteVO;
 import com.lingxiao.modules.cms.dto.portal.PortalTagVO;
+import com.lingxiao.modules.cms.service.CmsPortalContentService;
 import com.lingxiao.modules.cms.service.CmsPortalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -38,6 +44,7 @@ import java.util.List;
 public class CmsPortalController {
 
     private final CmsPortalService portalService;
+    private final CmsPortalContentService contentService;
 
     /** 启用站点列表，供门户做多站点切换。 */
     @GetMapping("/sites")
@@ -115,5 +122,39 @@ public class CmsPortalController {
             @RequestParam(defaultValue = "10") long pageSize,
             @RequestParam(required = false) String keyword) {
         return R.ok(portalService.search(siteKey, pageNum, pageSize, keyword));
+    }
+
+    /* ==================== 单页 / 导航 / 区块 / 轮播 ==================== */
+
+    @GetMapping("/sites/{siteKey}/pages/{pageKey}")
+    public R<PortalPageVO> page(@PathVariable String siteKey, @PathVariable String pageKey) {
+        return R.ok(contentService.page(siteKey, pageKey));
+    }
+
+    @GetMapping("/sites/{siteKey}/navs/{navKey}")
+    public R<PortalNavVO> nav(@PathVariable String siteKey, @PathVariable String navKey) {
+        return R.ok(contentService.nav(siteKey, navKey));
+    }
+
+    @GetMapping("/sites/{siteKey}/blocks/{blockKey}")
+    public R<PortalBlockVO> block(@PathVariable String siteKey, @PathVariable String blockKey) {
+        return R.ok(contentService.block(siteKey, blockKey));
+    }
+
+    @GetMapping("/sites/{siteKey}/banners")
+    public R<List<PortalBannerVO>> banners(@PathVariable String siteKey,
+                                          @RequestParam(required = false) String groupKey) {
+        return R.ok(contentService.banners(siteKey, groupKey));
+    }
+
+    /**
+     * 草稿预览：票据一次性消费。
+     *
+     * <p>票据绑定站点与目标，因此这里不经过 siteKey 路径；无效 / 过期 /
+     * 已使用一律按参数错误处理。</p>
+     */
+    @GetMapping("/preview/{ticket}")
+    public R<PortalPreviewVO> preview(@PathVariable String ticket) {
+        return R.ok(contentService.preview(ticket));
     }
 }

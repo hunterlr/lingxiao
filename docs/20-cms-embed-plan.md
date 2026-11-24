@@ -1087,3 +1087,70 @@ docs/05 表、docs/29 接口），最后 git commit & push。完成后列出验�
 不跨模块外键、文件只存 fileId、CMS 关闭 404、迁移从 V35 起不改历史、文案中英双份）。
 完成后列出验收结果与遗留。
 ```
+
+---
+
+## 22. v1.3 CMS 第三刀落地（2026-11-24）
+
+第三刀目标：后台能定义内容结构、运营首页；门户能读单页 / 导航 / 区块 / 轮播并用一次性票据预览草稿。
+本轮不做服务端模板引擎，不做静态页生成，模板编码仍留给第四刀。
+
+### 22.1 代码落点
+
+| 层 | 落点 | 说明 |
+|---|---|---|
+| 迁移 | `V35__cms_model_page_nav.sql` | 建 9 张表，播种文章 / 图集 / 单页三个内置模型与字段，回填 `cms_category.model_id` |
+| 迁移 | `V36__cms_model_menu.sql` | `3056`、`3060~3103` 菜单与按钮权限，`INSERT IGNORE` 幂等 |
+| 服务 | `CmsModelService` / `CmsContentExtService` | 模型字段定义、`ensureBuiltIn` 懒初始化、扩展字段校验与 JSON 存取 |
+| 服务 | `CmsPageService` / `CmsNavService` / `CmsBlockService` / `CmsBannerService` | 单页、导航树、区块、轮播的 CRUD 与引用保护 |
+| 服务 | `CmsPreviewTicketService` / `CmsPortalContentService` | 一次性票据与门户只读聚合 |
+| 后台接口 | `/api/admin/cms/model|field|page|nav|block|banner|preview` | 权限码 `platform:cms:*`，模块关闭时不装配 |
+| 门户接口 | `/api/portal/cms/sites/{siteKey}/pages|navs|blocks|banners`、`/preview/{ticket}` | 只读、只出启用 / 已发布内容 |
+| 后台页面 | `views/cms/model|page|nav|block|banner`、`components/CmsExtFields.vue` | 模型字段设计器、动态表单、预览入口 |
+| 门户页面 | `pages/page/[key].vue`、`pages/preview/[ticket].vue`、layout 导航、首页轮播 / 区块 | 均为 SSR，失败回退为空而不是整页报错 |
+
+### 22.2 关键决策
+
+1. **图集复用 `cms_article`**：栏目绑定 `gallery` 模型，图片存 `cms_content_ext.ext_json.images`，
+   不另建 `cms_gallery`。
+2. **模型是站点级**：内容表只存 `model_id`；扩展字段统一放 `cms_content_ext`，
+   `owner_type` 同时支持 `article` / `page`。
+3. **内置模型懒初始化**：`ensureBuiltIn(siteId)` 在模型列表、内容保存、栏目解析时兜底补齐，
+   站点创建流程不改；迁移同时为历史站点播种。
+4. **预览用一次性票据**：TTL 10 分钟，消费用单条原子 UPDATE 抢占；消费成功才查草稿，
+   不校验发布状态、不累加阅读量。
+5. **导航目标失效整项不下发**：栏目停用、单页未发布、跨站点目标都直接丢弃，
+   父项被过滤时子项上提为根，避免门户出现死链。
+6. **单页复用文章状态机**：`0` 草稿 / `1` 已发布 / `2` 已下线；新建一律草稿。
+7. **扩展字段不进版本快照**：文章回滚只回滚主表字段，扩展值保留当前值；在文档与 UI 中明确。
+8. **站点删除先守卫再清理**：删除站点前依次检查文章（含回收站）、栏目、单页、导航、区块、轮播与
+   自定义模型引用，任一存在即拒绝；通过后物理删除该站点的内置模型与字段，避免 `cms_model` /
+   `cms_model_field` 留下孤儿配置。守卫文案键为 `cms.site.delete.*`，中英文各一份。
+
+### 22.3 数据与接口边界
+
+- 门户只调 `/api/portal/cms/**` 与 `/api/app/**`；后台页面只调 `/api/admin/**`。
+- CMS 不 import 会员类，会员不 import CMS 类，跨模块不建外键；导航目标、内容归属只存 ID。
+- 文件只存 `fileId` 或 URL，不建 `cms_file`。
+- 后台 Token `lx-platform-token` 与会员 Token `lx-member-token` 互不识别。
+- CMS 关闭时：`ConditionalOnProperty` 让整组 Controller 不装配（404），
+  `V35/V36` 迁移随模块目录跳过，菜单按 `module_code=cms` 过滤不下发。
+
+### 22.4 验证结果
+
+- 后端：`mvn -o -q -pl lx-modules/lx-module-cms test` 通过（含模型、单页、导航、区块 / 轮播、
+  预览票据、门户内容与既有文章 / 栏目 / 门户测试）。
+- Flyway：启动后端后 `V35` / `V36` 成功执行，内置模型与字段、菜单权限落库。
+- 接口脚本：`.local/cms-model-check.mjs` 覆盖登录、模型 / 字段、单页发布、导航、区块、轮播、
+  文章扩展字段、门户只读与预览票据一次性。
+- 构建：后台 `npm run build`、门户 `npm run build` 通过。
+- 浏览器：后台模型 / 单页 / 导航 / 区块 / 轮播页与门户单页 / 预览页走查，无控制台错误。
+- 关闭态：`lx.module.modules.cms.enabled=false` 时后台接口 404、门户接口 404、菜单不下发。
+
+### 22.5 当前限制
+
+- 扩展字段未进入文章版本快照；回滚不会恢复旧的扩展值。
+- 字段删除不级联清理 `cms_content_ext`，历史 JSON 中可能留下无定义键（读取时仍原样返回）。
+- 导航只做树结构与目标校验，不做拖拽排序；排序仍靠 `sort` 数字。
+- 门户预览票据只能单次使用，刷新预览页会失效，需要重新生成。
+- 模板编码、门户组件映射、sitemap / RSS 与静态化仍属于第四刀 / P6。

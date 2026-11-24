@@ -49,6 +49,11 @@
 | GET | `/api/portal/cms/sites/{siteKey}/articles/batch?ids=1,2,3` | 按 ID 批量取摘要（最多 50 条） |
 | GET | `/api/portal/cms/sites/{siteKey}/articles/by-slug/{slug}` | 文章详情（按 slug，适合伪静态） |
 | GET | `/api/portal/cms/sites/{siteKey}/search` | 关键字搜索（标题 / 摘要） |
+| GET | `/api/portal/cms/sites/{siteKey}/pages/{pageKey}` | 已发布单页 |
+| GET | `/api/portal/cms/sites/{siteKey}/navs/{navKey}` | 启用导航及有效导航项树 |
+| GET | `/api/portal/cms/sites/{siteKey}/blocks/{blockKey}` | 启用区块（正文已清洗） |
+| GET | `/api/portal/cms/sites/{siteKey}/banners?groupKey=home` | 启用且在时间窗内的轮播 |
+| GET | `/api/portal/cms/preview/{ticket}` | 一次性草稿预览（不经过 siteKey） |
 
 `siteKey` 是后台“站点标识”，不是数据库主键；站点不存在或停用一律 `1004`。
 
@@ -82,7 +87,14 @@
    - 隐藏栏目（`visible=1`）本身不出现在导航树，但它的可见子栏目会上提为根节点或挂到最近可见父级。
      这样“隐藏容器、保留子页面”不需要额外字段。
 4. **标签**：只输出启用标签；文章详情 / 列表中会自动过滤停用标签和跨站点标签。
-5. **排序**：栏目按 `sort`、`categoryId`；文章按 `sort`、`publishTime`、`articleId` 倒序。
+5. **单页**：只有 `status=1`（已发布）可见；草稿 / 已下线一律 `1004`。
+6. **导航**：导航与导航项都必须启用且显示；目标为栏目时栏目必须启用，目标为单页时必须已发布；
+   目标失效的导航项整项不下发，父项被过滤时子项上提为根。
+7. **区块 / 轮播**：区块只出 `status=0`（启用）；轮播还要求当前时间在 `start_time` /
+   `end_time` 之间（留空表示不限）。
+8. **排序**：栏目按 `sort`、`categoryId`；文章按 `sort`、`publishTime`、`articleId` 倒序；
+   导航项 / 区块 / 轮播按 `sort` 升序。
+9. **预览**：票据一次性消费，10 分钟过期；成功后才返回草稿，且不累加阅读量。
 
 > 直接改库把栏目状态改成停用时，闭包表可能没同步。列表 SQL 的祖先判断依赖
 > `cms_category_closure`；如果运维手工改库，改完必须调用一次后台的栏目编辑
@@ -123,6 +135,28 @@
 - 不可见 / 已下线的 ID 直接省略，不报错，门户据此显示“内容已下线”；
 - **不累加阅读量**，因此收藏列表不能改用逐篇详情接口补标题。
 
+### 4.5 单页 / 导航 / 区块 / 轮播
+
+- **单页**：`pageId / pageKey / pageName / title / summary / cover / content / template /
+  seoTitle / seoKeywords / seoDescription / publishTime / ext`；
+  `content` 同样经过 `HtmlSanitizer`，`ext` 为 page 模型扩展字段。
+- **导航**：`navId / navKey / navName / position / items[]`；每个导航项包含
+  `itemId / itemName / targetType / targetId / url / icon / sort / children[]`。
+  `url` 由服务端解析好：栏目优先用 `path`，否则 `/category/{categoryKey}`；
+  单页为 `/page/{pageKey}`；外链原样返回。
+- **区块**：`blockId / blockKey / blockName / blockType / content / cover / linkUrl / sort`。
+  `blockType=html` 时 `content` 已清洗；`blockType=image` 用 `cover` + `linkUrl`。
+- **轮播**：`bannerId / bannerGroup / title / image / linkUrl / sort`。
+  `groupKey` 默认 `home`。
+
+### 4.6 草稿预览
+
+`GET /api/portal/cms/preview/{ticket}` 不需要 `siteKey`：票据本身绑定站点与目标。
+返回 `targetType`（`article` / `page`）以及 `article` 或 `page` 对象，字段与正式接口一致。
+票据由后台接口 `POST /api/admin/cms/article/{id}/preview-ticket` 或
+`POST /api/admin/cms/page/{id}/preview-ticket` 生成，TTL 10 分钟，只能消费一次；
+无效 / 过期 / 已使用统一按参数错误处理。预览不校验发布状态，也不累加阅读量。
+
 **阅读量**：详情接口每调用一次 `view_count = view_count + 1`（单条 UPDATE 自增，
 不先查后写）。当前没有防刷策略，门户上线前需要按 IP / 会话做限流或改异步统计。
 
@@ -152,6 +186,15 @@ curl http://127.0.0.1:8080/api/portal/cms/sites/main/articles/by-slug/hello-worl
 
 # 批量摘要（不累加阅读量）
 curl "http://127.0.0.1:8080/api/portal/cms/sites/main/articles/batch?ids=1234567890,1234567891"
+
+# 单页 / 导航 / 区块 / 轮播
+curl http://127.0.0.1:8080/api/portal/cms/sites/main/pages/about
+curl http://127.0.0.1:8080/api/portal/cms/sites/main/navs/main
+curl http://127.0.0.1:8080/api/portal/cms/sites/main/blocks/home-hero
+curl "http://127.0.0.1:8080/api/portal/cms/sites/main/banners?groupKey=home"
+
+# 草稿预览（票据先由后台接口生成，10 分钟内有效且只能用一次）
+curl http://127.0.0.1:8080/api/portal/cms/preview/9f2c1a7b4e
 ```
 
 多语言：门户接口本身不做内容翻译。错误文案受 `X-Lang / ?lang / Accept-Language` 影响，

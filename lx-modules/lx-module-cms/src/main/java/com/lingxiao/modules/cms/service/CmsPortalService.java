@@ -73,6 +73,7 @@ public class CmsPortalService {
     private final CmsTagMapper tagMapper;
     private final CmsArticleTagMapper articleTagMapper;
     private final CmsCategoryClosureMapper closureMapper;
+    private final CmsContentExtService extService;
 
     /** 启用站点列表，供门户做站点切换。 */
     public List<PortalSiteVO> sites() {
@@ -254,6 +255,7 @@ public class CmsPortalService {
         vo.setViewCount((article.getViewCount() == null ? 0L : article.getViewCount()) + 1);
         vo.setCategory(toCategoryNode(category));
         vo.setTags(loadTags(site.getSiteId(), articleTagMapper.selectTagIds(article.getArticleId())));
+        vo.setExt(extService.load("article", article.getArticleId()));
         return vo;
     }
 
@@ -481,7 +483,7 @@ public class CmsPortalService {
         return roots;
     }
 
-    private static PortalCategoryVO toCategoryNode(CmsCategory category) {
+    static PortalCategoryVO toCategoryNode(CmsCategory category) {
         PortalCategoryVO vo = new PortalCategoryVO();
         vo.setCategoryId(category.getCategoryId());
         vo.setParentId(category.getParentId());

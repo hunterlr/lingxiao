@@ -6,9 +6,11 @@ import com.lingxiao.common.core.enums.ErrorCode;
 import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.common.security.util.LoginHelper;
 import com.lingxiao.modules.cms.entity.CmsCategory;
+import com.lingxiao.modules.cms.entity.CmsModel;
 import com.lingxiao.modules.cms.mapper.CmsArticleMapper;
 import com.lingxiao.modules.cms.mapper.CmsCategoryClosureMapper;
 import com.lingxiao.modules.cms.mapper.CmsCategoryMapper;
+import com.lingxiao.modules.cms.mapper.CmsModelMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -45,6 +47,7 @@ public class CmsCategoryService {
     private final CmsCategoryClosureMapper closureMapper;
     private final CmsArticleMapper articleMapper;
     private final CmsSiteService siteService;
+    private final CmsModelMapper modelMapper;
 
     /** 站点下的栏目树（含停用栏目，供后台管理）。 */
     public List<CmsCategory> tree(Long siteId, String keyword, String status) {
@@ -87,6 +90,7 @@ public class CmsCategoryService {
         category.setParentId(parentId);
         category.setCategoryKey(category.getCategoryKey().trim());
         category.setCategoryName(category.getCategoryName().trim());
+        category.setModelId(validateModel(siteId, category.getModelId()));
         ensureKeyUnique(siteId, category.getCategoryKey(), null);
         category.setSort(category.getSort() == null ? 0 : category.getSort());
         category.setVisible(defaultIfBlank(category.getVisible(), CommonConstants.STATUS_NORMAL));
@@ -121,6 +125,9 @@ public class CmsCategoryService {
         existing.setParentId(newParentId);
         existing.setCategoryKey(categoryKey);
         existing.setCategoryName(category.getCategoryName().trim());
+        // 未传模型时保留原绑定；清空绑定需显式传 0（回退内置文章模型）
+        existing.setModelId(category.getModelId() == null
+                ? existing.getModelId() : validateModel(siteId, category.getModelId()));
         existing.setSlug(category.getSlug());
         existing.setPath(category.getPath());
         existing.setTemplate(category.getTemplate());
@@ -197,6 +204,22 @@ public class CmsCategoryService {
     }
 
     // ==================== 内部方法 ====================
+
+    /** 栏目只能绑定同站点的 article / gallery 模型；0 表示清空绑定回退文章模型。 */
+    private Long validateModel(Long siteId, Long modelId) {
+        if (modelId == null) {
+            return null;
+        }
+        if (modelId == 0L) {
+            return null;
+        }
+        CmsModel model = modelMapper.selectById(modelId);
+        if (model == null || !Objects.equals(model.getSiteId(), siteId)
+                || "page".equals(model.getModelType())) {
+            throw ServiceException.keyed(ErrorCode.BAD_REQUEST, "cms.model.invalid");
+        }
+        return modelId;
+    }
 
     private CmsCategory mustGet(Long categoryId) {
         CmsCategory category = categoryId == null ? null : categoryMapper.selectById(categoryId);

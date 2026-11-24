@@ -7,6 +7,7 @@ import com.lingxiao.modules.cms.dto.CmsArticleVersionVO;
 import com.lingxiao.modules.cms.entity.CmsArticle;
 import com.lingxiao.modules.cms.entity.CmsArticleVersion;
 import com.lingxiao.modules.cms.entity.CmsCategory;
+import com.lingxiao.modules.cms.entity.CmsModel;
 import com.lingxiao.modules.cms.entity.CmsTag;
 import com.lingxiao.modules.cms.mapper.CmsArticleMapper;
 import com.lingxiao.modules.cms.mapper.CmsArticleTagMapper;
@@ -26,6 +27,7 @@ import java.util.Collections;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -54,6 +56,8 @@ class CmsArticleServiceTest {
     private CmsTagMapper tagMapper;
     private CmsSiteService siteService;
     private CmsCategoryService categoryService;
+    private CmsModelService modelService;
+    private CmsContentExtService extService;
     private CmsArticleService service;
 
     @BeforeEach
@@ -65,8 +69,16 @@ class CmsArticleServiceTest {
         tagMapper = mock(CmsTagMapper.class);
         siteService = mock(CmsSiteService.class);
         categoryService = mock(CmsCategoryService.class);
+        modelService = mock(CmsModelService.class);
+        extService = mock(CmsContentExtService.class);
         service = new CmsArticleService(articleMapper, articleTagMapper, versionMapper,
-                categoryMapper, tagMapper, siteService, categoryService);
+                categoryMapper, tagMapper, siteService, categoryService, modelService, extService);
+
+        CmsModel builtIn = new CmsModel();
+        builtIn.setModelId(100L);
+        builtIn.setSiteId(1L);
+        when(modelService.resolveForCategory(any())).thenReturn(builtIn);
+        when(modelService.validateExt(any(), any(), anyBoolean())).thenReturn(Collections.emptyMap());
     }
 
     @Test

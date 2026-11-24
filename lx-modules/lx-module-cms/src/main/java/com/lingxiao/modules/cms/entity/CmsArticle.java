@@ -13,7 +13,9 @@ import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * CMS 文章（cms_article）。
@@ -94,4 +96,8 @@ public class CmsArticle extends BaseEntity {
     /** 编辑时提交的标签；详情接口也会回填，不是表字段 */
     @TableField(exist = false)
     private List<Long> tagIds = new ArrayList<>();
+
+    /** 模型扩展字段（图集 images 等）；详情接口回填，不是表字段 */
+    @TableField(exist = false)
+    private Map<String, Object> ext = new LinkedHashMap<>();
 }

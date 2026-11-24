@@ -1,16 +1,32 @@
 <script setup lang="ts">
 const route = useRoute()
-const { fetchSite, fetchCategories } = usePortalApi()
+const api = usePortalApi()
 const { profile, isLoggedIn, ensureProfile } = useMemberAuth()
 
-const { data: site } = await useAsyncData('portal-site', fetchSite)
-const { data: categories } = await useAsyncData('portal-categories', fetchCategories)
+const { data: site } = await useAsyncData('portal-site', api.fetchSite)
+const { data: categories } = await useAsyncData('portal-categories', api.fetchCategories)
+// 导航是可选配置：没有导航或 CMS 关闭时回退到一级栏目
+const { data: nav } = await useAsyncData('portal-nav-main', () => api.fetchNav('main').catch(() => null))
 // 有 Token 才请求会员资料；失败不会阻断内容页
 await ensureProfile()
 
 const siteName = computed(() => site.value?.siteName || '凌霄门户')
 const logo = computed(() => mediaUrl(site.value?.logo))
-const navItems = computed(() => rootCategories(categories.value || []).slice(0, 6))
+const navItems = computed(() => {
+  const items = nav.value?.items || []
+  if (items.length) {
+    return items.map((item) => ({
+      key: `nav-${item.itemId}`,
+      label: item.itemName,
+      url: item.url
+    }))
+  }
+  return rootCategories(categories.value || []).slice(0, 6).map((item) => ({
+    key: `category-${item.categoryId}`,
+    label: item.categoryName,
+    url: `/category/${item.categoryKey}`
+  }))
+})
 const year = new Date().getFullYear()
 
 const memberName = computed(() => profile.value?.nickname || profile.value?.username || '个人中心')
@@ -63,12 +79,12 @@ useSeoMeta({
           <NuxtLink to="/" class="nav-link" :class="{ 'is-active': route.path === '/' }">首页</NuxtLink>
           <NuxtLink
             v-for="item in navItems"
-            :key="item.categoryId"
-            :to="`/category/${item.categoryKey}`"
+            :key="item.key"
+            :to="item.url"
             class="nav-link"
-            :class="{ 'is-active': route.path === `/category/${item.categoryKey}` }"
+            :class="{ 'is-active': route.path === item.url || route.path.startsWith(`${item.url}/`) }"
           >
-            {{ item.categoryName }}
+            {{ item.label }}
           </NuxtLink>
         </nav>
 
@@ -115,8 +131,8 @@ useSeoMeta({
         </div>
         <nav class="footer-links" aria-label="页脚导航">
           <NuxtLink to="/">首页</NuxtLink>
-          <NuxtLink v-for="item in navItems" :key="item.categoryId" :to="`/category/${item.categoryKey}`">
-            {{ item.categoryName }}
+          <NuxtLink v-for="item in navItems" :key="item.key" :to="item.url">
+            {{ item.label }}
           </NuxtLink>
         </nav>
         <p class="footer-copy">© {{ year }} {{ siteName }} · Powered by 凌霄 LingXiao</p>

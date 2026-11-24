@@ -8,9 +8,11 @@ import com.lingxiao.common.security.annotation.RequiresPermission;
 import com.lingxiao.modules.cms.dto.CmsArticleRecycleVO;
 import com.lingxiao.modules.cms.dto.CmsArticleScheduleDTO;
 import com.lingxiao.modules.cms.dto.CmsArticleVersionVO;
+import com.lingxiao.modules.cms.dto.CmsPreviewTicketVO;
 import com.lingxiao.modules.cms.entity.CmsArticle;
 import com.lingxiao.modules.cms.entity.CmsArticleVersion;
 import com.lingxiao.modules.cms.service.CmsArticleService;
+import com.lingxiao.modules.cms.service.CmsPreviewTicketService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -38,6 +40,7 @@ import javax.validation.Valid;
 public class CmsArticleController {
 
     private final CmsArticleService articleService;
+    private final CmsPreviewTicketService previewTicketService;
 
     @RequiresPermission("platform:cms:article:list")
     @GetMapping("/list")
@@ -66,6 +69,13 @@ public class CmsArticleController {
     @GetMapping("/{articleId}")
     public R<CmsArticle> detail(@PathVariable Long articleId) {
         return R.ok(articleService.detail(articleId));
+    }
+
+    /** 生成一次性预览票据；草稿 / 已下线文章可凭票在门户预览。 */
+    @RequiresPermission("platform:cms:article:preview")
+    @PostMapping("/{articleId}/preview-ticket")
+    public R<CmsPreviewTicketVO> previewTicket(@PathVariable Long articleId) {
+        return R.ok(previewTicketService.issue(CmsPreviewTicketService.TARGET_ARTICLE, articleId));
     }
 
     /** 历史版本列表：只出摘要，正文按版本详情单独读取。 */

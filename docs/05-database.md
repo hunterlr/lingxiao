@@ -207,22 +207,25 @@ remark       varchar(500) default null        comment '备注'
 
 ### 2.8 多语言 `i18n_`
 
-| 表 | 说明 | 租户 |
-|---|---|---|
-| `i18n_language` | 平台语言定义 | 否 |
-| `i18n_tenant_language` | 租户启用语言 / 默认语言 | 是 |
-| `i18n_namespace` | 命名空间 | 否 |
-| `i18n_key` | 翻译键 / 默认值 | 否 |
-| `i18n_value` | 翻译值（平台 0 + 租户覆盖） | 是 |
-| `i18n_pack` | 语言包版本 / 校验和 | 是 |
-| `i18n_glossary` | 术语表 | 否 |
-| `i18n_missing_log` | 缺失翻译记录 | 是 |
-| `cms_content_i18n` | CMS 内容翻译 | 是 |
-| `cms_category_i18n` | 栏目翻译 | 是 |
-| `cms_site_i18n` | 站点名称 / SEO 翻译 | 是 |
-| `cms_block_i18n` | 区块 / 导航 / 广告文案翻译 | 是 |
+| 表 | 说明 | 租户 | v1.4 状态 |
+|---|---|---|---|
+| `i18n_language` | 平台语言定义 | 否 | ✅ 已落地（V39） |
+| `i18n_key` | 翻译键 / 默认值 | 否 | ✅ 已落地（V39） |
+| `i18n_value` | 翻译值（平台 0 + 租户覆盖） | 是 | ✅ 已落地（V39，V42 增发布值） |
+| `i18n_pack` | 语言包版本 / 校验和 / 发布快照 | 是 | ✅ 已落地（V39） |
+| `i18n_missing_log` | 缺失翻译记录 | 是 | ✅ 已落地（V39） |
+| `i18n_tenant_language` | 租户启用语言 / 默认语言 | 是 | 预留 |
+| `i18n_namespace` | 命名空间 | 否 | 预留（当前取键前缀） |
+| `i18n_glossary` | 术语表 | 否 | 预留 |
+| `cms_content_i18n` | CMS 内容翻译 | 是 | 预留（P2.5 后半段） |
+| `cms_category_i18n` | 栏目翻译 | 是 | 预留 |
+| `cms_site_i18n` | 站点名称 / SEO 翻译 | 是 | 预留 |
+| `cms_block_i18n` | 区块 / 导航 / 广告文案翻译 | 是 | 预留 |
 
 > i18n 表由 `lx.module.i18n.enabled` 控制迁移；关闭时系统按默认语言运行，表不创建。
+> 迁移目录 `db/migration/i18n/V39~V42`：V39 建表 + 语言种子，V40 菜单权限，
+> V41 从 `messages*.properties` 导入 348 个键 / 696 条译文，V42 给 `i18n_value`
+> 增加 `published_text`（工作副本 `value_text` 与线上发布值分离，草稿不影响线上）。
 
 ---
 

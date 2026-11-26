@@ -51,6 +51,23 @@ class ModuleMigrationLocationsTest {
                 "classpath:db/migration/job");
     }
 
+    @Test
+    @DisplayName("i18n 开关打开时扫描 i18n 目录，关闭时不扫描")
+    void i18nLocationFollowsDedicatedSwitch() {
+        LxModuleProperties enabled = properties();
+        enabled.getI18n().setEnabled(true);
+        assertThat(ModuleMigrationLocations.build(enabled, code -> true))
+                .containsExactly(
+                        "classpath:db/migration/system",
+                        "classpath:db/migration/file",
+                        "classpath:db/migration/i18n");
+
+        LxModuleProperties disabled = properties();
+        disabled.getI18n().setEnabled(false);
+        assertThat(ModuleMigrationLocations.build(disabled, code -> true))
+                .doesNotContain("classpath:db/migration/i18n");
+    }
+
     private static LxModuleProperties properties(String... codesAndFlags) {
         LxModuleProperties properties = new LxModuleProperties();
         Map<String, LxModuleProperties.ModuleSwitch> modules = new LinkedHashMap<>();

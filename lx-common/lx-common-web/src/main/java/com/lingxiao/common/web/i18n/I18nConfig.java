@@ -1,5 +1,6 @@
 package com.lingxiao.common.web.i18n;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,6 +37,7 @@ public class I18nConfig {
      * </ul>
      */
     @Bean
+    @ConditionalOnProperty(name = "lx.module.i18n.enabled", havingValue = "false", matchIfMissing = true)
     public MessageSource messageSource() {
         ResourceBundleMessageSource source = new ResourceBundleMessageSource();
         source.setBasenames(MESSAGE_BASENAME);

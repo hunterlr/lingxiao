@@ -29,6 +29,14 @@ public class LxModuleProperties {
     /** key = 模块编码，例如 demo / cms / member */
     private Map<String, ModuleSwitch> modules = new LinkedHashMap<>();
 
+    /**
+     * 多语言模块专用开关。
+     *
+     * <p>按 v1.4 约定使用 {@code lx.module.i18n.enabled}，不放进
+     * {@link #modules}，避免和“模块编码即配置键”的旧写法混淆。</p>
+     */
+    private ModuleSwitch i18n = new ModuleSwitch();
+
     @Data
     public static class ModuleSwitch {
         /** 是否启用；默认 false，未配置的模块一律不加载 */

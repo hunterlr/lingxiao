@@ -1011,3 +1011,36 @@ sitemap 最多 500 篇文章且不含单页；RSS 只出最近 30 篇摘要。
 传统模板 CMS 能力（CMS-063~065）：模板在线编辑 + 标签 + 静态页生成 + CDN 刷新，
 建 `cms_static_task`，默认关闭，只在私有化 / 高流量 / 客户要求伪静态时开启。
 不排入 v1.3 / v1.4，等真实场景再开工。详见 `docs/20-cms-embed-plan.md` §21.6。
+
+### 12.27 P2.5：v1.4 多语言第二刀 — 数据库语言包（✅ 已完成，2026-11-26）
+
+**范围**：把后端 `messages*.properties` 搬进数据库并做成可运营的语言包。只做
+“语言管理 + 翻译工作台 + 发布 / 回滚 + 门户公开语言包接口”；CMS 内容翻译、
+`/{lang}/` 前缀 / hreflang、租户语言包、门户前端接入不在本刀。
+
+**落地**：
+
+- 新模块 `lx-modules/lx-module-i18n`，独立开关 `lx.module.i18n.enabled`；
+  关闭时 Bean 不装配、接口 404、菜单不下发、迁移目录不扫描。
+- 迁移 `V39__i18n_schema.sql`（5 张表 + zh-CN/en-US 种子）、
+  `V40__i18n_menu.sql`（5000 段菜单 / 18 个权限，仅授 role 1）、
+  `V41__i18n_seed_messages.sql`（348 键 / 696 值，来自现有 properties）、
+  `V42__i18n_value_published.sql`（`published_text` 分离工作副本与线上值）。
+- `MessageSource`：DB 已发布值 > 资源包 > 调用方默认值；Caffeine 5 秒缓存，
+  发布 / 回滚主动失效。
+- 后台页面：语言管理、翻译维护（批量草稿 / CSV 导入导出 / 覆盖率 / 缺失记录）、
+  语言包（历史 / 发布 / 回滚）；权限码 `platform:i18n:*`。
+- 门户接口：`/api/portal/i18n/languages`、`/version`、`/{lang}/{namespace}`，
+  返回已发布值，带 `ETag` 与 `Cache-Control: max-age=5`。
+- 回滚是真回滚：按 `i18n_pack.snapshot_json` 恢复 `value_text` / `published_text`，
+  同时切换当前版本指针。
+
+**验收**：Flyway V39~V42 实跑成功（全新库一次到 v42，关闭态停在 v38）；
+`verify-i18n.mjs` 73/73，`--off` 12/12；模块单测与全量后端测试通过；
+`lx-ui-admin npm run build` 通过。
+
+**已知取舍**：首版不建审核表，`review_status` 只表示“工作副本是否已发布”；
+语言包缓存单机 Caffeine + 5 秒 TTL，多实例最终一致；命名空间取键前缀，
+暂不建 `i18n_namespace`；后台前端语言包仍为文件形式。
+
+详见 `docs/15-i18n.md` §8.2 / §13 / §20.1 与 `docs/23-i18n-plan.md` §10.5。

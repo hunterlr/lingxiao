@@ -54,7 +54,8 @@ const ICON_MAP = {
   dashboard: 'Odometer',
   lock: 'Lock',
   userfilled: 'UserFilled',
-  link: 'Link'
+  link: 'Link',
+  language: 'ChatLineSquare'
 }
 
 const resolved = computed(() => {

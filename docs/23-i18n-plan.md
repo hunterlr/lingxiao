@@ -516,3 +516,44 @@ mvn -B -ntp test                   84 项全通过（16 个测试类）
 >
 > 下一步是 L2（v1.2）：`i18n_*` 表翻译业务数据；L1 不新增数据库列。
 
+### 10.5 第三轮（v1.4 / P2.5 第二刀）：数据库语言包（已完成，2026-11-26）
+
+**边界**：只做“后端文案 + 后台翻译工作台 + 门户公开语言包接口”。CMS 内容翻译、
+`/{lang}/` URL 前缀、hreflang、租户语言包、门户前端接入均不在本刀。
+
+**落地**：
+
+| 内容 | 落点 |
+|---|---|
+| 独立模块 | `lx-modules/lx-module-i18n`，由 `lx.module.i18n.enabled` 控制；关闭时 Bean 不装配 |
+| 迁移 | `db/migration/i18n/V39` 建 5 张表 + 语言种子；`V40` 菜单 / 权限（5000 段）；`V41` 从 `messages*.properties` 导入 348 键 / 696 译文；`V42` 增加 `i18n_value.published_text` |
+| MessageSource | `I18nModuleConfig` 提供名为 `messageSource` 的 `@Primary` Bean；DB 已发布值 > 资源包 > 调用方默认值 |
+| 缓存 | `DatabaseTranslationProvider`，Caffeine 5 秒；发布 / 回滚主动清空 |
+| 语言解析 | 复用 `X-Lang > ?lang= > Accept-Language > zh-CN`，未新增解析器 |
+| 后台接口 | 语言 CRUD / 启停、键 CRUD、批量保存草稿、CSV 导入导出、覆盖率、缺失记录、发布 / 回滚 |
+| 后台页面 | `views/i18n/{language,translation,pack}` + `api/i18n.js`，菜单 / 权限 `platform:i18n:*` |
+| 门户接口 | `/api/portal/i18n/languages`、`/version`、`/{lang}/{namespace}`，ETag + 5 秒缓存 |
+
+**两个关键语义**：
+
+1. **草稿隔离**：`i18n_value.value_text` 是工作副本，`published_text` 是线上发布值。
+   保存草稿只改前者并置 `review_status=0`，所以编辑中的新键不会出现在门户，
+   已发布键也继续返回上一版。发布时才 `published_text = value_text`。
+2. **真回滚**：`i18n_pack.snapshot_json` 保存 `{keyId: valueText}`。回滚不仅切换
+   当前版本指针，还按快照恢复 `value_text` / `published_text`，避免“指针回去了、内容没回去”。
+
+**验收**：
+
+```text
+mvn -q -pl lx-modules/lx-module-i18n -am test          通过
+mvn -q -pl lx-boot -am test                            通过
+Flyway（全新库）                                        V1~V42 一次跑通
+verify-i18n.mjs                                         73/73
+verify-i18n.mjs --off（8081 + 全新库）                   12/12
+lx-ui-admin npm run build                              通过
+```
+
+**已知取舍**：首版不建单独的审核表，`review_status` 只表示工作副本是否已发布；
+语言包缓存是单机 Caffeine，多实例靠 5 秒 TTL；命名空间取键前缀，暂不建
+`i18n_namespace`；管理端前端语言包仍是文件形式，本刀只接管后端文案。
+

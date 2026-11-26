@@ -73,11 +73,28 @@ class ModuleRegistryTest {
         }});
         List<ModuleInfo> modules = registry.list();
         assertThat(modules).extracting(ModuleInfo::getCode)
-                .containsExactly("demo", "file", "generator", "system");
+                .containsExactly("demo", "file", "generator", "i18n", "system");
         assertThat(modules).filteredOn(item -> "system".equals(item.getCode()))
                 .allMatch(ModuleInfo::isEnabled);
         assertThat(modules).filteredOn(item -> "demo".equals(item.getCode()))
                 .noneMatch(ModuleInfo::isEnabled);
+        assertThat(modules).filteredOn(item -> "i18n".equals(item.getCode()))
+                .noneMatch(ModuleInfo::isEnabled);
+    }
+
+    @Test
+    @DisplayName("多语言模块走 lx.module.i18n.enabled，不依赖 modules Map")
+    void i18nFollowsDedicatedSwitch() {
+        ModuleRegistry disabled = registryOf(new LinkedHashMap<>());
+        assertThat(disabled.isEnabled("i18n")).isFalse();
+
+        LxModuleProperties properties = new LxModuleProperties();
+        properties.getI18n().setEnabled(true);
+        properties.getI18n().setName("多语言");
+        ModuleRegistry enabled = new ModuleRegistry(properties);
+        assertThat(enabled.isEnabled("i18n")).isTrue();
+        assertThat(enabled.list()).filteredOn(item -> "i18n".equals(item.getCode()))
+                .allMatch(ModuleInfo::isEnabled);
     }
 
     @Test

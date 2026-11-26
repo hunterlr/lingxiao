@@ -34,6 +34,10 @@ public final class ModuleMigrationLocations {
         List<String> codes = new ArrayList<>();
         codes.add("system");
         codes.add("file");
+        // 多语言模块用 lx.module.i18n.enabled 单独控制；关闭时不扫描 i18n 目录
+        if (properties.getI18n() != null && properties.getI18n().isEnabled()) {
+            codes.add("i18n");
+        }
 
         properties.getModules().entrySet().stream()
                 .filter(entry -> entry.getValue().isEnabled())

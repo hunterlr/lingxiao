@@ -55,8 +55,14 @@
 | GET | `/api/portal/cms/sites/{siteKey}/blocks/{blockKey}` | 启用区块（正文已清洗） |
 | GET | `/api/portal/cms/sites/{siteKey}/banners?groupKey=home` | 启用且在时间窗内的轮播 |
 | GET | `/api/portal/cms/preview/{ticket}` | 一次性草稿预览（不经过 siteKey） |
+| GET | `/api/portal/i18n/languages` | 门户可用语言（含默认语言标记） |
+| GET | `/api/portal/i18n/{lang}/{namespace}` | 已发布语言包（ETag / 5 秒缓存） |
+| GET | `/api/portal/i18n/version?lang=&namespace=` | 当前语言包版本 |
 
 `siteKey` 是后台“站点标识”，不是数据库主键；站点不存在或停用一律 `1004`。
+
+i18n 接口与 CMS 站点无关，只返回后台“语言包”页面已发布的内容；
+语言不存在 / 停用返回 `1004`，草稿永远不出现。
 
 ### 2.1 文章列表参数
 
@@ -295,3 +301,21 @@ curl http://127.0.0.1:8080/api/portal/cms/preview/9f2c1a7b4e
 - 模板编码 → 组件映射集中在 `utils/templates.ts`，未知编码回退默认版式。
 
 详见 `docs/31-portal-frontend.md` 与 `lx-ui-portal/README.md`。
+
+### 8.1 多语言接口接入状态（2026-11-26）
+
+后端 `/api/portal/i18n/**` 已上线并通过验收：
+
+```http
+GET /api/portal/i18n/languages
+GET /api/portal/i18n/en-US/common
+GET /api/portal/i18n/version?lang=en-US&namespace=common
+If-None-Match: "9462...c1"
+```
+
+- 返回结构 `R<PortalPackVO>`：`languageCode / namespace / version / checksum / messages`；
+- `ETag` 为发布版本 checksum，命中返回 `304`；`Cache-Control: public, max-age=5`；
+- 只读后台已发布译文，草稿、停用键、停用语言都不会下发。
+
+**门户前端本刀未接入**：`lx-ui-portal` 仍使用文件语言包；接入（首屏 SSR 注入、
+语言切换、`/{lang}/` 前缀与 hreflang）留给 P2.5 后半段。

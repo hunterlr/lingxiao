@@ -53,6 +53,10 @@ public class ModuleRegistry implements ModuleProvider {
         if (BASE_MODULES.contains(code)) {
             return true;
         }
+        // 多语言模块使用 lx.module.i18n.enabled，不走 modules Map
+        if ("i18n".equals(code)) {
+            return properties.getI18n() != null && properties.getI18n().isEnabled();
+        }
         LxModuleProperties.ModuleSwitch module = properties.getModules().get(code);
         return module != null && module.isEnabled();
     }
@@ -68,7 +72,19 @@ public class ModuleRegistry implements ModuleProvider {
         for (String code : BASE_MODULES) {
             result.put(code, new ModuleInfo(code, baseName(code), true, "基座模块，始终启用"));
         }
+        LxModuleProperties.ModuleSwitch i18n = properties.getI18n();
+        if (i18n != null) {
+            result.put("i18n", new ModuleInfo(
+                    "i18n",
+                    i18n.getName() == null ? "多语言" : i18n.getName(),
+                    i18n.isEnabled(),
+                    i18n.getDescription()
+            ));
+        }
         properties.getModules().forEach((code, module) -> {
+            if ("i18n".equals(code)) {
+                return;
+            }
             boolean enabled = BASE_MODULES.contains(code) || module.isEnabled();
             result.put(code, new ModuleInfo(
                     code,

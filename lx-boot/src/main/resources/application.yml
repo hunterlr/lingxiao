@@ -168,6 +168,11 @@ lx:
         enabled: true
         name: 前台会员
         description: 注册 / 登录 / 个人中心 / 后台会员管理；关闭后 /api/app/** 与 /api/admin/member 不加载
+    # 多语言（v1.4）：独立开关，不放进 modules Map；关闭时表不迁移、接口 404、菜单不下发
+    i18n:
+      enabled: true
+      name: 多语言
+      description: 数据库语言包 / 翻译工作台 / 发布回滚；关闭后 /api/admin/i18n 与 /api/portal/i18n 不加载
   # 会员消息通道（短信 / 邮件）配置在后台「会员管理 → 渠道配置」维护：
   # dev = 验证码只写日志（默认）；prod = 使用部署方提供的 MemberSmsSender /
   # MemberEmailSender 实现。运行期切换，不需要改 yml 或重启。

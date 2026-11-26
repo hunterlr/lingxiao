@@ -39,6 +39,7 @@
         <module>lx-module-demo</module>
         <module>lx-module-cms</module>
         <module>lx-module-member</module>
+        <module>lx-module-i18n</module>
     </modules>
 
     <dependencies>

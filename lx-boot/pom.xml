@@ -76,6 +76,10 @@
         </dependency>
         <dependency>
             <groupId>com.lingxiao</groupId>
+            <artifactId>lx-module-i18n</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
             <artifactId>lx-module-demo</artifactId>
         </dependency>
 

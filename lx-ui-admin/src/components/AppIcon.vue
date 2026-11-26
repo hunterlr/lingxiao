@@ -42,6 +42,10 @@ const ICON_MAP = {
   redis: 'Coin',
   upload: 'UploadFilled',
   picture: 'Picture',
+  component: 'Box',
+  color: 'Grid',
+  document: 'Document',
+  delete: 'Delete',
   crop: 'Crop',
   'time-range': 'Timer',
   code: 'MagicStick',
@@ -55,6 +59,6 @@ const ICON_MAP = {
 
 const resolved = computed(() => {
   if (!props.name) return ''
-  return ICON_MAP[props.name.toLowerCase()] || props.name || 'Menu'
+  return ICON_MAP[props.name.toLowerCase()] || 'Menu'
 })
 </script>

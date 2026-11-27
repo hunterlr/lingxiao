@@ -71,6 +71,7 @@ LingXiao is a **modular monolith** foundation for back-office systems. It is not
 - Page-level `title / description / canonical / OG`, article JSON-LD, `sitemap.xml` / `robots.txt` / `rss.xml`
 - Member registration / sign-in / password reset / profile / favorites / likes / comments; the token lives in a cookie, never in the URL
 - `/api/**` is proxied same-origin by Nitro, so the browser never talks to the backend directly and deployment only changes environment variables
+- Chinese and English UI with a header switch; copy keys can be published from the admin i18n workbench
 
 **Membership (v1.2 module)**
 

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { PortalPage } from '~/types/portal'
 
+const { t } = usePortalI18n()
+
 /**
  * 「关于我们」单页模板（page.about）：窄栏、引文式摘要与留白。
  *
@@ -14,10 +16,10 @@ const cover = computed(() => mediaUrl(props.page.cover, 'medium'))
 <template>
   <div class="template-page-about about-page">
     <header class="page-head">
-      <p class="eyebrow">关于</p>
+      <p class="eyebrow">{{ t('page.aboutEyebrow') }}</p>
       <h1 class="page-title">{{ page.title || page.pageName }}</h1>
       <p v-if="page.publishTime" class="article-meta">
-        <time :datetime="page.publishTime">更新于 {{ formatDate(page.publishTime) }}</time>
+        <time :datetime="page.publishTime">{{ t('page.updated', { date: formatDate(page.publishTime) }) }}</time>
       </p>
     </header>
 

@@ -6464,3 +6464,56 @@ nuxt build                  通过；/account SSR 含「登录设备」「上传
 | 头像裁剪 | 未做；需要时前端引 `vue-cropper`，服务端已有衍生图能力 |
 | 旧头像回收 | 无引用计数，暂不清理 |
 | 最后活跃时间 | Sa-Token 不逐请求记录，列表只给登录时间与剩余有效期 |
+
+## 68. 门户公共页文案双语（刀 A1，2026-11-27）
+
+### 68.1 一句话结论
+
+门户公共页不再硬编码中文：109 个键的中英语言包 + 页头语言切换，
+后台发布同名键即覆盖；模板残留中文由脚本拦在 CI 里。
+
+### 68.2 代码落点
+
+| 层 | 文件 |
+|---|---|
+| 语言包 | `i18n/zh-CN.ts`、`i18n/en-US.ts` |
+| 组合式 | `composables/usePortalI18n.ts`（`t` / `loadPack` / `setLang` / Cookie） |
+| 页头 | `layouts/default.vue`（`.lang-switch` + html lang） |
+| 公共页 | `pages/index.vue`、`category/[key].vue`、`article/[id].vue`、`search.vue`、`tag/[key].vue`、`page/[key].vue`、`preview/[ticket].vue`、`error.vue` |
+| 组件 | `ArticleCard`、`EmptyState`、`PortalPager`、6 个 `components/templates/*` |
+| 守卫 | `scripts/check-portal-i18n.mjs`；CI `portal` job 增加该步骤 |
+
+### 68.3 关键决策
+
+1. **不猜 `Accept-Language`**：只认 Cookie，默认中文。同一 URL 对不同人渲染不同语言，
+   会让 CDN / 缓存 / 搜索引擎三者都难受；等刀 C 有了 `/{lang}/` 前缀再按 URL 区分。
+2. **后台语言包优先、内置文案兜底**：i18n 模块关掉或某键没发布时，页面必须还能完整渲染。
+3. **缺键返回键名而不是空串**：`portal.home.x` 比空白更容易被发现。
+4. **切换语言整页刷新**：文案散在 SSR HTML 与 `<head>`（title / og），局部替换容易漏。
+5. **用脚本守“没有硬编码中文”**：只靠人肉 review 一定会漏；脚本把注释、CSS、
+   品牌名排除，其余中文一律报错，并把会员中心暂时列入 `PENDING`。
+
+### 68.4 验证
+
+```text
+node scripts/check-portal-i18n.mjs   通过（zh=109 en=109，跳过 7 个 A2 文件）
+nuxt build                           通过
+SSR（zh / en-US 各一次）              首页、栏目、文章、搜索关键文案与 html lang 全部正确
+页头                                  lang-button 在两种语言页面都渲染
+```
+
+### 68.5 踩坑
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| 检查脚本一上来报 4 处“残留中文” | 首字占位 `'文'` / `'会'`、`memberName` 兜底、Logo 占位 `'凌'` | 前三处改成 `t()` 或英文占位；`凌` 是品牌字，加入白名单 |
+| `bash` 里起门户进程，退出后端口还占着 | 沙箱 job 会回收子进程，但 `$!` 不是 node.exe 的 Windows PID | 验收在同一个调用里“起 → 请求 → 停”；生产用 `portal.ps1`（真实 PID） |
+| Node 侧读 TS 语言包 | `check-portal-i18n.mjs` 不能直接 import `.ts` | 用正则读 `'key': 'value'` 行，脚本零依赖 |
+
+### 68.6 遗留
+
+| 项 | 说明 |
+|---|---|
+| 会员中心文案（刀 A2） | 登录 / 注册 / 找回 / 个人中心 / 消息 / 第三方回调仍在 `PENDING` |
+| CMS 内容翻译（刀 B） | 表与接口方案见 `docs/13` §12.34.4 |
+| URL 前缀与 hreflang（刀 C） | 方案见 §12.34，等 B 完成 |

@@ -13,6 +13,8 @@ const props = defineProps<{
   extraQuery?: Record<string, string | number | undefined | null>
 }>()
 
+const { t } = usePortalI18n()
+
 const totalCount = computed(() => Math.max(0, Number(props.total) || 0))
 const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / Math.max(1, props.pageSize))))
 const current = computed(() => Math.min(Math.max(1, props.page), totalPages.value))
@@ -48,9 +50,9 @@ function linkFor(page: number) {
 </script>
 
 <template>
-  <nav v-if="totalPages > 1" class="pager" aria-label="分页">
-    <NuxtLink v-if="current > 1" class="pager-link" :to="linkFor(current - 1)" rel="prev">上一页</NuxtLink>
-    <span v-else class="pager-link is-disabled">上一页</span>
+  <nav v-if="totalPages > 1" class="pager" :aria-label="t('common.pager')">
+    <NuxtLink v-if="current > 1" class="pager-link" :to="linkFor(current - 1)" rel="prev">{{ t('common.prev') }}</NuxtLink>
+    <span v-else class="pager-link is-disabled">{{ t('common.prev') }}</span>
 
     <template v-for="item in items" :key="item.key">
       <span v-if="item.gap" class="pager-gap" aria-hidden="true">…</span>
@@ -60,7 +62,7 @@ function linkFor(page: number) {
       <NuxtLink v-else class="pager-link" :to="linkFor(item.page!)">{{ item.page }}</NuxtLink>
     </template>
 
-    <NuxtLink v-if="current < totalPages" class="pager-link" :to="linkFor(current + 1)" rel="next">下一页</NuxtLink>
-    <span v-else class="pager-link is-disabled">下一页</span>
+    <NuxtLink v-if="current < totalPages" class="pager-link" :to="linkFor(current + 1)" rel="next">{{ t('common.next') }}</NuxtLink>
+    <span v-else class="pager-link is-disabled">{{ t('common.next') }}</span>
   </nav>
 </template>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { PortalArticleDetail } from '~/types/portal'
 
+const { t } = usePortalI18n()
+
 /**
  * 新闻详情模板（detail.news）：更紧凑的标题层级与引文式摘要。
  *
@@ -22,7 +24,7 @@ const tags = computed(() => props.article.tags || [])
       <div class="article-meta">
         <span v-if="article.authorName">{{ article.authorName }}</span>
         <time v-if="article.publishTime" :datetime="article.publishTime">{{ formatDate(article.publishTime) }}</time>
-        <span v-if="article.viewCount != null">阅读 {{ formatCount(article.viewCount) }}</span>
+        <span v-if="article.viewCount != null">{{ t('common.readCount', { count: formatCount(article.viewCount) }) }}</span>
       </div>
     </header>
 
@@ -34,7 +36,7 @@ const tags = computed(() => props.article.tags || [])
 
     <div class="article-content" v-html="article.content" />
 
-    <ul v-if="tags.length" class="tag-list" aria-label="文章标签">
+    <ul v-if="tags.length" class="tag-list" :aria-label="t('article.tags')">
       <li v-for="tag in tags" :key="tag.tagId" class="tag">
         <NuxtLink :to="`/tag/${tag.tagKey}`">{{ tag.tagName }}</NuxtLink>
       </li>

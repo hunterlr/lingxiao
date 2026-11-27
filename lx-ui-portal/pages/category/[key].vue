@@ -6,6 +6,7 @@ definePageMeta({
 const route = useRoute()
 const api = usePortalApi()
 const config = useRuntimeConfig()
+const { t } = usePortalI18n()
 
 const categoryKey = String(route.params.key || '')
 const page = Math.max(1, Number(route.query.page) || 1)
@@ -16,7 +17,7 @@ const { data: categories } = await useAsyncData('portal-categories', api.fetchCa
 const trail = findCategoryTrail(categories.value || [], categoryKey)
 const category = trail[trail.length - 1]
 if (!category) {
-  throw createError({ statusCode: 404, statusMessage: '栏目不存在或已下线' })
+  throw createError({ statusCode: 404, statusMessage: t('category.notFound') })
 }
 
 const { data: result } = await useAsyncData(`category-${categoryKey}-${page}`, () =>
@@ -30,7 +31,7 @@ const listTemplate = computed(() => resolveListTemplate(category.template))
 
 useSeoMeta({
   title: () => category.seoTitle || category.categoryName,
-  description: () => category.seoDescription || `浏览「${category.categoryName}」栏目下的全部文章。`,
+  description: () => category.seoDescription || t('category.seoDescription', { name: category.categoryName }),
   keywords: () => category.seoKeywords || '',
   ogType: 'website',
   ogUrl: () => `${siteUrl}/category/${encodeURIComponent(categoryKey)}`
@@ -43,8 +44,8 @@ useHead({
 
 <template>
   <div class="list-page">
-    <nav class="breadcrumb" aria-label="面包屑">
-      <NuxtLink to="/">首页</NuxtLink>
+    <nav class="breadcrumb" :aria-label="t('common.breadcrumb')">
+      <NuxtLink to="/">{{ t('common.home') }}</NuxtLink>
       <template v-for="item in trail" :key="item.categoryId">
         <span class="breadcrumb-sep" aria-hidden="true">/</span>
         <NuxtLink :to="`/category/${item.categoryKey}`">{{ item.categoryName }}</NuxtLink>
@@ -52,16 +53,16 @@ useHead({
     </nav>
 
     <header class="page-head">
-      <p class="eyebrow">栏目</p>
+      <p class="eyebrow">{{ t('category.eyebrow') }}</p>
       <h1 class="page-title">{{ category.categoryName }}</h1>
       <p v-if="category.seoDescription" class="page-description">{{ category.seoDescription }}</p>
-      <p class="page-count">共 {{ total }} 篇文章</p>
+      <p class="page-count">{{ t('category.count', { count: total }) }}</p>
     </header>
 
     <component :is="listTemplate" v-if="articles.length" :category="category" :articles="articles" />
     <EmptyState v-else>
-      <template #title>该栏目暂无文章</template>
-      <template #description>内容发布后会按时间倒序出现在这里。</template>
+      <template #title>{{ t('category.empty.title') }}</template>
+      <template #description>{{ t('category.empty.desc') }}</template>
     </EmptyState>
 
     <PortalPager

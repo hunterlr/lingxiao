@@ -2,6 +2,7 @@
 const route = useRoute()
 const api = usePortalApi()
 const { profile, isLoggedIn, ensureProfile, unreadCount, refreshUnread } = useMemberAuth()
+const { t, lang, loadPack, setLang, languages } = usePortalI18n()
 
 const { data: site } = await useAsyncData('portal-site', api.fetchSite)
 const { data: categories } = await useAsyncData('portal-categories', api.fetchCategories)
@@ -13,6 +14,8 @@ await ensureProfile()
 if (isLoggedIn.value) {
   await refreshUnread()
 }
+// 文案：先拉后台已发布语言包，失败回落内置字典
+await loadPack()
 // 客户端登录 / 退出后同步角标，避免要刷新整页才出现
 onMounted(() => {
   if (isLoggedIn.value) refreshUnread()
@@ -42,9 +45,9 @@ const navItems = computed(() => {
 })
 const year = new Date().getFullYear()
 
-const memberName = computed(() => profile.value?.nickname || profile.value?.username || '个人中心')
+const memberName = computed(() => profile.value?.nickname || profile.value?.username || t('layout.member.account'))
 const memberAvatar = computed(() => mediaUrl(profile.value?.avatar, 'thumb'))
-const memberInitial = computed(() => (memberName.value || '会').slice(0, 1))
+const memberInitial = computed(() => (memberName.value || 'M').slice(0, 1))
 
 const keyword = ref(route.path === '/search' ? String(route.query.keyword || '') : '')
 watch(
@@ -63,20 +66,20 @@ function submitSearch() {
 useHead(() => ({
   titleTemplate: (titleChunk) =>
     titleChunk ? `${titleChunk} · ${siteName.value}` : site.value?.seoTitle || siteName.value,
-  htmlAttrs: { 'data-theme': theme.value }
+  htmlAttrs: { 'data-theme': theme.value, lang: lang.value }
 }))
 
 useSeoMeta({
   description: () => site.value?.seoDescription || '',
   keywords: () => site.value?.seoKeywords || '',
   ogSiteName: () => siteName.value,
-  ogLocale: 'zh_CN'
+  ogLocale: () => (lang.value === 'en-US' ? 'en_US' : 'zh_CN')
 })
 </script>
 
 <template>
   <div class="portal-shell" :data-theme="theme">
-    <a class="skip-link" href="#main">跳到主要内容</a>
+    <a class="skip-link" href="#main">{{ t('layout.skip') }}</a>
 
     <header class="site-header">
       <div class="container header-inner">
@@ -89,8 +92,8 @@ useSeoMeta({
           </span>
         </NuxtLink>
 
-        <nav class="site-nav" aria-label="主导航">
-          <NuxtLink to="/" class="nav-link" :class="{ 'is-active': route.path === '/' }">首页</NuxtLink>
+        <nav class="site-nav" :aria-label="t('layout.nav.label')">
+          <NuxtLink to="/" class="nav-link" :class="{ 'is-active': route.path === '/' }">{{ t('common.home') }}</NuxtLink>
           <NuxtLink
             v-for="item in navItems"
             :key="item.key"
@@ -107,11 +110,24 @@ useSeoMeta({
             v-model="keyword"
             type="search"
             name="keyword"
-            placeholder="搜索文章"
-            aria-label="搜索文章"
+            :placeholder="t('layout.searchPlaceholder')"
+            :aria-label="t('layout.searchPlaceholder')"
           />
-          <button type="submit" aria-label="提交搜索">搜索</button>
+          <button type="submit" :aria-label="t('layout.searchSubmit')">{{ t('layout.searchSubmit') }}</button>
         </form>
+
+        <div class="lang-switch" role="group" :aria-label="t('layout.lang.label')">
+          <button
+            v-for="item in languages"
+            :key="item.code"
+            type="button"
+            class="lang-button"
+            :class="{ 'is-active': item.code === lang }"
+            @click="setLang(item.code)"
+          >
+            {{ item.label }}
+          </button>
+        </div>
 
         <div class="member-actions">
           <NuxtLink
@@ -119,7 +135,7 @@ useSeoMeta({
             to="/messages"
             class="member-bell"
             :class="{ 'is-active': route.path === '/messages' }"
-            :aria-label="unreadCount ? `消息中心，${unreadCount} 条未读` : '消息中心'"
+            :aria-label="unreadCount ? t('layout.member.unread', { count: unreadCount }) : t('layout.member.messages')"
           >
             <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
               <path
@@ -129,7 +145,7 @@ useSeoMeta({
             </svg>
             <span v-if="unreadCount > 0" class="member-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
           </NuxtLink>
-          <NuxtLink v-if="isLoggedIn" to="/account" class="member-chip" :aria-label="`个人中心：${memberName}`">
+          <NuxtLink v-if="isLoggedIn" to="/account" class="member-chip" :aria-label="`${t('layout.member.account')} · ${memberName}`">
             <img
               v-if="memberAvatar"
               :src="memberAvatar"
@@ -141,8 +157,8 @@ useSeoMeta({
             <span class="member-name">{{ memberName }}</span>
           </NuxtLink>
           <template v-else>
-            <NuxtLink to="/login" class="member-login" :class="{ 'is-active': route.path === '/login' }">登录</NuxtLink>
-            <NuxtLink to="/register" class="member-register">注册</NuxtLink>
+            <NuxtLink to="/login" class="member-login" :class="{ 'is-active': route.path === '/login' }">{{ t('layout.member.login') }}</NuxtLink>
+            <NuxtLink to="/register" class="member-register">{{ t('layout.member.register') }}</NuxtLink>
           </template>
         </div>
       </div>
@@ -156,15 +172,15 @@ useSeoMeta({
       <div class="container footer-inner">
         <div class="footer-brand">
           <strong>{{ siteName }}</strong>
-          <p>{{ site?.seoDescription || '内容由凌霄 CMS 驱动，门户只读取已发布内容。' }}</p>
+          <p>{{ site?.seoDescription || t('layout.footer.tagline') }}</p>
         </div>
-        <nav class="footer-links" aria-label="页脚导航">
-          <NuxtLink to="/">首页</NuxtLink>
+        <nav class="footer-links" :aria-label="t('layout.footer.nav')">
+          <NuxtLink to="/">{{ t('common.home') }}</NuxtLink>
           <NuxtLink v-for="item in navItems" :key="item.key" :to="item.url">
             {{ item.label }}
           </NuxtLink>
         </nav>
-        <p class="footer-copy">© {{ year }} {{ siteName }} · Powered by 凌霄 LingXiao</p>
+        <p class="footer-copy">{{ t('layout.footer.copy', { year, site: siteName }) }}</p>
       </div>
     </footer>
   </div>

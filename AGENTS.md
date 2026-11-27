@@ -43,6 +43,7 @@ node scripts/check-i18n-keys.mjs
 
 # 门户：构建（在 lx-ui-portal 下）
 npm run build
+node scripts/check-portal-i18n.mjs   # 中英文案键一致 + 模板无硬编码中文
 
 # 打包发布包（需要先有 jar / 后台 dist / 门户 .output）
 bash deploy/package.sh 1.4.0
@@ -120,7 +121,7 @@ java -jar lx-boot/target/lingxiao.jar --lx.captcha.enabled=false
 
 - [ ] `mvn -o -B -ntp test` 全绿
 - [ ] 后台 `npm run build` + `node scripts/check-i18n-keys.mjs`（`missing=none`、无 dotted-leaf）
-- [ ] 动了门户：门户 `npm run build`
+- [ ] 动了门户：门户 `npm run build` + `node scripts/check-portal-i18n.mjs`
 - [ ] 新迁移：真实库启动一次，`flyway_schema_history` 到新版本
 - [ ] 可选模块：关闭后启动成功、接口 404、菜单不下发；重开后数据还在
 - [ ] 接口脚本 `.local/*-check.mjs` 覆盖正常路径、越权、关闭态

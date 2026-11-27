@@ -6,6 +6,7 @@ definePageMeta({
 const route = useRoute()
 const api = usePortalApi()
 const config = useRuntimeConfig()
+const { t } = usePortalI18n()
 
 const keyword = computed(() => String(route.query.keyword || '').trim())
 const page = Math.max(1, Number(route.query.page) || 1)
@@ -30,8 +31,11 @@ function submitSearch() {
 }
 
 useSeoMeta({
-  title: () => (keyword.value ? `搜索：${keyword.value}` : '搜索'),
-  description: () => (keyword.value ? `站内搜索「${keyword.value}」的结果。` : '站内搜索'),
+  title: () => (keyword.value ? t('search.seoTitle', { keyword: keyword.value }) : t('search.title')),
+  description: () =>
+    keyword.value
+      ? t('search.seoDescription', { keyword: keyword.value })
+      : t('search.seoDescriptionEmpty'),
   robots: 'noindex,follow'
 })
 </script>
@@ -39,22 +43,22 @@ useSeoMeta({
 <template>
   <div class="search-page">
     <header class="page-head">
-      <p class="eyebrow">站内搜索</p>
-      <h1 class="page-title">{{ keyword ? '搜索结果' : '搜索文章' }}</h1>
+      <p class="eyebrow">{{ t('search.eyebrow') }}</p>
+      <h1 class="page-title">{{ keyword ? t('search.titleWithKeyword') : t('search.title') }}</h1>
       <form class="search-form" role="search" @submit.prevent="submitSearch">
-        <input v-model="input" type="search" placeholder="输入标题或摘要关键字" aria-label="搜索关键字" />
-        <button type="submit" class="button">搜索</button>
+        <input v-model="input" type="search" :placeholder="t('search.placeholder')" :aria-label="t('search.label')" />
+        <button type="submit" class="button">{{ t('common.search') }}</button>
       </form>
-      <p v-if="keyword" class="page-count">「{{ keyword }}」找到 {{ total }} 篇文章</p>
-      <p v-else class="page-description">输入关键字，按标题与摘要匹配已发布内容。</p>
+      <p v-if="keyword" class="page-count">{{ t('search.count', { keyword, count: total }) }}</p>
+      <p v-else class="page-description">{{ t('search.hint') }}</p>
     </header>
 
     <div v-if="articles.length" class="article-grid">
       <ArticleCard v-for="article in articles" :key="article.articleId" :article="article" />
     </div>
     <EmptyState v-else-if="keyword">
-      <template #title>没有找到相关内容</template>
-      <template #description>换一个关键字，或从栏目导航继续浏览。</template>
+      <template #title>{{ t('search.empty.title') }}</template>
+      <template #description>{{ t('search.empty.desc') }}</template>
     </EmptyState>
 
     <PortalPager

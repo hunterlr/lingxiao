@@ -69,6 +69,7 @@
 - 页面级 `title / description / canonical / OG`、文章 JSON-LD、`sitemap.xml` / `robots.txt` / `rss.xml`
 - 会员注册 / 登录 / 找回密码 / 个人中心 / 收藏 / 点赞 / 评论，Token 存 Cookie，不进 URL
 - `/api/**` 由 Nitro 同源代理到后端，浏览器不直连，部署只改环境变量
+- 界面中英双语：页头一键切换，文案键可在后台「多语言」里维护并发布
 
 **会员体系（v1.2 模块）**
 

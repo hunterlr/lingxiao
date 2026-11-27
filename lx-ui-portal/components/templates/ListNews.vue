@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { PortalArticleSummary, PortalCategory } from '~/types/portal'
 
+const { t } = usePortalI18n()
+
 /**
  * 新闻列表模板（list.news）：左侧日期、右侧标题与摘要的紧凑列表。
  *
@@ -16,7 +18,7 @@ defineProps<{
   <ul class="news-list template-list-news">
     <li v-for="article in articles" :key="article.articleId" class="news-item">
       <time class="news-date" :datetime="article.publishTime || undefined">
-        {{ formatDay(article.publishTime) || '未发布' }}
+        {{ formatDay(article.publishTime) || t('list.unpublished') }}
       </time>
       <div class="news-body">
         <h2 class="news-title">
@@ -26,7 +28,7 @@ defineProps<{
         <div class="news-meta">
           <span v-if="article.authorName">{{ article.authorName }}</span>
           <span v-if="article.publishTime">{{ formatDate(article.publishTime) }}</span>
-          <span>阅读 {{ formatCount(article.viewCount) }}</span>
+          <span>{{ t('list.readCount', { count: formatCount(article.viewCount) }) }}</span>
           <NuxtLink
             v-for="tag in (article.tags || []).slice(0, 3)"
             :key="tag.tagId"

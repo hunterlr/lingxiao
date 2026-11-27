@@ -314,6 +314,38 @@ button {
   white-space: nowrap;
 }
 
+/* 页头语言切换：两个小圆角按钮，当前语言高亮 */
+.lang-switch {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.lang-button {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.lang-button:hover {
+  color: var(--accent);
+}
+
+.lang-button.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* 页头消息入口：未读角标叠在铃铛右上角 */
 .member-bell {
   position: relative;

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const api = usePortalApi()
 const config = useRuntimeConfig()
+const { t } = usePortalI18n()
 
 const { data: site } = await useAsyncData('portal-site', api.fetchSite)
 const { data: categories } = await useAsyncData('portal-categories', api.fetchCategories)
@@ -20,7 +21,7 @@ const bannerList = computed(() => banners.value || [])
 const hero = computed(() => records.value[0] || null)
 const rest = computed(() => records.value.slice(1))
 const heroCover = computed(() => mediaUrl(hero.value?.cover, 'medium'))
-const heroInitial = computed(() => hero.value?.title?.trim().slice(0, 1) || '文')
+const heroInitial = computed(() => hero.value?.title?.trim().slice(0, 1) || 'A')
 const chips = computed(() => rootCategories(categories.value || []))
 const siteUrl = String(config.public.siteUrl).replace(/\/$/, '')
 
@@ -39,7 +40,7 @@ useHead({
 
 <template>
   <div class="home">
-    <section v-if="bannerList.length" class="banner-strip" aria-label="轮播">
+    <section v-if="bannerList.length" class="banner-strip" :aria-label="t('home.banners')">
       <component
         :is="banner.linkUrl ? 'a' : 'div'"
         v-for="banner in bannerList"
@@ -47,8 +48,8 @@ useHead({
         :href="banner.linkUrl || undefined"
         class="banner-card"
       >
-        <img v-if="banner.image" :src="mediaUrl(banner.image, 'medium')" :alt="banner.title || '轮播图'" />
-        <span v-else class="banner-fallback">{{ banner.title || '轮播图' }}</span>
+        <img v-if="banner.image" :src="mediaUrl(banner.image, 'medium')" :alt="banner.title || t('home.bannerAlt')" />
+        <span v-else class="banner-fallback">{{ banner.title || t('home.bannerAlt') }}</span>
         <span v-if="banner.title" class="banner-title">{{ banner.title }}</span>
       </component>
     </section>
@@ -57,7 +58,7 @@ useHead({
 
     <section v-if="hero" class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">最新发布</p>
+        <p class="eyebrow">{{ t('home.latest') }}</p>
         <h1 class="hero-title">
           <NuxtLink :to="`/article/${hero.articleId}`">{{ hero.title }}</NuxtLink>
         </h1>
@@ -71,9 +72,9 @@ useHead({
             {{ hero.categoryName }}
           </NuxtLink>
           <time v-if="hero.publishTime" :datetime="hero.publishTime">{{ formatDate(hero.publishTime) }}</time>
-          <span v-if="hero.viewCount != null">阅读 {{ formatCount(hero.viewCount) }}</span>
+          <span v-if="hero.viewCount != null">{{ t('common.readCount', { count: formatCount(hero.viewCount) }) }}</span>
         </p>
-        <NuxtLink class="button" :to="`/article/${hero.articleId}`">阅读全文</NuxtLink>
+        <NuxtLink class="button" :to="`/article/${hero.articleId}`">{{ t('home.readMore') }}</NuxtLink>
       </div>
 
       <NuxtLink class="hero-media" :to="`/article/${hero.articleId}`" :aria-label="hero.title">
@@ -82,7 +83,7 @@ useHead({
       </NuxtLink>
     </section>
 
-    <section v-if="chips.length" class="category-strip" aria-label="栏目导航">
+    <section v-if="chips.length" class="category-strip" :aria-label="t('home.categoryNav')">
       <NuxtLink
         v-for="item in chips"
         :key="item.categoryId"
@@ -96,8 +97,8 @@ useHead({
 
     <section v-if="rest.length" class="section">
       <div class="section-head">
-        <h2 class="section-title">最新文章</h2>
-        <p class="section-sub">按发布时间排序</p>
+        <h2 class="section-title">{{ t('home.latestPosts') }}</h2>
+        <p class="section-sub">{{ t('home.sortedByPublish') }}</p>
       </div>
       <div class="article-grid">
         <ArticleCard v-for="article in rest" :key="article.articleId" :article="article" />
@@ -105,8 +106,8 @@ useHead({
     </section>
 
     <EmptyState v-if="!records.length">
-      <template #title>还没有已发布内容</template>
-      <template #description>在后台「CMS → 文章」发布文章后，这里会自动出现。</template>
+      <template #title>{{ t('home.empty.title') }}</template>
+      <template #description>{{ t('home.empty.desc') }}</template>
     </EmptyState>
   </div>
 </template>

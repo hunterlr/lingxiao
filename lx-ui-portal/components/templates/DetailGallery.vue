@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { PortalArticleDetail } from '~/types/portal'
 
+const { t } = usePortalI18n()
+
 /**
  * 图集详情模板（detail.gallery）：封面优先，正文前展示扩展图集。
  *
@@ -25,7 +27,7 @@ const images = computed(() => galleryImages(props.article.ext?.images))
       <div class="article-meta">
         <span v-if="article.authorName">{{ article.authorName }}</span>
         <time v-if="article.publishTime" :datetime="article.publishTime">{{ formatDate(article.publishTime) }}</time>
-        <span v-if="article.viewCount != null">阅读 {{ formatCount(article.viewCount) }}</span>
+        <span v-if="article.viewCount != null">{{ t('common.readCount', { count: formatCount(article.viewCount) }) }}</span>
       </div>
     </header>
 
@@ -33,13 +35,13 @@ const images = computed(() => galleryImages(props.article.ext?.images))
       <img :src="cover" :alt="article.title" />
     </figure>
 
-    <div v-if="images.length" class="gallery-ext" aria-label="图集">
-      <img v-for="(image, index) in images" :key="`${image}-${index}`" :src="image" :alt="`${article.title} 图 ${index + 1}`" />
+    <div v-if="images.length" class="gallery-ext" :aria-label="t('article.gallery')">
+      <img v-for="(image, index) in images" :key="`${image}-${index}`" :src="image" :alt="t('article.galleryAlt', { title: article.title, index: index + 1 })" />
     </div>
 
     <div class="article-content" v-html="article.content" />
 
-    <ul v-if="tags.length" class="tag-list" aria-label="文章标签">
+    <ul v-if="tags.length" class="tag-list" :aria-label="t('article.tags')">
       <li v-for="tag in tags" :key="tag.tagId" class="tag">
         <NuxtLink :to="`/tag/${tag.tagKey}`">{{ tag.tagName }}</NuxtLink>
       </li>

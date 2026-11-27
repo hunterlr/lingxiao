@@ -6,9 +6,11 @@ const props = defineProps<{
   featured?: boolean
 }>()
 
+const { t } = usePortalI18n()
+
 const to = computed(() => `/article/${props.article.articleId}`)
 const cover = computed(() => mediaUrl(props.article.cover, 'medium'))
-const initial = computed(() => props.article.title?.trim().slice(0, 1) || '文')
+const initial = computed(() => props.article.title?.trim().slice(0, 1) || 'A')
 </script>
 
 <template>
@@ -29,7 +31,7 @@ const initial = computed(() => props.article.title?.trim().slice(0, 1) || '文')
         <p v-if="article.summary" class="card-summary">{{ article.summary }}</p>
         <p class="card-meta">
           <span v-if="article.authorName">{{ article.authorName }}</span>
-          <span v-if="article.viewCount != null">阅读 {{ formatCount(article.viewCount) }}</span>
+          <span v-if="article.viewCount != null">{{ t('list.readCount', { count: formatCount(article.viewCount) }) }}</span>
         </p>
       </div>
     </NuxtLink>

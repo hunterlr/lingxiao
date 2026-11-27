@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { PortalPage } from '~/types/portal'
 
+const { t } = usePortalI18n()
+
 /**
  * 默认单页模板（page.default）：标题、封面、正文。
  *
@@ -14,7 +16,7 @@ const cover = computed(() => mediaUrl(props.page.cover, 'medium'))
 <template>
   <div class="template-page-default">
     <header class="page-head">
-      <p class="eyebrow">单页</p>
+      <p class="eyebrow">{{ t('page.eyebrow') }}</p>
       <h1 class="page-title">{{ page.title || page.pageName }}</h1>
       <p v-if="page.summary" class="page-description">{{ page.summary }}</p>
     </header>

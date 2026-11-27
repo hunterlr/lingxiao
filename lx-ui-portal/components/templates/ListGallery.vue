@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { PortalArticleSummary, PortalCategory } from '~/types/portal'
 
+const { t } = usePortalI18n()
+
 /**
  * 图集列表模板（list.gallery）：封面优先的网格。
  *
@@ -30,7 +32,7 @@ defineProps<{
         <p v-if="article.summary">{{ article.summary }}</p>
         <div class="news-meta">
           <span v-if="article.publishTime">{{ formatDay(article.publishTime) }}</span>
-          <span>阅读 {{ formatCount(article.viewCount) }}</span>
+          <span>{{ t('list.readCount', { count: formatCount(article.viewCount) }) }}</span>
         </div>
       </div>
     </NuxtLink>

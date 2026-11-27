@@ -11,10 +11,11 @@ const api = usePortalApi()
 const config = useRuntimeConfig()
 // 会员 composable 必须在首个 await 前初始化，避免异步 setup 丢上下文
 const { isLoggedIn, fetchInteraction, setFavorite, setLike, fetchComments, submitComment } = useMemberAuth()
+const { t } = usePortalI18n()
 
 const articleId = String(route.params.id || '')
 if (!/^\d+$/.test(articleId)) {
-  throw createError({ statusCode: 404, statusMessage: '文章不存在' })
+  throw createError({ statusCode: 404, statusMessage: t('article.notFound') })
 }
 
 const siteUrl = String(config.public.siteUrl).replace(/\/$/, '')
@@ -23,7 +24,7 @@ const { data: site } = await useAsyncData('portal-site', api.fetchSite)
 const { data: article } = await useAsyncData(`article-${articleId}`, () => api.fetchArticle(articleId))
 
 if (!article.value) {
-  throw createError({ statusCode: 404, statusMessage: '文章不存在或尚未发布' })
+  throw createError({ statusCode: 404, statusMessage: t('article.notFound') })
 }
 
 // 会员模块关闭 / 网络异常时只回落为 0，不影响正文阅读
@@ -70,7 +71,7 @@ async function toggleFavorite() {
   try {
     interaction.value = await setFavorite(articleId, !interaction.value.favorited)
   } catch (error) {
-    handleInteractionError(error, '收藏失败，请稍后再试')
+    handleInteractionError(error, t('article.favoriteFailed'))
   } finally {
     interactionPending.value = false
   }
@@ -84,7 +85,7 @@ async function toggleLike() {
   try {
     interaction.value = await setLike(articleId, !interaction.value.liked)
   } catch (error) {
-    handleInteractionError(error, '点赞失败，请稍后再试')
+    handleInteractionError(error, t('article.likeFailed'))
   } finally {
     interactionPending.value = false
   }
@@ -130,7 +131,7 @@ async function loadComments(reset = false) {
     if (error instanceof MemberApiError && error.code === 1003) {
       commentsEnabled.value = false
     }
-    commentsError.value = memberErrorMessage(error, '评论暂不可用，请稍后再试')
+    commentsError.value = memberErrorMessage(error, t('article.commentUnavailable'))
   } finally {
     commentsLoading.value = false
   }
@@ -145,11 +146,11 @@ async function handleSubmitComment() {
 
   const content = commentContent.value.trim()
   if (!content) {
-    commentFormError.value = '评论内容不能为空'
+    commentFormError.value = t('article.commentRequired')
     return
   }
   if (content.length > 1000) {
-    commentFormError.value = '评论内容不能超过 1000 个字符'
+    commentFormError.value = t('article.commentTooLong')
     return
   }
   if (!(await ensureMember())) return
@@ -158,7 +159,7 @@ async function handleSubmitComment() {
   try {
     await submitComment(articleId, content)
     commentContent.value = ''
-    commentNotice.value = '评论已提交，审核通过后会展示在下方。'
+    commentNotice.value = t('article.submitted')
   } catch (error) {
     if (error instanceof MemberApiError && error.code === 1002) {
       navigateTo(loginTarget())
@@ -166,10 +167,10 @@ async function handleSubmitComment() {
     }
     if (error instanceof MemberApiError && error.code === 1003) {
       commentsEnabled.value = false
-      commentsError.value = memberErrorMessage(error, '评论功能已关闭')
+      commentsError.value = memberErrorMessage(error, t('article.commentDisabled'))
       return
     }
-    commentFormError.value = memberErrorMessage(error, '评论提交失败，请稍后再试')
+    commentFormError.value = memberErrorMessage(error, t('article.commentFailed'))
   } finally {
     commentSubmitting.value = false
   }
@@ -199,7 +200,7 @@ const sourceHref = computed(() => {
 })
 
 useSeoMeta({
-  title: () => article.value?.title || '文章',
+  title: () => article.value?.title || t('article.defaultTitle'),
   description: () => article.value?.summary || site.value?.seoDescription || '',
   ogTitle: () => article.value?.title || '',
   ogDescription: () => article.value?.summary || '',
@@ -238,8 +239,8 @@ useHead(() => {
 
 <template>
   <article v-if="article" class="article-page">
-    <nav class="breadcrumb" aria-label="面包屑">
-      <NuxtLink to="/">首页</NuxtLink>
+    <nav class="breadcrumb" :aria-label="t('common.breadcrumb')">
+      <NuxtLink to="/">{{ t('common.home') }}</NuxtLink>
       <template v-for="item in trail" :key="item.categoryId">
         <span class="breadcrumb-sep" aria-hidden="true">/</span>
         <NuxtLink :to="`/category/${item.categoryKey}`">{{ item.categoryName }}</NuxtLink>
@@ -249,7 +250,7 @@ useHead(() => {
     <!-- 标题 / 封面 / 正文由模板组件渲染；互动、评论与相关阅读留在页面级 -->
     <component :is="detailTemplate" :article="article" />
 
-    <div class="interaction-bar" aria-label="文章互动">
+    <div class="interaction-bar" :aria-label="t('article.interaction')">
       <button
         type="button"
         class="interaction-button"
@@ -258,7 +259,7 @@ useHead(() => {
         @click="toggleFavorite"
       >
         <span aria-hidden="true">{{ interaction.favorited ? '★' : '☆' }}</span>
-        {{ interaction.favorited ? '已收藏' : '收藏' }}
+        {{ interaction.favorited ? t('article.favorited') : t('article.favorite') }}
         <span class="interaction-count">{{ formatCount(interaction.favoriteCount) }}</span>
       </button>
       <button
@@ -269,7 +270,7 @@ useHead(() => {
         @click="toggleLike"
       >
         <span aria-hidden="true">♥</span>
-        {{ interaction.liked ? '已点赞' : '点赞' }}
+        {{ interaction.liked ? t('article.liked') : t('article.like') }}
         <span class="interaction-count">{{ formatCount(interaction.likeCount) }}</span>
       </button>
     </div>
@@ -277,13 +278,13 @@ useHead(() => {
       {{ interactionError }}
     </p>
     <p v-else-if="!isLoggedIn" class="form-hint interaction-hint">
-      登录后可收藏与点赞，收藏内容可在个人中心查看。
+      {{ t('article.loginHint') }}
     </p>
 
     <section class="comments" aria-labelledby="comments-title">
       <div class="section-head">
         <h2 id="comments-title" class="section-title">
-          评论<span v-if="commentTotal" class="comments-total">{{ formatCount(commentTotal) }}</span>
+          {{ t('article.comments') }}<span v-if="commentTotal" class="comments-total">{{ formatCount(commentTotal) }}</span>
         </h2>
       </div>
 
@@ -296,41 +297,41 @@ useHead(() => {
               <img
                 v-if="mediaUrl(item.avatar, 'thumb')"
                 :src="mediaUrl(item.avatar, 'thumb')!"
-                :alt="item.nickname || '会员'"
+                :alt="item.nickname || t('article.member')"
                 referrerpolicy="no-referrer"
               />
-              <span v-else aria-hidden="true">{{ (item.nickname || '会').slice(0, 1) }}</span>
+              <span v-else aria-hidden="true">{{ (item.nickname || 'M').slice(0, 1) }}</span>
             </span>
             <div class="comment-body">
               <div class="comment-meta">
-                <strong>{{ item.nickname || '会员' }}</strong>
+                <strong>{{ item.nickname || t('article.member') }}</strong>
                 <time v-if="item.createTime" :datetime="item.createTime">{{ formatDate(item.createTime) }}</time>
               </div>
               <p class="comment-content">{{ item.content }}</p>
             </div>
           </li>
         </ul>
-        <p v-else-if="!commentsLoading" class="comment-empty">还没有评论，来写下第一条吧。</p>
+        <p v-else-if="!commentsLoading" class="comment-empty">{{ t('article.commentEmpty') }}</p>
 
         <div v-if="commentHasMore" class="comment-more">
           <button type="button" class="button ghost" :disabled="commentsLoading" @click="loadComments()">
-            {{ commentsLoading ? '加载中…' : '加载更多评论' }}
+            {{ commentsLoading ? t('common.loading') : t('article.loadMore') }}
           </button>
         </div>
 
         <form v-if="isLoggedIn" class="comment-form" @submit.prevent="handleSubmitComment">
-          <label class="comment-label" for="comment-content">发表评论</label>
+          <label class="comment-label" for="comment-content">{{ t('article.formLabel') }}</label>
           <textarea
             id="comment-content"
             v-model="commentContent"
             maxlength="1000"
             rows="4"
-            placeholder="说点什么…（提交后需审核）"
+            :placeholder="t('article.formPlaceholder')"
           />
           <div class="comment-form-footer">
             <span class="form-hint">{{ commentContent.length }} / 1000</span>
             <button type="submit" class="button" :disabled="commentSubmitting">
-              {{ commentSubmitting ? '提交中…' : '提交评论' }}
+              {{ commentSubmitting ? t('article.submitting') : t('article.submit') }}
             </button>
           </div>
           <p v-if="commentFormError" class="form-alert error comment-feedback" role="alert">
@@ -341,26 +342,26 @@ useHead(() => {
           </p>
         </form>
         <p v-else class="form-hint comment-login-hint">
-          登录后可以发表评论。
-          <NuxtLink :to="loginTarget()">去登录</NuxtLink>
+          {{ t('article.commentLogin') }}
+          <NuxtLink :to="loginTarget()">{{ t('article.goLogin') }}</NuxtLink>
         </p>
       </template>
     </section>
 
     <footer class="article-footer">
       <p v-if="article.source">
-        来源：
+        {{ t('article.source') }}
         <a v-if="sourceHref" :href="sourceHref" target="_blank" rel="noopener noreferrer">
           {{ article.source }}
         </a>
         <span v-else>{{ article.source }}</span>
       </p>
-      <NuxtLink class="button ghost" to="/">返回首页</NuxtLink>
+      <NuxtLink class="button ghost" to="/">{{ t('article.backHome') }}</NuxtLink>
     </footer>
 
     <section v-if="related.length" class="section related">
       <div class="section-head">
-        <h2 class="section-title">同栏目更多</h2>
+        <h2 class="section-title">{{ t('article.related') }}</h2>
       </div>
       <div class="article-grid">
         <ArticleCard v-for="item in related" :key="item.articleId" :article="item" />

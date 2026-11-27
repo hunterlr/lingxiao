@@ -67,7 +67,7 @@ lx:
   # app:
   #   name: 某某后台
   #   name-en: XXX Admin
-  #   version: 1.0.0
+  #   version: 1.4.0
   captcha:
     # 生产必须开启验证码（参数设置里的 sys.account.captchaEnabled 仍可在运行期控制）
     enabled: true

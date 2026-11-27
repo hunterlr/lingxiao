@@ -1,6 +1,6 @@
 {
   "name": "lx-ui-portal",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "description": "凌霄 CMS 门户（Nuxt 3，只读消费 /api/portal/cms/**）",

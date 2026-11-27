@@ -14,7 +14,7 @@
 # =====================================================================
 set -euo pipefail
 
-VERSION="${1:-1.0.0}"
+VERSION="${1:-1.4.0}"
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$DEPLOY_DIR/.." && pwd)"
 JAR="$REPO/lx-boot/target/lingxiao.jar"

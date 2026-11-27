@@ -51,6 +51,14 @@ java -jar lx-boot/target/lingxiao.jar --lx.captcha.enabled=false
 本地隔离 MySQL 在 `127.0.0.1:3307`（`lingxiao / lingxiao123`），见 `docs/21` §2。
 `.local/` 不入库，里面的 `*-check.mjs` 验收脚本是本机回归用，换机器需要重建。
 
+**本机两个环境坑（先处理，否则第一步就失败）**
+
+- **编译用的 JDK**：默认 `java` 是 JRE（`jre1.8.0_351`），没有 `javac`。类文件过期或改了依赖版本时，
+  `mvn` 会报 `No compiler is provided in this environment`。先设置：
+  `JAVA_HOME=D:\Program Files\Java\jdk1.8.0_351`，并把它的 `bin` 放到 `PATH` 最前面。
+- **git**：换个用户执行 `git` 会报 `dubious ownership`。用
+  `git config --global --add safe.directory E:/java/lingxiao` 处理；只加这一个目录，不要配置 `safe.directory=*`。
+
 ## 4. 硬约束（违反即返工）
 
 **安全域**

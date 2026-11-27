@@ -10,7 +10,7 @@
 `deploy/` 是部署脚本与配置的**源目录**；执行打包脚本后会生成可直接上传的发布包：
 
 ```text
-lingxiao-1.0.0/
+lingxiao-1.4.0/
 ├─ lingxiao.jar                 # 后端可执行 jar
 ├─ config/
 │  └─ application-prod.yml      # 生产配置（敏感项走环境变量）
@@ -60,9 +60,9 @@ npm run build
 
 # 3) 组装发布包
 cd ..
-bash deploy/package.sh 1.0.0        # Linux
+bash deploy/package.sh 1.4.0        # Linux
 # 或
-powershell -ExecutionPolicy Bypass -File deploy\package.ps1 -Version 1.0.0   # Windows
+powershell -ExecutionPolicy Bypass -File deploy\package.ps1 -Version 1.4.0   # Windows
 ```
 
 产物在 `release/`：目录 + `.tar.gz`（Linux）或 `.zip`（Windows）。
@@ -183,8 +183,8 @@ $env:DB_PASSWORD = 'replace-me'
 ```bash
 sudo useradd -r -s /sbin/nologin lingxiao
 sudo mkdir -p /opt/lingxiao
-sudo tar -xzf lingxiao-1.0.0.tar.gz -C /tmp
-sudo cp -R /tmp/lingxiao-1.0.0/. /opt/lingxiao/
+sudo tar -xzf lingxiao-1.4.0.tar.gz -C /tmp
+sudo cp -R /tmp/lingxiao-1.4.0/. /opt/lingxiao/
 sudo chown -R lingxiao:lingxiao /opt/lingxiao
 sudo chmod +x /opt/lingxiao/bin/*.sh
 

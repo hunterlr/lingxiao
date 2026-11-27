@@ -25,7 +25,7 @@
 
     <groupId>com.lingxiao</groupId>
     <artifactId>lingxiao</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.4.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>lingxiao</name>
     <description>凌霄后台基座：模块化单体、可插拔模块、私有化部署</description>
@@ -48,7 +48,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- 项目内统一版本号，子模块引用内部依赖时不再逐个写版本 -->
-        <lingxiao.version>1.0.0-SNAPSHOT</lingxiao.version>
+        <lingxiao.version>1.4.0-SNAPSHOT</lingxiao.version>
 
         <!-- 第三方组件版本（详细说明见 lx-dependencies/pom.xml） -->
         <mybatis-plus.version>3.5.3.2</mybatis-plus.version>

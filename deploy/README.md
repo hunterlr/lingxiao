@@ -1,7 +1,8 @@
-# 凌霄 · 部署手册（v1.0）
+# 凌霄 · 部署手册（v1.4）
 
 > 目标：一台 2C/4G 服务器 + JDK 8/11/17 + MySQL 5.7/8.0，`java -jar` 起后端，
-> Nginx 提供前端静态文件并反代 `/api`。Redis 可选，单机不装也能跑。
+> Nginx 提供后台静态文件并反代 `/api`；内容门户由 Node 20+ 跑 Nuxt 产物。
+> Redis 可选，单机不装也能跑。
 
 ---
 
@@ -14,19 +15,23 @@ lingxiao-1.4.0/
 ├─ lingxiao.jar                 # 后端可执行 jar
 ├─ config/
 │  └─ application-prod.yml      # 生产配置（敏感项走环境变量）
-├─ web/                         # 前端 dist（Nginx root）
+├─ web/                         # 后台 dist（Nginx root）
+├─ portal/                      # 门户 .output（node server/index.mjs）
 ├─ bin/
-│  ├─ start.sh / stop.sh / restart.sh / status.sh   # Linux
-│  └─ start.ps1 / stop.ps1 / restart.ps1 / status.ps1  # Windows
-├─ lingxiao.service             # systemd 单元示例
+│  ├─ start.sh / stop.sh / restart.sh / status.sh      # 后端 Linux
+│  ├─ portal.sh                                        # 门户 Linux：start|stop|restart|status
+│  ├─ start.ps1 / stop.ps1 / restart.ps1 / status.ps1  # 后端 Windows
+│  └─ portal.ps1                                       # 门户 Windows：start|stop|restart|status
+├─ lingxiao.service             # 后端 systemd 单元示例
+├─ lingxiao-portal.service      # 门户 systemd 单元示例
 ├─ nginx/
-│  └─ lingxiao.conf             # Nginx 站点示例
+│  └─ lingxiao.conf             # Nginx 示例（后台 + 门户两个 server）
 ├─ sql/
 │  ├─ init-db.sql               # 建库 / 建账号 / 授权
-│  └─ lingxiao-1.0.0.sql        # 数据库快照（23 张业务表 + 初始数据，可选导入）
+│  └─ lingxiao-1.4.0.sql        # 数据库快照（56 张业务表 + 初始数据，可选导入）
 ├─ data/upload/                 # 本地文件存储（运行时写入）
 ├─ logs/                        # 日志
-└─ run/                         # pid 文件
+└─ run/                         # pid 文件（后端 lingxiao.pid / 门户 portal.pid）
 ```
 
 ---
@@ -36,9 +41,10 @@ lingxiao-1.4.0/
 | 项 | 要求 |
 |---|---|
 | JDK | 8 / 11 / 17（项目按 JDK 8 编译，向上兼容） |
+| Node | **20+**，只跑内容门户；不用门户可以不装 |
 | MySQL | 5.7 / 8.0，字符集 `utf8mb4` |
 | Redis | 可选；多实例部署时建议开启 |
-| Nginx | 生产提供静态文件与 TLS |
+| Nginx | 生产提供静态文件与 TLS，并反代门户 Node 进程 |
 | 内存 | 2C/4G 起步；`-Xmx512m` 足够后台基座 |
 
 服务器时间建议设为 `Asia/Shanghai`；JVM 启动参数已固定 `-Duser.timezone=Asia/Shanghai`。
@@ -52,13 +58,19 @@ lingxiao-1.4.0/
 mvn -DskipTests package
 # 产物：lx-boot/target/lingxiao.jar
 
-# 2) 前端
+# 2) 后台前端
 cd lx-ui-admin
 npm ci
 npm run build
 # 产物：lx-ui-admin/dist
 
-# 3) 组装发布包
+# 3) 内容门户（可选，但打包脚本要求它存在）
+cd ../lx-ui-portal
+npm ci
+npm run build
+# 产物：lx-ui-portal/.output
+
+# 4) 组装发布包
 cd ..
 bash deploy/package.sh 1.4.0        # Linux
 # 或
@@ -99,18 +111,16 @@ mysql -uroot -p < deploy/sql/init-db.sql
 参数、字典、定时任务都在），导入同目录的版本快照：
 
 ```bash
-mysql -uroot -p < deploy/sql/lingxiao-1.0.0.sql
+mysql -uroot -p < deploy/sql/lingxiao-1.4.0.sql
 ```
 
-- 文件约 50 KB，包含 24 张表（23 张业务表 + `flyway_schema_history`）和 V1~V17 迁移记录；
-- 因为带了迁移记录，导入后启动不会重复建表；V18 及之后的迁移会正常补执行；
+- 文件约 290 KB，包含 57 张表（56 张业务表 + `flyway_schema_history`）和 V1~V42 迁移记录；
+- 因为带了迁移记录，导入后启动不会重复建表，也不会有待执行的迁移（当前代码正好到 V42）；
 - 里面有 `DROP TABLE IF EXISTS`，重复导入会把库重置成快照状态；
 - 默认账号 `admin` / `admin123`，导入后请立刻改密码；
-- 登录日志、操作日志、文件记录、代码生成临时表是空的，首页统计为 0 属于正常。
-- 快照停在 v1.0 发布时的 V17，**没有刷新**：CMS、会员、多语言的表不在里面，导入后首次启动由 Flyway 补建。刷新计划见 `docs/13-roadmap.md` §12.29。
-
-> 本目录目前只覆盖**后台**（`lx-ui-admin` + 后端 jar）。内容门户 `lx-ui-portal` 还没有
-> 打包、进程脚本与 Nginx 示例，CI 也不构建它——这是已知缺口，见 `docs/13-roadmap.md` §12.28。
+- 登录日志、操作日志、文件记录是空的，首页统计为 0 属于正常；
+- 快照由「全新空库 + 启动 + mysqldump」生成，**不含任何站点 / 栏目 / 文章**；
+  门户首页需要先在后台建站点（`siteKey=main`）并发布内容，否则 `sitemap.xml` / `rss.xml` 会返回 502。
 
 两种方式选一种即可；正式环境建议用方式一（Flyway），快照主要用于本地开发、
 演示环境和“clone 下来马上能点”的场景。
@@ -167,6 +177,9 @@ $env:DB_PASSWORD = 'replace-me'
 | 项 | 生产值 | 原因 |
 |---|---|---|
 | 代码生成器 | `lx.module.modules.generator.enabled=false` | 会暴露整库表结构与生成代码 |
+| 内容管理 | `lx.module.modules.cms.enabled=true` | 关掉即接口 404、菜单不下发、迁移跳过；已有数据保留 |
+| 前台会员 | `lx.module.modules.member.enabled=true` | 关掉后 `/api/app/**` 与后台会员菜单整体消失 |
+| 多语言 | `lx.module.i18n.enabled=true` | 独立开关（不在 `modules` Map 里）；关掉后门户回落资源包文案 |
 | OpenAPI / Knife4j | `lx.api-doc.enabled=false`、`springdoc.*=false`、`knife4j.production=true` | 不对外暴露接口清单 |
 | 文档静态入口 | `ApiDocDisabledFilter` 把 `/doc.html`、`/webjars/**` 等直接回 404 | Knife4j 页面是静态资源，只关 SpringDoc 关不掉 |
 | SQL 日志 | `NoLoggingImpl` | 避免日志膨胀与参数泄露 |
@@ -227,6 +240,45 @@ powershell -ExecutionPolicy Bypass -File .\bin\stop.ps1
 `java.exe -jar C:\lingxiao\lingxiao.jar --spring.profiles.active=prod`
 设为启动命令，工作目录设为 `C:\lingxiao`。
 
+### 6.4 内容门户（Node 20+）
+
+门户是独立进程，读 `portal/` 下的 Nuxt 产物，默认监听 `3000`。
+它自己把 `/api/**` 反代到 `NUXT_BACKEND_BASE`，所以只需要一个对外入口。
+
+```bash
+# Linux（systemd，推荐）
+sudo cp /opt/lingxiao/lingxiao-portal.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now lingxiao-portal
+sudo systemctl status lingxiao-portal
+
+# Linux（无 systemd）
+cd /opt/lingxiao
+export NUXT_BACKEND_BASE=http://127.0.0.1:8080
+export NUXT_PUBLIC_SITE_KEY=main
+export NUXT_PUBLIC_SITE_URL=https://www.example.com
+./bin/portal.sh start
+./bin/portal.sh status
+./bin/portal.sh stop
+```
+
+```powershell
+# Windows
+cd C:\lingxiao
+$env:NUXT_BACKEND_BASE = 'http://127.0.0.1:8080'
+$env:NUXT_PUBLIC_SITE_URL = 'https://www.example.com'
+powershell -ExecutionPolicy Bypass -File .\bin\portal.ps1 start
+```
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `PORT` | `3000` | 门户监听端口，Nginx 反代到这里 |
+| `NUXT_BACKEND_BASE` | `http://127.0.0.1:8080` | 后端地址，Nitro 用它转发 `/api/**` |
+| `NUXT_PUBLIC_SITE_KEY` | `main` | 对应后台「CMS → 站点」的 `siteKey` |
+| `NUXT_PUBLIC_SITE_URL` | `http://127.0.0.1:3000` | 对外访问地址，用于 canonical / og:url，**必须是公网域名** |
+
+> `NUXT_PUBLIC_*` 会影响服务端渲染出的 HTML，换域名后需要重启门户进程。
+
 ---
 
 ## 7. Nginx
@@ -240,11 +292,15 @@ sudo systemctl reload nginx
 
 关键点：
 
-- `root` 指向 `/opt/lingxiao/web`（前端 dist）；
-- `location /` 使用 `try_files ... /index.html` 支持 Vue Router history 模式；
-- `location /api/` 反代到 `127.0.0.1:8080`，保留 `/api` 前缀；
+- 示例里有**两个** `server`：`admin.example.com` 指向 `web/`（后台静态），
+  `www.example.com` 全部反代到门户 `127.0.0.1:3000`；
+- 后台 `root` 指向 `/opt/lingxiao/web`（前端 dist）；
+- 后台 `location /` 使用 `try_files ... /index.html` 支持 Vue Router history 模式；
+- 后台 `location /api/` 反代到 `127.0.0.1:8080`，保留 `/api` 前缀；
+- 门户整站交给 Node：HTML 由 SSR 输出，`/api/**` 由门户的 Nitro 代理再转后端，
+  所以门户的 server 块里不需要 `root`；
 - `client_max_body_size 20m` 与后端 `spring.servlet.multipart.max-request-size` 对齐；
-- 生产只开放 80/443，8080 不要暴露到公网；
+- 生产只开放 80/443，8080 与 3000 都不要暴露到公网；
 - 上线前加 TLS（certbot / 云厂商证书），并把 HTTP 301 到 HTTPS。
 
 ---
@@ -262,6 +318,9 @@ sudo systemctl reload nginx
 - [ ] `/doc.html`、`/v3/api-docs` 返回 404（生产不应暴露接口文档）。
 - [ ] `curl -fsS http://127.0.0.1:8080/api/admin/auth/captcha` 返回 200。
 - [ ] Nginx 反代后 `/api` 正常，前端刷新深链不 404。
+- [ ] 门户进程已启动（`portal.sh status`），首页、栏目、文章详情、`/robots.txt`、`/sitemap.xml` 均为 200。
+- [ ] 门户里 `/api/portal/cms/sites/{siteKey}` 返回站点而不是 502（说明 `NUXT_BACKEND_BASE` 与 `siteKey` 都对）。
+- [ ] `NUXT_PUBLIC_SITE_URL` 是公网域名，页面 `canonical` 与小程序的分享链接一致。
 - [ ] 日志目录、上传目录有写权限，磁盘剩余空间足够。
 - [ ] MySQL 已配置定期备份；`data/upload` 与数据库一起备份。
 - [ ] 防火墙只开放 22 / 80 / 443。
@@ -273,10 +332,12 @@ sudo systemctl reload nginx
 升级：
 
 ```bash
-sudo systemctl stop lingxiao
+sudo systemctl stop lingxiao lingxiao-portal
 sudo cp lingxiao-1.0.1.jar /opt/lingxiao/lingxiao.jar
 sudo cp -R lingxiao-1.0.1/web/. /opt/lingxiao/web/
-sudo systemctl start lingxiao
+sudo mv /opt/lingxiao/portal /opt/lingxiao/portal.bak-$(date +%F)
+sudo cp -R lingxiao-1.0.1/portal /opt/lingxiao/portal
+sudo systemctl start lingxiao lingxiao-portal
 ```
 
 Flyway 在启动时自动执行新增迁移。**不要手工改已执行过的迁移文件**，
@@ -330,6 +391,10 @@ tar -czf upload-$(date +%F).tar.gz -C /opt/lingxiao data/upload
 | 中文乱码 | 数据库 / 表 / 连接串统一 `utf8mb4`；JVM 已有 `-Dfile.encoding=UTF-8` |
 | 时间差 8 小时 | JVM 时区、MySQL `serverTimezone=Asia/Shanghai`、Nginx 不影响时间 |
 | 日志太大 | 生产 `application-prod.yml` 已按 50MB 滚动、保留 30 份、总量 2GB |
+| 门户 502 / 空白页 | 后端没起或 `NUXT_BACKEND_BASE` 写错；先 `curl http://127.0.0.1:8080/api/admin/app/profile` |
+| 门户 `sitemap.xml` 502 | 后台没有 `siteKey` 匹配的启用站点，或站点下没有已发布内容 |
+| 门户起不来 `node: command not found` | 服务器没装 Node 20+；`NODE_BIN` 可指定绝对路径 |
+| 门户页面 canonical 指向 127.0.0.1 | `NUXT_PUBLIC_SITE_URL` 没设成公网域名，改完重启门户 |
 
 ---
 

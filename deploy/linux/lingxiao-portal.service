@@ -1,0 +1,42 @@
+# =====================================================================
+# LingXiao - systemd unit for the portal (Nuxt 3 SSR)
+# ---------------------------------------------------------------------
+# Install:
+#   sudo cp lingxiao-portal.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now lingxiao-portal
+#   sudo systemctl status lingxiao-portal
+#
+# Layout expected (the release package already matches it):
+#   /opt/lingxiao/portal/            <- lx-ui-portal/.output
+#   /opt/lingxiao/portal/server/index.mjs
+#
+# Adjust User / paths / env for your server. The portal needs Node 20+.
+# NUXT_PUBLIC_* values are baked into the HTML the visitor receives, so
+# they must be the public URLs, not internal ones.
+# =====================================================================
+[Unit]
+Description=LingXiao Portal (Nuxt 3 SSR)
+After=network-online.target lingxiao.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lingxiao
+Group=lingxiao
+WorkingDirectory=/opt/lingxiao/portal
+Environment="NODE_ENV=production"
+Environment="PORT=3000"
+Environment="NUXT_BACKEND_BASE=http://127.0.0.1:8080"
+Environment="NUXT_PUBLIC_SITE_KEY=main"
+Environment="NUXT_PUBLIC_SITE_URL=https://www.example.com"
+ExecStart=/usr/bin/node /opt/lingxiao/portal/server/index.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+LimitNOFILE=65535
+StandardOutput=append:/opt/lingxiao/logs/portal.out.log
+StandardError=append:/opt/lingxiao/logs/portal.err.log
+
+[Install]
+WantedBy=multi-user.target

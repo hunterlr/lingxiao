@@ -1078,10 +1078,10 @@ Flyway `V1~V42`；后台语言包自检 `missing=none`。
 
 | # | 缺口 | 证据 |
 |---|---|---|
-| A | 门户没有交付链路 | `deploy/package.ps1` / `.sh` 只打 `lx-ui-admin/dist`；`deploy/nginx/lingxiao.conf` 只有后台一个 server；`deploy/linux` 无门户进程单元。README 已把 v1.3 标为完成，但按 `deploy/` 部署不出门户 |
-| B | 生产配置未声明可选模块 | `deploy/config/application-prod.yml` 只写了 `generator` / `demo`；`cms` / `member` / `i18n` 走 jar 内默认值，部署方看不到开关 |
-| C | CI 不覆盖门户 | `.github/workflows/ci.yml` 只有后端矩阵与 `lx-ui-admin`；门户构建与后台语言包自检都没进 CI |
-| D | 数据库快照停在 V17 | `deploy/sql/lingxiao-1.0.0.sql` 为 24 张表；CMS / 会员 / 多语言的表都不在快照里。导入后启动仍会补跑 V18+，**不影响正确性**，只是“开箱即用”的价值在缩水 |
+| A | ~~门户没有交付链路~~ **已处理（2026-11-27，见 §12.31）** | `package.ps1` / `.sh` 带上门户 `.output`；新增 `portal.sh` / `portal.ps1` 与 `lingxiao-portal.service`；`nginx/lingxiao.conf` 增加门户 server 块 |
+| B | ~~生产配置未声明可选模块~~ **已处理** | `deploy/config/application-prod.yml` 显式写出 `cms` / `member` / `i18n` 三个开关（均 `true`，附关闭后的效果说明） |
+| C | ~~CI 不覆盖门户~~ **已处理** | `.github/workflows/ci.yml` 增加 `portal` job；`frontend` job 追加 `node scripts/check-i18n-keys.mjs` |
+| D | ~~数据库快照停在 V17~~ **已处理** | 用全新空库跑完 V1~V42 重新导出 `deploy/sql/lingxiao-1.4.0.sql`（57 张表 / 42 条迁移 / 157 菜单 / 33 参数 / 348 语言键），旧快照退役 |
 | E | ~~版本号未随功能推进~~ **已处理（2026-11-27）** | 根 `pom.xml`、BOM、全部子模块与两个前端 `package.json` 统一升到 `1.4.0-SNAPSHOT`；打包脚本默认版本改为 1.4.0。快照 `lingxiao-1.0.0.sql` 保持原名（它停在 V17） |
 | F | ~~尚无开源协议~~ **已处理（2026-11-27）** | 仓库根新增 `LICENSE`（MIT，© 2026 hunterlr）；README 中英、`package.json`、根 `pom.xml` 与 BOM 同步声明 |
 
@@ -1095,7 +1095,7 @@ Flyway `V1~V42`；后台语言包自检 `missing=none`。
 
 | 顺序 | 切片 | 范围 | 排序理由 | 适合交给谁 |
 |---|---|---|---|---|
-| 1 | v1.3 门户交付收口 | 缺口 A + B + C + D：打包带门户、门户进程脚本与 systemd、Nginx 门户 server、prod 配置显式模块开关、CI 加门户构建与语言包自检、快照刷到 V42 | 部署不了已标完成的能力；全是规则明确的机械活 | 便宜模型 |
+| 1 | ~~v1.3 门户交付收口~~ | 缺口 A + B + C + D：打包带门户、门户进程脚本与 systemd、Nginx 门户 server、prod 配置显式模块开关、CI 加门户构建与语言包自检、快照刷到 V42 | ✅ **已完成（2026-11-27，见 §12.31）** | — |
 | 2 | 会员消息通知 | 站内信表、评论审核结果通知、门户未读角标 | §12.20、§12.21 两次写了“下一步：消息通知”后顺延；完全沿用会员模块现有模式 | 便宜模型 |
 | 3 | 会员资料收尾 | 门户头像上传接文件中心（`/api/app/profile/avatar`）、会员会话管理（在线设备 / 踢下线） | `docs/31` §9 遗留；与第 2 项同模块，连着做省上下文 | 便宜模型 |
 | 4 | 多语言后半段 | 门户前端接 `/api/portal/i18n/**` → CMS 内容翻译 → `/{lang}/` 前缀 + hreflang + 多语言 sitemap | 内容翻译模型要先定（`docs/15` §10），**设计用强模型，实现可下放** | 先设计后实现 |
@@ -1107,8 +1107,8 @@ Flyway `V1~V42`；后台语言包自检 `missing=none`。
 
 ### 12.30 下一窗口启动提示词（第 1 项：门户交付收口）
 
-> 写给执行力强、但不喜欢自己拿主意的模型：范围、顺序、验收都定死。
-> 做第 2 项及之后，按同样结构另写一节，不要复用这一段。
+> **已执行（2026-11-27）**，结果见 §12.31。下面是当时的原文，保留作提示词模板；
+> 做第 2 项（会员消息通知）时按同样结构另写一节，不要复用这一段。
 
 ```text
 在仓库 E:\java\lingxiao 完成 v1.3 门户交付收口：只补部署与 CI，不做任何新功能。
@@ -1158,3 +1158,50 @@ lx-ui-portal/README.md 的「构建与部署」、lx-ui-portal/nuxt.config.ts。
 - 后台与门户 npm run build 通过，check-i18n-keys 输出 missing=none；
 - 最后 git commit（不要 push，除非我明确要求），完成后列出验收结果与遗留。
 ```
+
+### 12.31 v1.3 门户交付收口（✅ 已完成，2026-11-27）
+
+**为什么先做这一项**：README 已把 v1.3 标为功能完成，但按 `deploy/` 根本部署不出门户——
+打包脚本只复制后台 dist，Nginx 示例只有后台一个 server，CI 也不构建门户。
+先把“已声明能力”补齐，再谈新功能。
+
+**落地**：
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 打包 | `deploy/package.ps1` / `package.sh` | 增加门户 `.output` → 包内 `portal/`；缺产物时报错并提示先 `npm run build`；同时复制 `lingxiao-portal.service` |
+| 进程 | `deploy/linux/portal.sh`、`deploy/windows/portal.ps1` | `start|stop|restart|status`，pid 写 `run/portal.pid`、端口写 `run/portal.port`（`status` 显示真实端口） |
+| 进程 | `deploy/linux/lingxiao-portal.service` | systemd 单元：`WorkingDirectory=/opt/lingxiao/portal`，`PORT` / `NUXT_BACKEND_BASE` / `NUXT_PUBLIC_*` 走环境变量 |
+| Nginx | `deploy/nginx/lingxiao.conf` | 新增 `lingxiao_portal` upstream 与 `www.example.com` server（全站反代 3000，不设 `root`） |
+| 配置 | `deploy/config/application-prod.yml` | 显式声明 `cms` / `member` / `i18n` 三个开关，并注明关闭后的效果 |
+| CI | `.github/workflows/ci.yml` | 新增 `portal` job（Node 20 + `npm ci` + `npm run build`）；`frontend` job 追加语言包自检 |
+| 快照 | `deploy/sql/lingxiao-1.4.0.sql` | 全新空库跑完 V1~V42 后导出：57 张表 / 42 条迁移 / 157 菜单 / 33 参数 / 348 语言键；旧 `lingxiao-1.0.0.sql` 退役 |
+| 文档 | `deploy/README.md`、`docs/27`、`docs/26` §6、`lx-ui-portal/README.md`、README 中英 | 交付物、门户部署、环境变量、快照数字、CI 说明同步 |
+
+**验收（本机实跑，2026-11-27）**：
+
+```text
+打包          bash deploy/package.sh 1.4.0-check   → 62 MB 目录 / 50 MB tar.gz
+包内结构      portal/server/index.mjs ✔  web/index.html ✔  bin 10 个脚本 ✔  2 个 service ✔
+门户启动      PORT=3100 NUXT_BACKEND_BASE=http://127.0.0.1:8090 ./bin/portal.sh start
+              status 输出 "pid 1752, port 3100"（端口来自 run/portal.port）
+路由          / 200、/category/news 200、/article/{id} 200、/sitemap.xml 200、/robots.txt 200
+              /api/portal/cms/sites/main 200（Nitro 代理到后端成功）
+SSR 内容      首页 37 KB，含站点名与栏目名；文章页含正文；sitemap 有 3 条 <loc>
+快照          导入全新库：57 张表、42 条迁移、157 菜单、33 参数、348 语言键，0 报错
+后端          mvn -o test 312 项 0 失败；全新库启动 Flyway 一次跑到 v42
+```
+
+**未实跑（如实记录）**：`nginx -t`（本机没有 Nginx）、`lingxiao-portal.service`（本机没有
+systemd）、Windows 的 `portal.ps1`（沙箱里 `Start-Process` 起 Node 受权限限制，只做了语法与
+分支走查）。三项都按现有 `lingxiao.service` / `start.ps1` 的写法对齐，风险低但需在目标机复核。
+
+**顺带发现**：
+
+| 现象 | 说明 |
+|---|---|
+| 门户未配置站点时 `sitemap.xml` / `rss.xml` 返回 502 | `Nitro` 路由直接抛错。建议改成“没有站点就输出空 `urlset` 并返回 200”，避免爬虫把整站判为故障；排进 §12.29 第 2 项一起做 |
+| `portal.sh` 的 pid 是 MSYS 包装进程号 | 只影响 Windows 下用 `.sh` 调试；生产 Linux 上 `$!` 就是 node 进程，Windows 请用 `portal.ps1` |
+
+**下一步**：§12.29 第 2 项「会员消息通知」（站内信 + 评论审核结果通知 + 门户未读角标），
+顺带修上面的 sitemap 502。

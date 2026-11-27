@@ -192,7 +192,7 @@ npm run dev
 
 > Windows PowerShell 里设置环境变量用 `$env:DB_PORT="3306"`。
 > 想跳过逐条迁移、直接拿到带菜单和参数的完整数据，可以导入版本快照
-> [`deploy/sql/lingxiao-1.0.0.sql`](deploy/sql/lingxiao-1.0.0.sql)。
+> [`deploy/sql/lingxiao-1.4.0.sql`](deploy/sql/lingxiao-1.4.0.sql)。
 
 **常用配置**
 

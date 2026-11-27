@@ -4,8 +4,7 @@
 >
 > 结论：v1.0 基线 + v1.1 CMS + v1.2 会员 + v1.3 / v1.4 的模型 / 模板 / 多语言共 **312 个单测（53 个测试类）**，
 > 完全不依赖 MySQL / Redis，`mvn test` 一条命令跑完（JDK 8 本机约 30 秒）；
-> 再用 GitHub Actions 覆盖 JDK 8/11/17 与后台前端构建。
-> 门户构建与后台语言包自检**还没进 CI**，见 `docs/13` §12.28 缺口 C。
+> GitHub Actions 覆盖 JDK 8/11/17、后台构建 + 语言包自检、门户构建。
 
 ---
 
@@ -209,7 +208,8 @@ mvn -B -ntp -DskipTests package
 | Job | 内容 | 目的 |
 |---|---|---|
 | `backend` | 矩阵 JDK **8 / 11 / 17**；`mvn -B -ntp test`；JDK 8 额外 `package` | 证明同一份源码在三个 LTS 上都能编译、测试、打包 |
-| `frontend` | Node 20；`npm ci` + `npm run build` | 证明前端锁文件可复现、构建不依赖本机缓存 |
+| `frontend` | Node 20；`npm ci` + `node scripts/check-i18n-keys.mjs` + `npm run build` | 证明后台锁文件可复现、构建不依赖本机缓存，且中英文案键集合一致 |
+| `portal` | Node 20；`npm ci` + `npm run build` | 证明门户工程能独立构建；`nuxt build` 不连后端也不需要数据库 |
 
 触发条件：
 
@@ -220,7 +220,8 @@ mvn -B -ntp -DskipTests package
 构建产物：
 
 - `surefire-jdk8/11/17`：各 JDK 的测试报告（保留 7 天）；
-- `lx-ui-admin-dist`：前端 `dist`（保留 7 天）。
+- `lx-ui-admin-dist`：后台 `dist`（保留 7 天）；
+- `lx-ui-portal-output`：门户 `.output`（保留 7 天）。
 
 ### 6.1 启用前提
 
@@ -231,8 +232,8 @@ mvn -B -ntp -DskipTests package
 2. 在仓库 `Settings → Actions → General` 允许 Actions 运行；
 3. 首次 push 到 `main` / `master`，或在 Actions 页手动 `Run workflow`。
 
-**CI 目前不覆盖的部分**（见 `docs/13` §12.28 缺口 C）：门户 `lx-ui-portal` 的构建、
-后台 `node scripts/check-i18n-keys.mjs` 语言包自检。这两项现在只靠提交前手工执行。
+**CI 覆盖的是“能不能构建 + 单测有没有破”**，不替代发布前回归：
+接口脚本（`.local/*-check.mjs`）与浏览器走查仍要人工跑。
 
 私有仓库的 Actions 分钟数按账号套餐计算；只跑 `mvn test` + `npm run build`，
 单次约 3~5 分钟（含 Maven / npm 缓存命中）。

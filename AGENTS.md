@@ -44,6 +44,9 @@ node scripts/check-i18n-keys.mjs
 # 门户：构建（在 lx-ui-portal 下）
 npm run build
 
+# 打包发布包（需要先有 jar / 后台 dist / 门户 .output）
+bash deploy/package.sh 1.4.0
+
 # 本地联调：临时关闭验证码（只用于自动化脚本，生产禁止）
 java -jar lx-boot/target/lingxiao.jar --lx.captcha.enabled=false
 ```
@@ -58,6 +61,11 @@ java -jar lx-boot/target/lingxiao.jar --lx.captcha.enabled=false
   `JAVA_HOME=D:\Program Files\Java\jdk1.8.0_351`，并把它的 `bin` 放到 `PATH` 最前面。
 - **git**：换个用户执行 `git` 会报 `dubious ownership`。用
   `git config --global --add safe.directory E:/java/lingxiao` 处理；只加这一个目录，不要配置 `safe.directory=*`。
+- **沙箱里的 `bash` 和 `npm` 都是坏的**：`bash` 指向 Windows 的 WSL 存根，
+  `npm` 是 fnm 的包装脚本（`uname` 返回 Linux 会去调 `wslpath`）。
+  跑 shell 脚本用 `/usr/bin/bash deploy/package.sh`；
+  构建前端改用 `node lx-ui-portal/node_modules/nuxt/bin/nuxt.mjs build`
+  或 `node <pkg 目录>/node_modules/npm/bin/npm-cli.js run build`。
 
 ## 4. 硬约束（违反即返工）
 

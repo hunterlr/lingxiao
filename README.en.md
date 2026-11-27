@@ -181,7 +181,7 @@ The portal's Nitro server proxies `/api/**` to `NUXT_BACKEND_BASE` (default `htt
 
 > On Windows PowerShell, set environment variables with `$env:DB_PORT="3306"`.
 > To skip incremental migrations and start with the full menu and settings data, import the
-> snapshot [`deploy/sql/lingxiao-1.0.0.sql`](deploy/sql/lingxiao-1.0.0.sql).
+> snapshot [`deploy/sql/lingxiao-1.4.0.sql`](deploy/sql/lingxiao-1.4.0.sql).
 
 **Configuration**
 

@@ -82,6 +82,11 @@ jobs:
       - name: Install
         run: npm ci
 
+      # zh-CN / en-US 键集合必须一致，源码里 t('xxx') 引用的键必须存在。
+      # 脚本是纯 Node，不依赖浏览器也不依赖后端。
+      - name: Check i18n keys
+        run: node scripts/check-i18n-keys.mjs
+
       - name: Build
         run: npm run build
 
@@ -90,4 +95,35 @@ jobs:
         with:
           name: lx-ui-admin-dist
           path: lx-ui-admin/dist
+          retention-days: 7
+
+  portal:
+    name: Portal / build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lx-ui-portal
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: lx-ui-portal/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload output
+        uses: actions/upload-artifact@v4
+        with:
+          name: lx-ui-portal-output
+          path: lx-ui-portal/.output
+          if-no-files-found: error
           retention-days: 7

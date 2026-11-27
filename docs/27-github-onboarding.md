@@ -58,7 +58,7 @@ $z.Dispose()
 | `lx-ui-admin/`（不含 `node_modules/` `dist/`） | ✅ | 前端源码、`package-lock.json`、`.env.development` |
 | `docs/` `deploy/` `README.md` `.github/` | ✅ | 文档、部署脚本、CI |
 | 各模块 `src/test/` | ✅ | 112 项单测 |
-| `deploy/sql/lingxiao-1.0.0.sql` | ✅ | 50 KB 数据库快照，clone 后可直接导入（见 3.3 方式 B） |
+| `deploy/sql/lingxiao-1.4.0.sql` | ✅ | 290 KB 数据库快照，clone 后可直接导入（见 3.3 方式 B） |
 | `lx-ui-admin/public/ueditor-plus/` | ❌ | `prebuild` 从 npm 包生成，不入库 |
 | `target/` `dist/` `release/` | ❌ | 构建产物，重新生成 |
 | `data/upload/` | ❌ | 本地上传文件，不随代码走 |
@@ -147,7 +147,7 @@ cd lingxiao
 | 文件 | 作用 |
 |---|---|
 | `init-db.sql` | 建库、建应用账号、授权（必须执行） |
-| `lingxiao-1.0.0.sql` | v1.0.0 数据库快照：23 张业务表 + `flyway_schema_history` + 初始数据（可选） |
+| `lingxiao-1.4.0.sql` | v1.4.0 数据库快照：56 张业务表 + `flyway_schema_history` + 初始数据（可选） |
 
 第 1 步，建库建号：
 
@@ -168,20 +168,21 @@ mysql -uroot -p < deploy/sql/init-db.sql
 **方式 B（想要“开箱即用”的现成数据）：导入快照。**
 
 ```bash
-mysql -uroot -p < deploy/sql/lingxiao-1.0.0.sql
+mysql -uroot -p < deploy/sql/lingxiao-1.4.0.sql
 # 或者用应用账号（库已存在即可，不需要 CREATE DATABASE 权限）
-mysql -h127.0.0.1 -P3306 -ulingxiao -p lingxiao < deploy/sql/lingxiao-1.0.0.sql
+mysql -h127.0.0.1 -P3306 -ulingxiao -p lingxiao < deploy/sql/lingxiao-1.4.0.sql
 ```
 
 快照里已经包含：
 
 | 内容 | 数量 / 说明 |
 |---|---|
-| 表 | 24 张（23 张业务表 + `flyway_schema_history`） |
-| Flyway 记录 | 17 条（V1~V17）。快照停在 v1.0 发布时的状态，**尚未刷新**：首次启动会补执行 V18 起的全部迁移，CMS / 会员 / 多语言的表在这一步创建（刷新计划见 `docs/13` §12.29 第 1 项） |
-| 菜单 / 角色授权 | 64 条菜单 + 64 条角色菜单 |
-| 参数 / 字典 / 任务 / 公告 | 10 / 3+7 / 1 / 1 |
-| 账号 | `admin` / `admin123` |
+| 表 | 57 张（56 张业务表 + `flyway_schema_history`） |
+| Flyway 记录 | 42 条（V1~V42，与当前代码一致，导入后没有待执行迁移） |
+| 菜单 / 角色授权 | 157 条菜单（含 CMS、会员、多语言），已授权给超级管理员 |
+| 参数 / 字典 / 任务 / 公告 | 33 / 3+7 / 1 / 1 |
+| 多语言键 | 348 个（zh-CN / en-US，已发布） |
+| 站点 / 栏目 / 文章 | **无**，门户需要先建站点（`siteKey=main`）并发布内容 |
 
 导入时注意三点：
 
@@ -190,7 +191,7 @@ mysql -h127.0.0.1 -P3306 -ulingxiao -p lingxiao < deploy/sql/lingxiao-1.0.0.sql
 3. 登录日志 / 操作日志 / 文件记录 / 代码生成临时表已清空，所以首页统计是 0、文件中心是空列表，这是正常的。
 
 > 两种方式不能叠加：已经用 A 跑过一次、库里已有表之后，再导 B 也没关系（B 是覆盖），
-> 但反过来先导 B 再启动，Flyway 会补执行 V18 及之后尚未执行的迁移，不会重建已有的表。
+> 但反过来先导 B 再启动，Flyway 会按 `flyway_schema_history` 校验，不会重复执行迁移（快照已是最新 V42）。
 
 ### 3.4 启动后端
 
@@ -367,7 +368,7 @@ robocopy .local\uitest $dst\uitest *.mjs package.json package-lock.json fixtures
 | Flyway 报 checksum mismatch | 改过已经执行过的 `V*.sql`；不要改历史脚本，新增 `V15__xxx.sql` |
 | 前端 401 / 接口 404 | 后端没起或端口不是 8080；检查 `.env.development` 的 `VITE_PROXY_TARGET` |
 | 上传图片 404 | `lx.file.local-path` 相对启动目录；确认 `data/upload` 可写 |
-| 导完 `lingxiao-1.0.0.sql` 后首页统计是 0、文件中心空 | 正常：快照里日志与文件记录已清空，快照只保证菜单 / 角色 / 参数等基础数据 |
+| 导完 `lingxiao-1.4.0.sql` 后首页统计是 0、文件中心空 | 正常：快照里日志与文件记录已清空，快照只保证菜单 / 角色 / 参数等基础数据 |
 | 导入快照报 `Table 'lingxiao.xxx' already exists` | 快照里是 `DROP TABLE IF EXISTS`，正常不会报；若手工改过文件，改用方式 A 重建空库 |
 | `npm ci` 失败 | Node 版本过低（需 18+）；或 `package-lock.json` 与 `package.json` 不同步 |
 | `mvn package` 报 `Unable to rename ... lingxiao.jar` | Windows 下后端正从该 jar 运行；先停服务再打包 |

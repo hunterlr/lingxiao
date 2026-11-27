@@ -6276,3 +6276,71 @@ mvn -o test（JDK 8）                   312 项 / 53 类，0 失败
 |---|---|---|
 | 改版本号后 `mvn package` 报 `No compiler is provided in this environment` | 默认 `java` 是 JRE（`jre1.8.0_351`）；之前单测能过是因为类文件没过期，这次依赖版本变了触发重编译 | 构建前设 `JAVA_HOME` 指向 `jdk1.8.0_351`；已写进 `AGENTS.md` |
 | 沙箱用户执行 `git` 报 `dubious ownership`，且没有提交身份 | 仓库属于另一个系统用户 | 逐次用 `-c safe.directory=… -c user.name=… -c user.email=…`，不改全局配置 |
+
+## 65. v1.3 门户交付收口（2026-11-27）
+
+### 65.1 一句话结论
+
+门户从“代码能跑”补成“能交付”：发布包带上门户产物与启停脚本、Nginx 有了门户 server、
+生产配置显式声明三个模块开关、CI 开始构建门户、数据库快照刷到 V42 并实测可导入。
+没有改任何 Java / SQL 业务代码。
+
+### 65.2 代码落点
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 打包 | `deploy/package.ps1` / `.sh` | 复制 `lx-ui-portal/.output` → 包内 `portal/`；缺产物直接报错；多复制一个 service |
+| 进程 | `deploy/linux/portal.sh`、`deploy/windows/portal.ps1` | 一个脚本四个动作；pid / 端口分别写 `run/portal.pid`、`run/portal.port` |
+| 进程 | `deploy/linux/lingxiao-portal.service` | 与 `lingxiao.service` 同风格；门户依赖后端先起 |
+| Nginx | `deploy/nginx/lingxiao.conf` | 新增门户 server，全站反代 3000，`/api/**` 交给 Nitro |
+| 配置 | `deploy/config/application-prod.yml` | `cms` / `member` 进 `modules` Map，`i18n` 按独立开关写 |
+| CI | `.github/workflows/ci.yml` | `portal` job + `frontend` 里的语言包自检 |
+| 快照 | `deploy/sql/lingxiao-1.4.0.sql` | 全新库导出；旧的 `lingxiao-1.0.0.sql` 退役 |
+
+### 65.3 关键决策
+
+1. **门户脚本用 `start|stop|restart|status` 子命令，而不是再拆四个文件**：
+   后台的四件套保持原样（运维已经习惯），门户是新增进程，一个脚本更好记；
+   打包脚本按 `*.sh` / `*.ps1` 通配复制，不需要再改。
+2. **门户产物缺失时让打包失败**：宁可打不出包，也不要出一个“看起来完整、点进去 502”的包。
+   与后台 `dist` 的判断口径一致。
+3. **Nginx 门户块不写 `root`**：SSR 的 HTML 由 Node 出，静态资源也在 `.output/public`，
+   由 Nitro 自己处理；Nginx 只负责反代与 TLS。
+4. **快照用全新空库生成，不用开发库**：开发库有测试账号、日志、演示内容，
+   导出去会把这些带到客户环境；空库只有迁移自带的种子数据，天然干净。
+5. **快照改名 1.4.0 而不是继续叫 1.0.0**：版本号已经升到 1.4.0，快照内容也到 V42，
+   继续叫 1.0.0 只会误导。
+
+### 65.4 验证
+
+```text
+mvn -o test（JDK 8）                      312 项 / 53 类，0 失败
+全新空库启动 1.4.0                          Flyway V1~V42 一次跑通，now at version v42
+mysqldump → 导入另一个空库                  57 张表、42 条迁移、157 菜单、33 参数、348 语言键，0 报错
+deploy/package.sh 1.4.0-check              成功；包内 portal/、web/、bin（10 个）、2 个 service 齐全
+包内 portal.sh 启停                         start / status（端口 3100）/ stop 均正常
+门户路由                                    /、/category/news、/article/{id}、/sitemap.xml、/robots.txt 全 200
+SSR 内容                                    首页 37 KB 含站点名与栏目名；文章页含正文；sitemap 3 条 <loc>
+Nitro 代理                                  /api/portal/cms/sites/main 200
+```
+
+未实跑：`nginx -t`、systemd 单元、Windows `portal.ps1` 的进程启停（本机无 Nginx / systemd，
+沙箱不允许 `Start-Process` 起 Node）。三项按现有脚本写法对齐，需在目标机复核。
+
+### 65.5 踩坑（都是本机环境，不影响服务器）
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `bash deploy/package.sh` 输出“适用于 Linux 的 Windows 子系统没有已安装的分发版” | 沙箱 PATH 里 `bash` 指向 `C:\Windows\System32\bash.exe`（WSL 存根） | 用 `/usr/bin/bash` 执行脚本 |
+| `npm run build` 同样报 WSL 错误 | fnm 的 `npm` 是 shell 包装脚本，`uname` 在沙箱里返回 Linux，被当成 WSL 去调 `wslpath` | 直接 `node node_modules/nuxt/bin/nuxt.mjs build` |
+| `mvn package` 报 `No compiler is provided` | 默认 `java` 是 JRE | `JAVA_HOME` 指向 `jdk1.8.0_351` |
+| 打包脚本 `rm -rf release/lingxiao-1.4.0` 报 `Device or resource busy` | 上一次调试时 shell 停在该目录 / 遗留 node 进程占着句柄 | 换版本标签（`1.4.0-check`）验证；`release/` 不入库，删除时机交给系统 |
+| `portal.sh stop` 后 node 仍在 | Windows 下 `$!` 是 MSYS 包装进程号，不是 `node.exe` 的 pid | 生产 Linux 无此问题；Windows 请用 `portal.ps1`（`Start-Process` 拿真实 pid） |
+
+### 65.6 遗留
+
+| 项 | 处理 |
+|---|---|
+| 门户无站点时 `sitemap.xml` / `rss.xml` 返回 502 | 改成空 `urlset` + 200，排进下一项一起做 |
+| 快照里没有演示内容 | 有意为之，门户需先在后台建站点 |
+| 本机 `release/lingxiao-1.4.0` 残留目录删不掉 | 句柄释放后手工删或忽略（不入库） |

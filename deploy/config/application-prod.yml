@@ -82,6 +82,17 @@ lx:
         enabled: false
       demo:
         enabled: false
+      # 内容管理：接口与 cms_* 迁移按此开关加载。
+      # 还没准备好内容时可先置 false；已有数据不受影响，重开即用。
+      cms:
+        enabled: true
+      # 前台会员：false = /api/app/** 与 /api/admin/member 都不装配（登录、评论、互动全部 404）
+      member:
+        enabled: true
+    # 多语言是独立开关，不在 modules Map 里（与 lx-boot/application.yml 一致）。
+    # false = i18n_* 表不迁移、/api/admin/i18n 与 /api/portal/i18n 不加载、门户回落资源包文案
+    i18n:
+      enabled: true
   file:
     storage: local
     # 相对路径按进程工作目录解析；start 脚本会把工作目录设为应用根目录

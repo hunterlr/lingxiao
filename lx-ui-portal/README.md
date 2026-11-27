@@ -159,6 +159,10 @@ $env:NUXT_PUBLIC_SITE_URL='https://www.example.com'
 node .output/server/index.mjs
 ```
 
+发布包把它放在 `portal/`（即 `.output` 的内容），由 `bin/portal.sh` / `bin/portal.ps1`
+（`start|stop|restart|status`）或 `lingxiao-portal.service` 托管；Nginx 只反代到 Node 进程，
+不再单独转发 `/api/**`。完整步骤见 `deploy/README.md` §6.4。
+
 生产建议 Nginx 反代门户 Node 进程，并把 `/api/**` 一并交给门户的 Nitro 代理；
 如果直接由 Nginx 转发 `/api/**` 到后端，也可以保留门户内的代理作为本地开发兜底。
 

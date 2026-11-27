@@ -3,6 +3,11 @@
 > 基准：2026-11-16 启动，**AI 辅助开发为主（核心 2~3 人 + AI 助手）**，完整版约 6~8 个月。
 > **v1.0 只做后台基座（6 周，见 `17-v1-plan.md`）**；含 CMS / 门户的 MVP 约 3~4 个月，CMS / 会员 / 门户按 `20-cms-embed-plan.md` 以模块嵌入。
 > 排期按“契约先行 + 代码生成 + 并行 + 阶段门禁”估算，实际以 AI 采用度与评审效率校准。
+>
+> **状态（2026-11-27 复核）**：实际进度远快于下文排期——P1 基座、P2 CMS、P3 会员主体、
+> 门户（首页 / 栏目 / 详情 / 搜索 / SEO / 会员中心）、P2.5 的数据库语言包均已在
+> 2026-11-15 ~ 11-26 完成，逐项记录见 **§12**。§1~§3 的周期、甘特图与里程碑日期是
+> 2026-11-16 的原始估算，保留备查，**不再作为承诺日期**；当前待办与下一步见 §12.28 / §12.29。
 
 ---
 
@@ -190,11 +195,15 @@ gantt
 
 ## 8. 阶段门禁
 
+> 以下勾选项是 2026-11-16 的口径，未逐项回填；实际验收记录以 §12 各节为准。
+> 其中涉及 `tenant_id` / `TenantContext` 的条目已被 `17` §3.4.1 的决策取代。
+
 ### P0 → P1
 
 - [ ] 双账号 Demo：后台 / 会员 Token 互不通用。
 - [ ] 模块开关 Demo：关闭 CMS 后接口 404、Bean 不加载。
-- [ ] 单租户 Demo：`tenant_id` 默认 0、`TenantContext` 常驻、关闭 `saas` 时无租户表 / 接口。
+- [ ] ~~单租户 Demo：`tenant_id` 默认 0、`TenantContext` 常驻、关闭 `saas` 时无租户表 / 接口。~~
+      **已作废**：平台后台不引入隔离列与租户上下文，改以“关闭任意可选模块后基座仍能启动”验证（见 §12.7）。
 - [ ] JDK 8/11/17 同一 jar 启动。
 - [ ] jar 直部署 Demo：`java -jar` + Nginx + MySQL / Redis。
 - [ ] 图片上传 → 裁剪 → 水印 Demo。
@@ -340,7 +349,8 @@ gantt
 - 不要重复造轮子：权限、菜单、分页、上传、Excel、工作流引擎、富文本内核、流程设计器全部复用成熟组件。
 - 不要引入 GPL / AGPL / SSPL 组件而不做合规评估；调度不用 XXL-Job，搜索不用 Elasticsearch，CMS 内核不用 Halo。
 - 不要首发 Docker / K8s 自动化，jar 能上线就先上线。
-- 不要首发 SaaS；但必须保留 `tenant_id` 与 `TenantContext`。
+- 不要首发 SaaS；租户应用**独立立项**，平台后台不带 `tenant_id` / `TenantContext`
+  （原“必须保留 `tenant_id` 与 `TenantContext`”的说法已作废，见 `17` §3.4.1）。
 - 不要让 AI 生成的代码跳过评审、测试与依赖扫描。
 - 不要首发全量静态化集群。
 - 不要首发复杂计费 / 支付。
@@ -458,6 +468,9 @@ tool:gen:import|edit|preview|remove|download
 开启后两个 Token 都可用；停用 / 重置 / 删除后旧 Token 立即 401。
 
 ### 12.3 P1：L2 多语言设计（只写方案，v1.2 再实现）
+
+> 后续：方案已按 §12.27 落地为独立模块 `lx-module-i18n`（v1.4 第二刀）；
+> CMS 内容翻译、`/{lang}/` 前缀与 hreflang 仍未做，见 §12.29 待办池第 4 项。
 
 - `docs/15-i18n.md` 定稿：`i18n_language` / `i18n_key` / `i18n_text` 三张表；
 - 明确哪些翻译：字典 `label`、参数名 / 说明、菜单名、公告标题 / 正文、CMS 内容；
@@ -1044,3 +1057,104 @@ sitemap 最多 500 篇文章且不含单页；RSS 只出最近 30 篇摘要。
 暂不建 `i18n_namespace`；后台前端语言包仍为文件形式。
 
 详见 `docs/15-i18n.md` §8.2 / §13 / §20.1 与 `docs/23-i18n-plan.md` §10.5。
+
+### 12.28 复核：文档与交付链路缺口（2026-11-27）
+
+**基线**：提交 `705030b`，工作区干净；`mvn -o -B -ntp test` **312 项 / 53 类，0 失败**（JDK 8）；
+Flyway `V1~V42`；后台语言包自检 `missing=none`。
+
+**本次已同步的文档**：
+
+| 位置 | 修正 |
+|---|---|
+| `README.md` / `README.en.md` | 测试数 126 → 312；路线图状态；补 CMS 第三 / 四刀、会员后续刀、多语言模块、门户；目录结构与接口一览 |
+| `AGENTS.md`（新增） | 仓库约定：先读什么、开工自检、命令、硬约束、编号段、交付前检查（对应 §4.1 第 5 条） |
+| `docs/21` | §0 速览补齐；追加 §63 补记 11-23 ~ 11-26；§62.6 过期遗留回填 |
+| `docs/26` | 测试清单 182 项 / 31 类 → 312 项 / 53 类；CI“尚未 git init”过期说明 |
+| `docs/20` / `docs/31` / `docs/27` / `deploy/README.md` / `docs/17` | “待开工 / 等 CMS 第三刀 / V1~V18”等过期状态改为现状 |
+| 本文 | 头部状态说明；§8 作废的租户门禁；§11 租户口径；§12.3 后续说明 |
+
+**仍未补、需要动代码或环境的缺口**（按影响排序）：
+
+| # | 缺口 | 证据 |
+|---|---|---|
+| A | 门户没有交付链路 | `deploy/package.ps1` / `.sh` 只打 `lx-ui-admin/dist`；`deploy/nginx/lingxiao.conf` 只有后台一个 server；`deploy/linux` 无门户进程单元。README 已把 v1.3 标为完成，但按 `deploy/` 部署不出门户 |
+| B | 生产配置未声明可选模块 | `deploy/config/application-prod.yml` 只写了 `generator` / `demo`；`cms` / `member` / `i18n` 走 jar 内默认值，部署方看不到开关 |
+| C | CI 不覆盖门户 | `.github/workflows/ci.yml` 只有后端矩阵与 `lx-ui-admin`；门户构建与后台语言包自检都没进 CI |
+| D | 数据库快照停在 V17 | `deploy/sql/lingxiao-1.0.0.sql` 为 24 张表；CMS / 会员 / 多语言的表都不在快照里。导入后启动仍会补跑 V18+，**不影响正确性**，只是“开箱即用”的价值在缩水 |
+| E | 版本号未随功能推进 | 根 `pom.xml` 仍是 `1.0.0-SNAPSHOT`，jar 内 `lx.app.version` 也随之是 1.0.0，而功能已到 v1.3 / v1.4 |
+| F | 尚无开源协议 | README 写“保留所有权利”，但仓库已公开并征集 Issue / PR |
+
+> 说明：`.local/*-check.mjs` 验收脚本全部不入库，换机器不可复现。这是有意为之
+> （脚本含本机端口与测试账号），不算缺口；需要复现时按 `docs/21` 各节描述重写。
+
+### 12.29 待办池（建议顺序）
+
+排序原则沿用 §12 开头：**先补“已声明能力与实现之间的缺口”，再做新功能**；
+每一项都写成能独立验收的切片。
+
+| 顺序 | 切片 | 范围 | 排序理由 | 适合交给谁 |
+|---|---|---|---|---|
+| 1 | v1.3 门户交付收口 | 缺口 A + B + C + D：打包带门户、门户进程脚本与 systemd、Nginx 门户 server、prod 配置显式模块开关、CI 加门户构建与语言包自检、快照刷到 V42 | 部署不了已标完成的能力；全是规则明确的机械活 | 便宜模型 |
+| 2 | 会员消息通知 | 站内信表、评论审核结果通知、门户未读角标 | §12.20、§12.21 两次写了“下一步：消息通知”后顺延；完全沿用会员模块现有模式 | 便宜模型 |
+| 3 | 会员资料收尾 | 门户头像上传接文件中心（`/api/app/profile/avatar`）、会员会话管理（在线设备 / 踢下线） | `docs/31` §9 遗留；与第 2 项同模块，连着做省上下文 | 便宜模型 |
+| 4 | 多语言后半段 | 门户前端接 `/api/portal/i18n/**` → CMS 内容翻译 → `/{lang}/` 前缀 + hreflang + 多语言 sitemap | 内容翻译模型要先定（`docs/15` §10），**设计用强模型，实现可下放** | 先设计后实现 |
+| 5 | 工作流 / 多库 / SaaS | P4、P2.5 多库、P6 | 都要先出方案与选型验证（`docs/08` / `14` / `10`），不适合直接写代码 | 强模型设计 |
+| — | 缓存策略 | — | §12.6 的触发信号目前都不满足，**不排期** | — |
+
+**待决策（不阻塞第 1 项）**：缺口 E 的版本号策略（继续 1.0.0-SNAPSHOT 直到发正式版，
+还是随路线图升到 1.3.0 / 1.4.0-SNAPSHOT）；缺口 F 是否加开源协议（MIT / Apache-2.0）。
+
+### 12.30 下一窗口启动提示词（第 1 项：门户交付收口）
+
+> 写给执行力强、但不喜欢自己拿主意的模型：范围、顺序、验收都定死。
+> 做第 2 项及之后，按同样结构另写一节，不要复用这一段。
+
+```text
+在仓库 E:\java\lingxiao 完成 v1.3 门户交付收口：只补部署与 CI，不做任何新功能。
+先读仓库根 AGENTS.md，再读 docs/13-roadmap.md §12.28 / §12.29、deploy/README.md、
+deploy/package.ps1、deploy/package.sh、deploy/nginx/lingxiao.conf、
+deploy/config/application-prod.yml、.github/workflows/ci.yml、
+lx-ui-portal/README.md 的「构建与部署」、lx-ui-portal/nuxt.config.ts。
+
+开工自检：
+1) 执行 git log -1 和 git status --porcelain，确认基线在 705030b（含）之后、工作区干净；
+   有未提交改动先说明情况，不要覆盖。
+2) 执行 mvn -o -B -ntp test，确认 312 项 0 失败后再动手。
+3) 先输出方案并等确认，不要直接写文件：包内目录结构、门户进程的启动方式与环境变量、
+   Nginx 门户 server 块、prod 配置里各模块开关的取值、CI job 定义、快照生成步骤。
+   有疑问先问，不要跳步。
+
+要做的六件事：
+1. 打包：package.ps1 与 package.sh 在后台 dist 之外带上门户构建产物 .output
+   （需先在 lx-ui-portal 执行 npm run build）；产物缺失时报错并提示先构建，
+   与现有“后台 dist 不存在就报错”的做法一致。包内 README 写明门户的启动命令与环境变量
+   （NUXT_BACKEND_BASE / NUXT_PUBLIC_SITE_KEY / NUXT_PUBLIC_SITE_URL / 端口）。
+2. 进程：deploy/linux 增加 lingxiao-portal.service；deploy/linux 与 deploy/windows 的
+   启停脚本要能启停门户进程（并入现有脚本或另起 portal-* 脚本，二选一并说明理由）。
+3. Nginx：lingxiao.conf 增加门户 server 块（反代 127.0.0.1:3000；/api/** 交给门户的
+   Nitro 代理，与 lx-ui-portal/README.md 的说法一致），现有后台 server 不动。
+4. 生产配置：deploy/config/application-prod.yml 显式写出 cms / member / i18n 三个模块开关
+   （默认 enabled: true，注释说明各自关闭后的效果），键名与 lx-boot 的 application.yml 一致。
+5. CI：ci.yml 增加 portal job（Node 20、npm ci、npm run build，缓存依赖
+   lx-ui-portal/package-lock.json）；现有 frontend job 追加 node scripts/check-i18n-keys.mjs。
+6. 快照：按 deploy/sql/lingxiao-1.0.0.sql 文件头的“重新生成”步骤，用临时库重新导出一份
+   flyway_schema_history 到 V42 的快照，清理日志与测试数据；deploy/README.md 与
+   docs/27-github-onboarding.md 里的表数量、迁移条数、“首次启动补执行”的范围同步改对。
+
+硬约束：
+- 不改 Java 源码、不改前端页面、不改任何已有 V*.sql、不新增依赖；
+- 快照只在临时库上生成，不碰开发库 lingxiao；
+- 仓库里不出现真实密码或密钥；
+- 文档改动限于 deploy/README.md、docs/27、docs/26 §6、docs/13 §12（追加小节）、
+  docs/21（追加小节）。
+
+验收（做完逐项给出实际输出，没验证的写“未实跑”，不要写成已通过）：
+- mvn -o -B -ntp test 仍为 312 项 0 失败；
+- package.ps1 实跑一次，解压后目录与包内 README 一致；
+- 门户按新脚本启动，curl 首页、文章详情、/api/portal/cms/sites/main 均为 200；
+- 新 Nginx 配置 nginx -t 通过（本机无 Nginx 时如实注明）；
+- 快照导入全新库后启动，flyway_schema_history 到 V42 且无待执行迁移；
+- 后台与门户 npm run build 通过，check-i18n-keys 输出 missing=none；
+- 最后 git commit（不要 push，除非我明确要求），完成后列出验收结果与遗留。
+```

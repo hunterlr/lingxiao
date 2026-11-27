@@ -18,13 +18,13 @@
 
 LingXiao is a **modular monolith** foundation for back-office systems. It is not another scaffold that you throw away after generating a few CRUD pages. It closes the loops that actually eat weeks in every admin project — authentication and permissions, files and image pipelines, scheduled jobs, audit logs, code generation, deployment — so that application code can focus on its own domain.
 
-Version **v1.0** ships the admin foundation. v1.1 is embedding CMS as an independent module (site / category / article / tag management is usable today); membership, workflow and SaaS multi-tenancy will plug in the same way without touching the core.
+**v1.0** (admin foundation), **v1.1** (CMS), **v1.2** (membership) and **v1.3** (content portal) are complete, together with the v1.4 CMS templates and database-backed language packs. Every business capability is a pluggable module; workflow and SaaS multi-tenancy will plug in the same way without touching the core.
 
 <p align="center">
   <img src="docs/images/14-dashboard-en.png" width="900" alt="LingXiao dashboard" />
 </p>
 
-> The admin UI ships in Chinese and English (`zh-CN` / `en-US`, switchable in the top bar). Business data written by users — menu-free text such as a job name or a remark — stays in the language it was entered; content-level translation (`i18n_*` tables) is a later phase, see [docs/23-i18n-plan.md](docs/23-i18n-plan.md).
+> The admin UI ships in Chinese and English (`zh-CN` / `en-US`, switchable in the top bar). Backend messages live in the database since v1.4 and can be translated, published and rolled back from the admin UI; content-level translation is a later phase, see [docs/23-i18n-plan.md](docs/23-i18n-plan.md).
 
 ## Features
 
@@ -60,6 +60,16 @@ Version **v1.0** ships the admin foundation. v1.1 is embedding CMS as an indepen
 - Referential guards for sites, categories and tags; tags never cross sites
 - Logos and covers use a file-center image picker; selections store a `fileId`, external URLs still work
 - Public read-only portal API `/api/portal/cms/**`: sites, navigation tree, tags, article list / detail / search; published content only
+- Article recycle bin, scheduled publishing, content versions with rollback; recycled articles do not hold their slug
+- Content models with a field designer (article / gallery / page), single pages, navigation trees, blocks and banners; the admin issues one-time tickets to preview drafts
+- Template codes and themes (`list.*` / `detail.*` / `page.*`, three built-in themes); the portal maps codes to components and falls back to the default layout
+
+**Content portal (v1.3, `lx-ui-portal`)**
+
+- Nuxt 3 SSR with plain CSS and no UI framework: home, category, article, search, tag, single page, preview and 404
+- Page-level `title / description / canonical / OG`, article JSON-LD, `sitemap.xml` / `robots.txt` / `rss.xml`
+- Member registration / sign-in / password reset / profile / favorites / likes / comments; the token lives in a cookie, never in the URL
+- `/api/**` is proxied same-origin by Nitro, so the browser never talks to the backend directly and deployment only changes environment variables
 
 **Membership (v1.2 module)**
 
@@ -68,6 +78,16 @@ Version **v1.0** ships the admin foundation. v1.1 is embedding CMS as an indepen
 - Idempotent favorite and like writes; public stats are anonymous, signed-in members also get their own state
 - Comments are reviewed before publishing: portal submissions stay pending until approved; the comment switch takes effect at runtime in member settings
 - Clear business errors when the member or comment switch is off; the portal degrades without blank pages
+- Third-party login for 27 providers, enabled per platform in the admin with write-only credentials; one-time tickets exchange for the member token
+- Third-party avatars are copied into the file center; accounts sharing a phone or email are never merged silently — the member confirms the binding, or an admin merges with an audit record
+- Signed-in phone / email change verifies ownership of the new value and asks for the current password when one is set
+
+**Localization (v1.4 module)**
+
+- Standalone `lx-module-i18n`; backend messages move from `messages*.properties` into the database: published DB value > resource bundle > default text
+- Admin language management, a translation workbench (drafts / CSV import-export / coverage / missing keys), pack publish and rollback
+- Drafts never reach production until published; rollback restores the snapshot; publish and rollback evict the cache immediately, other instances converge within 5 seconds
+- Public `/api/portal/i18n/**` with `ETag`; disabling the module removes the `i18n_*` tables, endpoints and menus
 
 **Operations & tooling**
 
@@ -86,7 +106,7 @@ Version **v1.0** ships the admin foundation. v1.1 is embedding CMS as an indepen
 **Engineering**
 
 - Maven multi-module with auto-configuration and three-layer module switches; **disabled means not loaded** (beans, endpoints, migrations and frontend routes all go away)
-- 126 unit tests that need neither MySQL nor Redis; GitHub Actions covers JDK 8 / 11 / 17 plus the frontend build
+- 312 unit tests in 53 test classes that need neither MySQL nor Redis; GitHub Actions covers JDK 8 / 11 / 17 plus the admin frontend build
 - One jar runs on JDK 8, 11 and 17
 - Production profile and packaging scripts included: `java -jar` + Nginx; prod disables the generator, API docs and SQL logging
 
@@ -141,13 +161,22 @@ mysql -uroot -p < deploy/sql/init-db.sql
 mvn -DskipTests package
 DB_PORT=3306 DB_PASSWORD=<your-password> java -jar lx-boot/target/lingxiao.jar
 
-# 3. Run the frontend (second terminal)
+# 3. Run the admin frontend (second terminal)
 cd lx-ui-admin
+npm ci
+npm run dev
+
+# 4. Run the content portal (optional, from the repo root in another terminal)
+cd lx-ui-portal
 npm ci
 npm run dev
 ```
 
 Open <http://127.0.0.1:5173> and sign in with `admin / admin123`. Flyway creates the business tables on first startup.
+
+The portal runs at <http://127.0.0.1:3000> and shows published content only. The default site key is `main`;
+create a site with the same `siteKey` under CMS → Sites in the admin and publish an article.
+The portal's Nitro server proxies `/api/**` to `NUXT_BACKEND_BASE` (default `http://127.0.0.1:8080`).
 
 > On Windows PowerShell, set environment variables with `$env:DB_PORT="3306"`.
 > To skip incremental migrations and start with the full menu and settings data, import the
@@ -181,14 +210,20 @@ lingxiao/
 │  ├─ lx-module-system       #   Auth / users / roles / menus / dicts / settings / logs
 │  ├─ lx-module-file         #   Files and image pipeline
 │  ├─ lx-module-job          #   Scheduled jobs (Spring Task + database lock)
-│  ├─ lx-module-cms          #   Content management (v1.1: sites / categories / articles / tags)
-│  └─ lx-module-generator    #   Code generator (dev only, can be disabled in prod)
+│  ├─ lx-module-cms         #   Content management (sites / categories / articles / models / pages / navigation / blocks / templates)
+│  ├─ lx-module-member       #   Membership (accounts / security / interactions / comments / third-party login / channels)
+│  ├─ lx-module-i18n         #   Localization (database language packs / translation workbench / publish and rollback)
+│  ├─ lx-module-generator    #   Code generator (dev only, can be disabled in prod)
+│  └─ lx-module-demo         #   Proves the module switch (disabled by default)
 ├─ lx-api/lx-admin-api/      # DTOs and contracts for /api/admin
 ├─ lx-boot/                  # Application entry, config, packaging
 ├─ lx-ui-admin/              # Vue 3 + Element Plus admin UI
+├─ lx-ui-portal/             # Nuxt 3 content portal (SSR, read-only portal API + member API)
 ├─ deploy/                   # SQL, start-stop scripts, Nginx, release packaging
 └─ docs/                     # Design documents and build log
 ```
+
+> New to the codebase? Start with [`AGENTS.md`](AGENTS.md): what to read first, hard constraints, ID ranges and the pre-delivery checklist.
 
 ## API surface
 
@@ -199,10 +234,12 @@ lingxiao/
 /api/admin/system/oper-log|login-log    operation and login logs
 /api/admin/monitor/online|server|cache  online users / server metrics / cache stats
 /api/admin/monitor/job/**               scheduled jobs and execution logs
-/api/admin/cms/site|category|article|tag content management (v1.1 module)
-/api/portal/cms/**                     public read-only portal API (sites / categories / articles / tags / search)
-/api/admin/member/**                    members / message channels / comment review (v1.2 module)
-/api/app/**                             member registration / sign-in / reset / profile / favorites / likes / comments
+/api/admin/cms/**                        sites / categories / articles / tags / models / pages / navigation / blocks / banners / templates
+/api/portal/cms/**                      public read-only portal API (sites / categories / articles / tags / pages / navigation / blocks / search / preview)
+/api/admin/member/**                    members / message channels / comment review / third-party login (v1.2 module)
+/api/app/**                             member registration / sign-in / reset / profile / favorites / likes / comments / third-party login
+/api/admin/i18n/**                      languages / translations / language packs (v1.4 module)
+/api/portal/i18n/**                     public language packs for the portal
 /api/admin/tool/gen/**                  code generation
 /api/admin/file/**                      upload / dedup / list / rename / download
 /api/file/{fileId}                      public access (?size=thumb|medium)
@@ -227,23 +264,33 @@ Responses are uniform `{ code, msg, data }`: `0` success, `1xxx` general and val
 | [27-github-onboarding.md](docs/27-github-onboarding.md) | Moving to a new machine: database, startup, troubleshooting |
 | [28-third-party-login.md](docs/28-third-party-login.md) | Third-party login groundwork: bindings, avatars, boundaries |
 | [29-portal-api.md](docs/29-portal-api.md) | CMS portal API contract: endpoints, params, visibility, fields, caching |
+| [30-member-embed-plan.md](docs/30-member-embed-plan.md) | Membership embedding: isolated accounts, registration, security, channels |
+| [31-portal-frontend.md](docs/31-portal-frontend.md) | Portal frontend: pages, proxy, SEO, acceptance and pitfalls |
+| [15-i18n.md](docs/15-i18n.md) / [23-i18n-plan.md](docs/23-i18n-plan.md) | Localization design and rollout: database language packs, translation workbench, content translation |
+| [AGENTS.md](AGENTS.md) | Repository conventions: what to read first, hard constraints, ID ranges, pre-delivery checklist |
 
 ## Roadmap
 
 | Version | Scope | Status |
 |---|---|---|
 | v1.0 | Admin foundation: permissions, files, jobs, monitoring, generator, deployment | ✅ Done |
-| v1.1 | i18n L1 (bilingual UI), CMS module (admin flows + portal API + media picker done) | 🚧 In progress |
-| v1.2 | Membership (accounts, profile, security, message channels, favorites, likes, comments with review) | ✅ Done |
-| v1.3 | Workflow (Flowable), SaaS multi-tenancy | Planned |
+| v1.1 | i18n L1 (bilingual UI), CMS module (admin flows, portal API, media picker) | ✅ Done |
+| v1.2 | Membership (accounts, profile, security, message channels, favorites, likes, comments with review, third-party login) | ✅ Done |
+| v1.3 | Nuxt 3 content portal (home / category / detail / search / member center / SEO) | ✅ Features done; deployment scripts and CI coverage pending |
+| v1.4 | Internationalization and approvals: database language packs ✅, CMS templates ✅; workflow (Flowable), multi-database | 🚧 In progress |
+| v2.0 | SaaS multi-tenancy | Planned |
+
+> Current progress, open items and the next step live in [docs/13-roadmap.md](docs/13-roadmap.md) §12 (Chinese).
 
 ## Contributing
 
-Issues and pull requests are welcome. Before submitting, please make sure both pass:
+Issues and pull requests are welcome. Read [`AGENTS.md`](AGENTS.md) first, then make sure both pass:
 
 ```bash
-mvn -B -ntp test                 # unit tests need no MySQL / Redis
-cd lx-ui-admin && npm run build  # frontend build
+mvn -B -ntp test                            # unit tests need no MySQL / Redis
+cd lx-ui-admin && npm run build             # admin frontend build
+node scripts/check-i18n-keys.mjs            # zh-CN and en-US key sets match
+cd ../lx-ui-portal && npm run build         # when the portal changed
 ```
 
 Style follows the existing modules: Java with 4-space indentation and Javadoc on classes and public methods; frontend with 2 spaces, Composition API and `<script setup>`; every module directory carries a `README.md` describing its boundary.

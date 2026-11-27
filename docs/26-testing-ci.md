@@ -2,9 +2,10 @@
 
 > 本文回答两个问题：**哪些逻辑必须用单测锁住？没有数据库的机器上怎么自动验证？**
 >
-> 结论：v1.0 基线 + v1.1 CMS + v1.2 会员共 182 个单测（31 个测试类），
-> 完全不依赖 MySQL / Redis，`mvn test` 一条命令跑完；
-> 再用 GitHub Actions 覆盖 JDK 8/11/17 与前端构建。
+> 结论：v1.0 基线 + v1.1 CMS + v1.2 会员 + v1.3 / v1.4 的模型 / 模板 / 多语言共 **312 个单测（53 个测试类）**，
+> 完全不依赖 MySQL / Redis，`mvn test` 一条命令跑完（JDK 8 本机约 30 秒）；
+> 再用 GitHub Actions 覆盖 JDK 8/11/17 与后台前端构建。
+> 门户构建与后台语言包自检**还没进 CI**，见 `docs/13` §12.28 缺口 C。
 
 ---
 
@@ -68,7 +69,13 @@ mvn -B -ntp -DskipTests package
 
 ---
 
-## 3. 当前测试清单（182 项 / 31 个类）
+## 3. 当前测试清单（312 项 / 53 个类，2026-11-27 实测）
+
+> 按模块汇总：`lx-common-core` 25 / 6 类，`lx-common-web` 21 / 3 类，`lx-framework` 10 / 2 类，
+> `lx-module-system` 25 / 6 类，`lx-module-file` 4 / 1 类，`lx-module-job` 7 / 1 类，
+> `lx-module-generator` 18 / 3 类，`lx-module-cms` 84 / 12 类，`lx-module-member` 101 / 14 类，
+> `lx-module-i18n` 13 / 4 类，`lx-boot` 4 / 1 类。
+> 新增测试后请同步本表与 README 里的数字（取自 `mvn test` 输出，不要手算）。
 
 | 模块 | 测试类 | 项数 | 锁住什么 |
 |---|---|---|---|
@@ -92,19 +99,45 @@ mvn -B -ntp -DskipTests package
 | `lx-module-generator` | `JavaTypeResolverTest` | 5 | MySQL / PG / 达梦常见类型映射，未知类型回退 String |
 | `lx-module-generator` | `TextUtilsTest` | 8 | 注释折叠、Javadoc 截断、JS / HTML / Java / SQL 四类转义 |
 | `lx-boot` | `AppProfileTest` | 4 | 品牌名 trim、中英文名互相兜底、版本空值转空串 |
-| `lx-framework` | `ModuleRegistryTest` | 5 | 基座模块永远启用、显式关闭 / 未配置按关闭、空 `module_code` 兼容、列表排序、列表与 `isEnabled` 一致 |
-| `lx-framework` | `ModuleMigrationLocationsTest` | 3 | system / file 固定参与、启用模块排序、目录不存在时跳过 |
+| `lx-framework` | `ModuleRegistryTest` | 6 | 基座模块永远启用、显式关闭 / 未配置按关闭、空 `module_code` 兼容、列表排序、列表与 `isEnabled` 一致 |
+| `lx-framework` | `ModuleMigrationLocationsTest` | 4 | system / file 固定参与、启用模块排序、目录不存在时跳过 |
 | `lx-module-system` | `StpInterfaceImplTest` | 5 | 非 platform 域为空、超管全权限、关闭模块权限过滤、无注册表全放行、空权限码 |
 | `lx-module-cms` | `CmsCategoryServiceTest` | 4 | 闭包深度（自身 0 / 父 1 / 祖父 2）、跨站点父级拒绝、有子栏目 / 文章（含回收站）时拒绝删除 |
 | `lx-module-cms` | `CmsArticleServiceTest` | 27 | 读取侧清洗、删除进回收站且保留标签、回收站分页筛选、恢复回草稿 / 栏目缺失 / slug 冲突、彻底删除顺序与权限、跨站点栏目拒绝、slug 重复、文章不存在；定时发布过去时间 / 已发布拒绝 / 排期 / 取消 / 非定时拒绝 / 到点扫描计数 / 无候选；版本列表 / 详情清洗 / 归属校验 / 回滚校验与快照 / 编辑快照 |
-| `lx-module-cms` | `CmsSiteServiceTest` | 3 | 有栏目 / 文章（含回收站）时拒绝删除、空站点物理删除 |
+| `lx-module-cms` | `CmsSiteServiceTest` | 4 | 空站点物理删除；有栏目 / 文章（含回收站）/ 其它内容时拒绝删除 |
 | `lx-module-cms` | `CmsTagServiceTest` | 2 | 被文章引用时拒绝删除、未引用物理删除 |
 | `lx-module-cms` | `CmsPortalServiceTest` | 8 | 草稿 / 跨站点 / 停用栏目 / 停用祖先按不存在处理、正文清洗与阅读量、导航树剔除与提升、空 slug、站点字段白名单 |
-| `lx-module-member` | `MemberUserServiceTest` | 15 | 注册落 `mem_user` 与默认等级 / 渠道、未勾协议拒绝、重名拒绝、登录清零失败计数、密码错误累计、第 5 次锁定、锁定期内不比对密码、找回密码静默与验证码一次性、过期验证码拒绝、后台列表补等级名、停用 / 删除踢会话 |
+| `lx-module-cms` | `CmsModelServiceTest` | 7 | 内置模型懒初始化、必填扩展字段缺失拒绝、只保留已定义字段、内置 / 被引用模型不可删、字段类型非法拒绝 |
+| `lx-module-cms` | `CmsPageServiceTest` | 4 | 新建强制草稿并绑定 page 模型、`pageKey` 站点内唯一、被导航引用时拒绝删除 |
+| `lx-module-cms` | `CmsNavServiceTest` | 5 | 外链地址必填、栏目目标跨站点拒绝、父级不能挂到自己后代下、有子项拒绝删除、按 `sort` 成树 |
+| `lx-module-cms` | `CmsBlockBannerServiceTest` | 3 | 区块 html 正文写入前清洗、区块类型非法拒绝、轮播结束时间晚于开始时间 |
+| `lx-module-cms` | `CmsPreviewTicketServiceTest` | 6 | 票据携带目标与过期时间、模板与目标类型不匹配拒绝、无效 / 过期 / 已使用拒绝、原子抢占 |
+| `lx-module-cms` | `CmsPortalContentServiceTest` | 8 | 单页未发布按不存在、导航目标停用整项不下发且栏目链接固定 `/category/{key}`、预览不校验发布状态、详情模板推导 |
+| `lx-module-cms` | `CmsTemplatesTest` | 6 | 主题 / 栏目 / 单页模板白名单与回退、详情模板由列表模板推导、预览模板按目标类型限制前缀、三组选项互不重叠 |
+| `lx-module-member` | `MemberUserServiceTest` | 22 | 注册落 `mem_user` 与默认等级 / 渠道、未勾协议拒绝、重名拒绝、登录清零失败计数、密码错误累计、锁定、找回密码静默与验证码一次性、停用 / 删除踢会话 |
 | `lx-module-member` | `MemberPasswordPolicyTest` | 5 | 缺失配置回退 basic、basic 拒绝弱密码、strong 要求四类字符、off 放行、非法值回退 basic |
-| `lx-module-member` | `MemberCaptchaServiceTest` | 6 | 图片与 key 生成、5 分钟有效、一次性、场景隔离、总闸关闭不生成、参数关闭不生成、非法场景拒绝 |
+| `lx-module-member` | `MemberCaptchaServiceTest` | 7 | 图片与 key 生成、5 分钟有效、一次性、场景隔离、总闸关闭不生成、参数关闭不生成、非法场景拒绝 |
+| `lx-module-member` | `MemberRateLimitServiceTest` | 4 | 窗口内超限返回 1006、不同 Key 独立计数、窗口过期重新计数、非法阈值关闭限流 |
+| `lx-module-member` | `RoutingMemberResetCodeSenderTest` | 5 | 手机号走短信、邮箱走邮件、用户名优先短信并回退邮件、两者都为空不抛异常 |
+| `lx-module-member` | `MemberChannelConfigServiceTest` | 9 | dev / prod 实现选择、缺生产实现时拒绝切 prod、密钥留空沿用原值、测试发送在 dev / prod 的回显差异 |
+| `lx-module-member` | `MemberInteractionServiceTest` | 6 | 匿名只返回总数、收藏 / 点赞幂等、取消即物理删除、非法文章 ID 不落库、我的收藏倒序分页 |
+| `lx-module-member` | `MemberCommentServiceTest` | 7 | 发表默认待审核并回填昵称、空评论不落库、公开列表只出展示字段、审核只接受通过 / 拒绝并写审核人 |
+| `lx-module-member` | `MemberOAuthStateStoreTest` | 5 | state / ticket / bindTicket 一次性消费，伪造 key 返回 null 不抛异常 |
+| `lx-module-member` | `MemberOAuthServiceTest` | 10 | state 过期与绑定失败的安全回跳、总开关关闭时回调与 exchange 均拒绝、ticket 换 Token、普通平台不能走 `mini-login`、回跳只允许站内路径 |
+| `lx-module-member` | `MemberOAuthAccountServiceTest` | 3 | 已验证邮箱命中已有会员时要求先绑定、未验证邮箱不参与匹配、无冲突时建号并占用唯一键 |
+| `lx-module-member` | `MemberAvatarLocalizerTest` | 2 | 内网 / 回环 / 非法协议的头像地址直接忽略，空地址不下载 |
+| `lx-module-member` | `MemberMergeServiceTest` | 3 | 预览只统计不改数据、执行合并去重并停用旧账号写审计、不能合并到自身 |
+| `lx-module-member` | `MemberContactServiceTest` | 13 | 已设密码必须提交当前密码、发码只存哈希并作废旧码、唯一性 / 格式在发码前拒绝、通道停用或异常时作废验证码、验证码一次性与过期 |
+| `lx-module-i18n` | `I18nMessageSourceTest` | 4 | （与 `lx-common-web` 的同名类不在同一个包）数据库已发布值 > 资源包 > 默认文案并记录缺失、中文 Locale 归一到 `zh-CN` |
+| `lx-module-i18n` | `I18nTranslationServiceTest` | 3 | 占位符不一致拒绝保存、新增译文只写草稿、编辑已发布译文不动线上值 |
+| `lx-module-i18n` | `I18nPackServiceTest` | 2 | 发布生成新版本 / 快照 / 校验和，回滚按快照恢复译文并切换当前版本 |
+| `lx-module-i18n` | `I18nCsvCodecTest` | 4 | 解析 BOM / 引号 / 逗号 / 换行，引号内换行不拆行，未闭合引号按格式错误处理 |
 
-合计：**Tests run: 182, Failures: 0, Errors: 0, Skipped: 0**（2026-11-22 在 JDK 8 / JDK 11 各 `clean test` 一遍均通过；156 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍均通过；148 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，141 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，134 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，126 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，112 项基线于 2026-11-22 在 JDK 8 / JDK 11 各跑一遍，99 项基线于 2026-11-21 在 JDK 8 跑通，66 项基线于 2026-11-15 在 JDK 8 / 11 各跑一遍）。
+合计：**Tests run: 312, Failures: 0, Errors: 0, Skipped: 0**（2026-11-27 在 JDK 8 上 `mvn -o test` 实测）。
+
+> JDK 11 上一次有记录的全量基线是 2026-11-22 的 205 项；之后新增的 107 项只在本地 JDK 8 跑过，
+> JDK 11 / 17 由 CI 矩阵覆盖。历史基线：257、244（11-23），232、218、205（11-22），
+> 182、156、148、141、134、126、112（11-22），99（11-21），66（11-15）。
 
 ---
 
@@ -191,12 +224,15 @@ mvn -B -ntp -DskipTests package
 
 ### 6.1 启用前提
 
-当前工作目录**尚未初始化 git**（`git init` 都还没做），所以这份流水线不会自动跑。
-推到 GitHub 后需要：
+仓库已推送到 GitHub（`hunterlr/lingxiao`），流水线随 push / PR 自动触发。
+换到新仓库或 fork 后需要：
 
-1. `git init` + 首次提交（`.gitignore` 已就绪，`target/`、`node_modules/`、`release/`、`data/`、`.local/` 都不会入库）；
+1. 确认 `.gitignore` 生效（`target/`、`node_modules/`、`release/`、`data/`、`.local/` 都不入库）；
 2. 在仓库 `Settings → Actions → General` 允许 Actions 运行；
 3. 首次 push 到 `main` / `master`，或在 Actions 页手动 `Run workflow`。
+
+**CI 目前不覆盖的部分**（见 `docs/13` §12.28 缺口 C）：门户 `lx-ui-portal` 的构建、
+后台 `node scripts/check-i18n-keys.mjs` 语言包自检。这两项现在只靠提交前手工执行。
 
 私有仓库的 Actions 分钟数按账号套餐计算；只跑 `mvn test` + `npm run build`，
 单次约 3~5 分钟（含 Maven / npm 缓存命中）。

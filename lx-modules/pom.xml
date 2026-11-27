@@ -12,13 +12,14 @@
         lx-module-file       文件中心（存储抽象 / 上传 / 下载 / 文件库）
         lx-module-job        定时任务（Spring Task + 数据库锁 / 执行日志）
         lx-module-generator  代码生成器（导入表 / 配置字段 / 预览 / 下载）
-        lx-module-demo       可选模块契约验证（生产不打包）
+        lx-module-demo       可选模块契约验证（随 jar 打包，由开关控制，默认关闭）
 
       v1.1 起按计划嵌入可选模块：
-        lx-module-cms        内容管理（站点 / 栏目 / 文章 / 标签）
-        lx-module-member     前台会员（注册 / 登录 / 个人中心 / 后台会员管理）
+        lx-module-cms        内容管理（站点 / 栏目 / 文章 / 模型 / 单页 / 导航 / 区块 / 模板）
+        lx-module-member     前台会员（注册 / 登录 / 个人中心 / 互动 / 评论 / 第三方登录）
+        lx-module-i18n       多语言（数据库语言包 / 翻译工作台 / 发布回滚）
 
-      不建 portal；门户工程按 v1.3 计划独立交付。
+      门户不在本聚合内：lx-ui-portal 是独立的 Nuxt3 工程，只调门户接口。
     -->
     <parent>
         <groupId>com.lingxiao</groupId>

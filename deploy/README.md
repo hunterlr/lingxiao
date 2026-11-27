@@ -86,7 +86,7 @@ mysql -uroot -p < deploy/sql/init-db.sql
 2. 建应用账号 `lingxiao`；
 3. 授权 `SELECT/INSERT/UPDATE/DELETE/CREATE/ALTER/INDEX/DROP/REFERENCES`。
 
-**业务表不用手工导入**：应用启动时 Flyway 自动执行 `V1`~`V14`。
+**业务表不用手工导入**：应用启动时 Flyway 自动执行 `V1` 起的全部迁移（当前到 V42）。
 应用账号必须有 `CREATE / ALTER / INDEX / DROP`，否则首次启动迁移会失败。
 迁移完成后也不必回收这些权限：后续版本仍会加新脚本。
 
@@ -107,6 +107,10 @@ mysql -uroot -p < deploy/sql/lingxiao-1.0.0.sql
 - 里面有 `DROP TABLE IF EXISTS`，重复导入会把库重置成快照状态；
 - 默认账号 `admin` / `admin123`，导入后请立刻改密码；
 - 登录日志、操作日志、文件记录、代码生成临时表是空的，首页统计为 0 属于正常。
+- 快照停在 v1.0 发布时的 V17，**没有刷新**：CMS、会员、多语言的表不在里面，导入后首次启动由 Flyway 补建。刷新计划见 `docs/13-roadmap.md` §12.29。
+
+> 本目录目前只覆盖**后台**（`lx-ui-admin` + 后端 jar）。内容门户 `lx-ui-portal` 还没有
+> 打包、进程脚本与 Nginx 示例，CI 也不构建它——这是已知缺口，见 `docs/13-roadmap.md` §12.28。
 
 两种方式选一种即可；正式环境建议用方式一（Flyway），快照主要用于本地开发、
 演示环境和“clone 下来马上能点”的场景。

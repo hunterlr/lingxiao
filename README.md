@@ -18,7 +18,7 @@
 
 凌霄是一套面向中后台系统的**模块化单体**基座。它不是又一个「生成完就扔」的脚手架，而是把后台项目里最费时间的那几件事——登录与权限、文件与图片、定时任务、日志审计、代码生成、部署交付——做成可直接使用的完整闭环，业务代码只管写自己的领域逻辑。
 
-当前版本 **v1.0** 已完成后台基座；v1.1 正在把 CMS 作为独立模块嵌入（后台站点 / 栏目 / 文章 / 标签已可用），会员、工作流、SaaS 多租户后续按同样方式接入，不需要改动基座。
+已完成 **v1.0 后台基座、v1.1 CMS、v1.2 会员、v1.3 内容门户**，以及 v1.4 的 CMS 模板与数据库语言包。所有业务能力都是可插拔模块，工作流、SaaS 多租户后续按同样方式接入，不需要改动基座。
 
 <p align="center">
   <img src="docs/images/02-dashboard.png" width="900" alt="凌霄后台首页" />
@@ -58,6 +58,16 @@
 - 站点 / 栏目 / 标签引用保护；标签不跨站点复用
 - Logo / 封面接文件中心图片选择器，选中写 `fileId`，外链继续兼容
 - 门户只读接口 `/api/portal/cms/**`：站点、导航树、标签、文章列表 / 详情 / 搜索，只出已发布内容
+- 文章回收站、定时发布、内容版本与回滚；回收中的内容不占 slug
+- 内容模型与字段设计器（文章 / 图集 / 单页）、单页、导航树、区块、轮播，后台生成一次性票据预览草稿
+- 模板编码 + 主题（`list.*` / `detail.*` / `page.*`，三套内置主题），门户按编码映射组件，未知编码回退默认版式
+
+**内容门户（v1.3，`lx-ui-portal`）**
+
+- Nuxt 3 SSR，纯 CSS 无 UI 框架：首页、栏目、文章详情、搜索、标签页、单页、预览页、404
+- 页面级 `title / description / canonical / OG`、文章 JSON-LD、`sitemap.xml` / `robots.txt` / `rss.xml`
+- 会员注册 / 登录 / 找回密码 / 个人中心 / 收藏 / 点赞 / 评论，Token 存 Cookie，不进 URL
+- `/api/**` 由 Nitro 同源代理到后端，浏览器不直连，部署只改环境变量
 
 **会员体系（v1.2 模块）**
 
@@ -68,6 +78,15 @@
 - 会员总开关或评论开关关闭时接口返回明确业务错误，门户评论区与正文降级不白屏
 - 第三方登录覆盖 27 个平台，后台按平台勾选启用并填凭据；总开关关闭时门户隐藏全部按钮
 - 第三方登录使用一次性 ticket 换会员 Token，Token 不进 URL；会员与后台账号始终隔离
+- 第三方头像自动转存文件中心；同手机号 / 邮箱账号不静默合并，由会员确认绑定或后台合并并留审计
+- 登录态换绑手机号 / 邮箱：验证新值归属，已设密码的账号还需当前密码
+
+**多语言（v1.4 模块）**
+
+- 独立模块 `lx-module-i18n`，后端文案从 `messages*.properties` 搬进数据库：数据库已发布值 > 资源包 > 默认文案
+- 后台语言管理、翻译工作台（草稿 / CSV 导入导出 / 覆盖率 / 缺失记录）、语言包发布与回滚
+- 保存草稿不影响线上，发布才生效；回滚按快照真恢复译文；发布 / 回滚后缓存立即失效，多实例 5 秒内一致
+- 门户公开接口 `/api/portal/i18n/**`，带 `ETag`；关闭模块后无 `i18n_*` 表、接口 404、菜单不下发
 
 **运维与工具**
 
@@ -86,7 +105,7 @@
 **工程**
 
 - Maven 多模块 + 自动装配 + 三层模块开关，**关闭 = 不加载**（Bean、接口、迁移、前端路由一起下线）
-- 126 项单元测试（不依赖 MySQL / Redis），GitHub Actions 覆盖 JDK 8 / 11 / 17 与前端构建
+- 312 项单元测试（53 个测试类，不依赖 MySQL / Redis），GitHub Actions 覆盖 JDK 8 / 11 / 17 与后台前端构建
 - 一个 jar 同时跑在 JDK 8 / 11 / 17 上
 - 生产配置与发布包组装脚本齐备：`java -jar` + Nginx，prod 关闭生成器 / 接口文档 / SQL 日志
 
@@ -202,16 +221,20 @@ lingxiao/
 │  ├─ lx-module-system       #   认证 / 用户 / 角色 / 菜单 / 字典 / 参数 / 日志
 │  ├─ lx-module-file         #   文件与图片管线
 │  ├─ lx-module-job          #   定时任务（Spring Task + 数据库锁）
-│  ├─ lx-module-cms          #   内容管理（v1.1：站点 / 栏目 / 文章 / 标签）
-│  ├─ lx-module-member       #   会员（账号 / 安全 / 渠道配置）
-│  └─ lx-module-generator    #   代码生成（开发期，生产可关）
+│  ├─ lx-module-cms         #   内容管理（站点 / 栏目 / 文章 / 模型 / 单页 / 导航 / 区块 / 模板）
+│  ├─ lx-module-member       #   会员（账号 / 安全 / 互动 / 评论 / 第三方登录 / 渠道配置）
+│  ├─ lx-module-i18n         #   多语言（数据库语言包 / 翻译工作台 / 发布回滚）
+│  ├─ lx-module-generator    #   代码生成（开发期，生产可关）
+│  └─ lx-module-demo         #   可选模块关闭态验证（默认关闭）
 ├─ lx-api/lx-admin-api/      # /api/admin 的 DTO 与契约
 ├─ lx-boot/                  # 启动类、配置、打包
 ├─ lx-ui-admin/              # Vue3 + Element Plus 后台前端
-├─ lx-ui-portal/             # Nuxt3 内容门户（SSR，只读门户接口）
+├─ lx-ui-portal/             # Nuxt3 内容门户（SSR，只读门户接口 + 会员接口）
 ├─ deploy/                   # SQL、启停脚本、Nginx、发布包组装
 └─ docs/                     # 设计文档与施工记录
 ```
+
+> 接手开发先读仓库根的 [`AGENTS.md`](AGENTS.md)：先读哪些文档、硬约束、编号段与交付前检查都在里面。
 
 ## 接口一览
 
@@ -222,10 +245,12 @@ lingxiao/
 /api/admin/system/oper-log|login-log    操作日志 / 登录日志
 /api/admin/monitor/online|server|cache  在线用户 / 服务监控 / 缓存监控
 /api/admin/monitor/job/**               定时任务与执行日志
-/api/admin/cms/site|category|article|tag 内容管理（v1.1 模块）
-/api/portal/cms/**                      门户只读接口（站点 / 栏目 / 文章 / 标签 / 搜索）
-/api/admin/member/**                     会员管理 / 渠道配置 / 评论审核（v1.2 模块）
-/api/app/**                              会员注册 / 登录 / 找回 / 个人中心 / 收藏点赞 / 评论
+/api/admin/cms/**                        站点 / 栏目 / 文章 / 标签 / 模型 / 单页 / 导航 / 区块 / 轮播 / 模板
+/api/portal/cms/**                      门户只读接口（站点 / 栏目 / 文章 / 标签 / 单页 / 导航 / 区块 / 搜索 / 预览）
+/api/admin/member/**                     会员管理 / 渠道配置 / 评论审核 / 第三方登录（v1.2 模块）
+/api/app/**                              会员注册 / 登录 / 找回 / 个人中心 / 收藏点赞 / 评论 / 第三方登录
+/api/admin/i18n/**                       语言 / 翻译 / 语言包（v1.4 模块）
+/api/portal/i18n/**                     门户公开语言包
 /api/admin/tool/gen/**                  代码生成
 /api/admin/file/**                      上传 / 秒传 / 列表 / 改名 / 下载
 /api/file/{fileId}                      公开访问（?size=thumb|medium）
@@ -252,6 +277,8 @@ lingxiao/
 | [29-portal-api.md](docs/29-portal-api.md) | CMS 门户接口契约：路径、参数、可见性、字段与缓存建议 |
 | [30-member-embed-plan.md](docs/30-member-embed-plan.md) | 会员模块嵌入：双账号隔离、注册登录、安全与渠道配置 |
 | [31-portal-frontend.md](docs/31-portal-frontend.md) | 门户前端：页面、代理、SEO、验收与踩坑 |
+| [15-i18n.md](docs/15-i18n.md) / [23-i18n-plan.md](docs/23-i18n-plan.md) | 多语言总体设计与落地方案：数据库语言包、翻译工作台、内容翻译 |
+| [AGENTS.md](AGENTS.md) | 仓库约定：先读什么、硬约束、编号段、交付前检查 |
 
 ## 路线图
 
@@ -259,17 +286,22 @@ lingxiao/
 |---|---|---|
 | v1.0 | 后台基座：权限、文件、任务、监控、生成器、部署 | ✅ 已完成 |
 | v1.1 | 多语言 L1（界面双语）、CMS 模块嵌入（后台链路 + 门户 API + 素材选择器） | ✅ 已完成 |
-| v1.2 | 会员体系（注册 / 登录 / 个人中心 / 安全补口 / 渠道配置 / 收藏点赞 / 评论审核） | ✅ 已完成 |
-| v1.3 | Nuxt3 内容门户（首页 / 栏目 / 详情 / 搜索 / SEO） | 🚧 进行中 |
-| v1.4 | 工作流（Flowable）、SaaS 多租户 | 规划中 |
+| v1.2 | 会员体系（注册 / 登录 / 个人中心 / 安全补口 / 渠道配置 / 收藏点赞 / 评论审核 / 第三方登录） | ✅ 已完成 |
+| v1.3 | Nuxt3 内容门户（首页 / 栏目 / 详情 / 搜索 / 会员中心 / SEO） | ✅ 功能完成；部署脚本与 CI 覆盖待补 |
+| v1.4 | 国际化与审批版：数据库语言包 ✅、CMS 模板 ✅；工作流（Flowable）、多数据库适配 | 🚧 进行中 |
+| v2.0 | SaaS 多租户 | 规划中 |
+
+> 当前进度、遗留与下一步以 [docs/13-roadmap.md](docs/13-roadmap.md) §12 为准。
 
 ## 参与贡献
 
-欢迎提 Issue 和 PR。提交前请确认：
+欢迎提 Issue 和 PR。提交前请先读仓库根的 [`AGENTS.md`](AGENTS.md)，并确认：
 
 ```bash
-mvn -B -ntp test                 # 单测不依赖 MySQL / Redis
-cd lx-ui-admin && npm run build  # 前端构建
+mvn -B -ntp test                            # 单测不依赖 MySQL / Redis
+cd lx-ui-admin && npm run build             # 后台前端构建
+node scripts/check-i18n-keys.mjs            # 后台中英文案键集合一致
+cd ../lx-ui-portal && npm run build         # 动了门户时
 ```
 
 代码风格沿用现有模块：Java 4 空格缩进、类与公开方法写中文 Javadoc；前端 2 空格、组合式 API + `<script setup>`；每个模块目录有 `README.md` 说明职责边界。

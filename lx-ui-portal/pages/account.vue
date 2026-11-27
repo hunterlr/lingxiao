@@ -166,7 +166,25 @@
                   maxlength="255"
                   placeholder="图片地址或文件 ID，留空则使用文字头像"
                 />
-                <p class="form-hint">支持 `https://` 图片地址、后台文件 ID，或 `/api/file/{id}` 路径。</p>
+                <div class="avatar-upload">
+                  <input
+                    ref="avatarInput"
+                    type="file"
+                    accept="image/*"
+                    class="avatar-file"
+                    @change="onAvatarPicked"
+                  />
+                  <button
+                    type="button"
+                    class="button ghost"
+                    :disabled="avatarUploading"
+                    @click="avatarInput?.click()"
+                  >
+                    {{ avatarUploading ? '上传中…' : '上传图片' }}
+                  </button>
+                  <span class="form-hint">支持 JPG / PNG / WebP，上传后自动生成缩略图。</span>
+                </div>
+                <p class="form-hint">也可以直接填 `https://` 图片地址、后台文件 ID，或 `/api/file/{id}` 路径。</p>
               </div>
             </div>
           </div>
@@ -323,6 +341,46 @@
               </button>
             </div>
           </form>
+        </div>
+      </section>
+
+      <section class="account-panel">
+        <h2 class="panel-title">登录设备</h2>
+        <p class="panel-description">
+          同一账号在不同浏览器登录会各占一条。发现不认识的设备可以直接退出，不会影响当前这一台。
+        </p>
+
+        <p v-if="sessionsError" class="form-alert error" role="alert">{{ sessionsError }}</p>
+
+        <ul v-if="sessions.length" class="session-list">
+          <li v-for="item in sessions" :key="item.sessionId" class="session-item">
+            <div class="session-main">
+              <strong>
+                {{ item.device || '未知设备' }}
+                <span v-if="item.currentSession" class="session-tag">当前设备</span>
+              </strong>
+              <span class="form-hint">
+                {{ item.loginIp || '未知 IP' }} · {{ formatDate(item.loginTime) || '登录时间未知' }}
+              </span>
+            </div>
+            <button
+              v-if="!item.currentSession"
+              type="button"
+              class="button ghost"
+              :disabled="kickingId === item.sessionId"
+              @click="onKickSession(item)"
+            >
+              {{ kickingId === item.sessionId ? '退出中…' : '退出' }}
+            </button>
+          </li>
+        </ul>
+        <p v-else-if="!sessionsLoaded" class="form-hint">加载中…</p>
+        <p v-else class="form-hint">只有当前这一台设备在登录。</p>
+
+        <div v-if="sessions.some((item) => !item.currentSession)" class="form-actions">
+          <button type="button" class="button ghost" :disabled="kickingOthers" @click="onKickOthers">
+            {{ kickingOthers ? '处理中…' : '退出其他设备' }}
+          </button>
         </div>
       </section>
 
@@ -495,7 +553,11 @@ const {
   fetchFavorites,
   setFavorite,
   fetchOAuthBindings,
-  unbindOAuth
+  unbindOAuth,
+  uploadAvatar,
+  fetchSessions,
+  kickSession,
+  kickOtherSessions
 } = useMemberAuth()
 const portalApi = usePortalApi()
 
@@ -512,6 +574,79 @@ const passwordError = ref('')
 const passwordSuccess = ref('')
 /** 只有第三方建号（password_set=0）才显示“设置密码”；老账号默认视为已设置。 */
 const passwordSet = computed(() => profile.value?.passwordSet !== '0')
+
+/* ==================== 头像上传 ==================== */
+
+const avatarUploading = ref(false)
+const avatarInput = ref<HTMLInputElement | null>(null)
+
+async function onAvatarPicked(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  profileError.value = ''
+  profileSuccess.value = ''
+  avatarUploading.value = true
+  try {
+    const updated = await uploadAvatar(file)
+    profileForm.avatar = updated.avatar || ''
+    profileSuccess.value = '头像已更新'
+  } catch (error) {
+    profileError.value = memberErrorMessage(error, '头像上传失败，请稍后再试')
+  } finally {
+    avatarUploading.value = false
+    input.value = ''
+  }
+}
+
+/* ==================== 登录设备 ==================== */
+
+const sessions = ref<MemberDeviceSession[]>([])
+const sessionsLoading = ref(false)
+/** 首次加载完成前不显示“只有当前设备”，避免 SSR 先闪一句错误文案 */
+const sessionsLoaded = ref(false)
+const sessionsError = ref('')
+const kickingId = ref('')
+const kickingOthers = ref(false)
+
+async function loadSessions() {
+  sessionsLoading.value = true
+  sessionsError.value = ''
+  try {
+    sessions.value = await fetchSessions()
+  } catch (error) {
+    sessionsError.value = memberErrorMessage(error, '设备列表加载失败')
+  } finally {
+    sessionsLoading.value = false
+    sessionsLoaded.value = true
+  }
+}
+
+async function onKickSession(item: MemberDeviceSession) {
+  kickingId.value = item.sessionId
+  sessionsError.value = ''
+  try {
+    await kickSession(item.sessionId)
+    sessions.value = sessions.value.filter((row) => row.sessionId !== item.sessionId)
+  } catch (error) {
+    sessionsError.value = memberErrorMessage(error, '退出设备失败')
+  } finally {
+    kickingId.value = ''
+  }
+}
+
+async function onKickOthers() {
+  kickingOthers.value = true
+  sessionsError.value = ''
+  try {
+    await kickOtherSessions()
+    sessions.value = sessions.value.filter((row) => row.currentSession)
+  } catch (error) {
+    sessionsError.value = memberErrorMessage(error, '操作失败，请稍后再试')
+  } finally {
+    kickingOthers.value = false
+  }
+}
 
 /** 手机号 / 邮箱换绑表单；密码只在发送验证码时校验，确认换绑不需要再带。 */
 const contactForms = reactive({
@@ -665,6 +800,7 @@ onMounted(() => {
   if (profile.value) {
     loadFavorites(1)
     loadBindings()
+    loadSessions()
   }
 })
 watch(profile, (value) => {
@@ -672,6 +808,8 @@ watch(profile, (value) => {
     resetFavorites()
     bindings.value = []
     bindingsError.value = ''
+    sessions.value = []
+    sessionsError.value = ''
   }
 })
 

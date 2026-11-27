@@ -82,6 +82,7 @@ LingXiao is a **modular monolith** foundation for back-office systems. It is not
 - Third-party login for 27 providers, enabled per platform in the admin with write-only credentials; one-time tickets exchange for the member token
 - Third-party avatars are copied into the file center; accounts sharing a phone or email are never merged silently — the member confirms the binding, or an admin merges with an audit record
 - In-app messages: comment review results notify the author automatically; the portal shows an unread badge and a message list, and admins can broadcast system notices to selected members
+- Avatars upload straight into the file center (only `fileId` is stored); a "signed-in devices" panel lists IP and login time and can sign out a single device or all the others
 - Signed-in phone / email change verifies ownership of the new value and asks for the current password when one is set
 
 **Localization (v1.4 module)**
@@ -108,7 +109,7 @@ LingXiao is a **modular monolith** foundation for back-office systems. It is not
 **Engineering**
 
 - Maven multi-module with auto-configuration and three-layer module switches; **disabled means not loaded** (beans, endpoints, migrations and frontend routes all go away)
-- 324 unit tests in 54 test classes that need neither MySQL nor Redis; GitHub Actions covers JDK 8 / 11 / 17 plus the admin frontend build
+- 331 unit tests in 55 test classes that need neither MySQL nor Redis; GitHub Actions covers JDK 8 / 11 / 17 plus the admin frontend build
 - One jar runs on JDK 8, 11 and 17
 - Production profile and packaging scripts included: `java -jar` + Nginx; prod disables the generator, API docs and SQL logging
 
@@ -239,7 +240,7 @@ lingxiao/
 /api/admin/cms/**                        sites / categories / articles / tags / models / pages / navigation / blocks / banners / templates
 /api/portal/cms/**                      public read-only portal API (sites / categories / articles / tags / pages / navigation / blocks / search / preview)
 /api/admin/member/**                    members / message channels / comment review / third-party login / in-app messages (v1.2 module)
-/api/app/**                             member registration / sign-in / reset / profile / favorites / likes / comments / third-party login / messages
+/api/app/**                             member registration / sign-in / reset / profile (avatar upload / sessions) / favorites / likes / comments / third-party login / messages
 /api/admin/i18n/**                      languages / translations / language packs (v1.4 module)
 /api/portal/i18n/**                     public language packs for the portal
 /api/admin/tool/gen/**                  code generation

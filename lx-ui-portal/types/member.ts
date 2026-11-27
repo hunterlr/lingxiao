@@ -175,3 +175,14 @@ export interface MemberMessageItem {
   readTime?: string | null
   createTime?: string | null
 }
+
+/** 一次登录会话（登录设备）；sessionId 是 Token 哈希句柄，不是 Token 本身。 */
+export interface MemberDeviceSession {
+  sessionId: string
+  currentSession?: boolean
+  device?: string
+  userAgent?: string | null
+  loginIp?: string | null
+  loginTime?: string | null
+  expiresIn?: number
+}

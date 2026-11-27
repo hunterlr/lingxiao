@@ -3,6 +3,7 @@ import type {
   MemberCommentItem,
   MemberContactChangeForm,
   MemberContactCodeForm,
+  MemberDeviceSession,
   MemberFavoriteItem,
   MemberForgotPasswordForm,
   MemberInteraction,
@@ -408,8 +409,58 @@ export function useMemberAuth() {
     })
   }
 
-  // ==================== 站内消息 ====================
+  // ==================== 头像 / 登录设备 ====================
 
+  /**
+   * 上传头像。
+   *
+   * <p>只能在浏览器端调用：FormData 需要真实的 File 对象。图片进文件中心，
+   * 后端返回最新资料；这里顺手更新本地 profile，页头头像立刻跟着变。</p>
+   */
+  async function uploadAvatar(file: File): Promise<MemberProfile> {
+    const form = new FormData()
+    form.append('file', file)
+    const headers: Record<string, string> = { Accept: 'application/json' }
+    if (token.value) {
+      headers[tokenName.value || DEFAULT_TOKEN_NAME] = token.value
+    }
+    let response: ApiEnvelope<MemberProfile>
+    try {
+      response = await requestFetch<ApiEnvelope<MemberProfile>>('/api/app/profile/avatar', {
+        method: 'POST',
+        headers,
+        body: form
+      })
+    } catch (cause) {
+      const body = (cause as { data?: ApiEnvelope<unknown> })?.data
+      if (body && typeof body === 'object' && typeof body.code === 'number') {
+        throw new MemberApiError(body.code, body.msg || '上传失败')
+      }
+      throw new MemberApiError(0, '网络异常，请稍后再试')
+    }
+    if (response.code !== 0) {
+      throw new MemberApiError(response.code, response.msg || '上传失败')
+    }
+    profile.value = { ...(profile.value || ({} as MemberProfile)), ...response.data }
+    return response.data
+  }
+
+  /** 登录设备列表。 */
+  function fetchSessions(): Promise<MemberDeviceSession[]> {
+    return request<MemberDeviceSession[]>('/profile/sessions')
+  }
+
+  /** 退出指定设备；当前设备会返回“请使用退出登录”。 */
+  function kickSession(sessionId: string): Promise<void> {
+    return request<void>(`/profile/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' })
+  }
+
+  /** 退出除当前设备外的全部会话，返回被踢数量。 */
+  function kickOtherSessions(): Promise<number> {
+    return request<number>('/profile/sessions/others', { method: 'DELETE' })
+  }
+
+  // ==================== 站内消息 ====================
   /**
    * 未读数。
    *
@@ -484,6 +535,10 @@ export function useMemberAuth() {
     fetchMessages,
     refreshUnread,
     markMessageRead,
-    markAllMessagesRead
+    markAllMessagesRead,
+    uploadAvatar,
+    fetchSessions,
+    kickSession,
+    kickOtherSessions
   }
 }

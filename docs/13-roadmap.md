@@ -1097,8 +1097,8 @@ Flyway `V1~V42`；后台语言包自检 `missing=none`。
 |---|---|---|---|---|
 | 1 | ~~v1.3 门户交付收口~~ | 缺口 A + B + C + D：打包带门户、门户进程脚本与 systemd、Nginx 门户 server、prod 配置显式模块开关、CI 加门户构建与语言包自检、快照刷到 V42 | ✅ **已完成（2026-11-27，见 §12.31）** | — |
 | 2 | ~~会员消息通知~~ | 站内信表、评论审核结果通知、门户未读角标 | ✅ **已完成（2026-11-27，见 §12.32）**，顺带修掉 sitemap 502 | — |
-| 3 | 会员资料收尾 | 门户头像上传接文件中心（`/api/app/profile/avatar`）、会员会话管理（在线设备 / 踢下线） | `docs/31` §9 遗留；与第 2 项同模块，连着做省上下文 | 便宜模型 |
-| 4 | 多语言后半段 | 门户前端接 `/api/portal/i18n/**` → CMS 内容翻译 → `/{lang}/` 前缀 + hreflang + 多语言 sitemap | 内容翻译模型要先定（`docs/15` §10），**设计用强模型，实现可下放** | 先设计后实现 |
+| 3 | ~~会员资料收尾~~ | 门户头像上传接文件中心、会员会话管理（在线设备 / 踢下线） | ✅ **已完成（2026-11-27，见 §12.33）** | — |
+| 4 | 多语言后半段 | 门户前端接 `/api/portal/i18n/**` → CMS 内容翻译 → `/{lang}/` 前缀 + hreflang + 多语言 sitemap | 方案已就绪（见 §12.34），拆成三刀；第一刀是纯前端文案键化，可交给便宜模型 | 先设计后实现 |
 | 5 | 工作流 / 多库 / SaaS | P4、P2.5 多库、P6 | 都要先出方案与选型验证（`docs/08` / `14` / `10`），不适合直接写代码 | 强模型设计 |
 | — | 缓存策略 | — | §12.6 的触发信号目前都不满足，**不排期** | — |
 
@@ -1243,3 +1243,88 @@ sitemap / rss                    无站点时 200 + 空订阅源（不再 502）
 
 **下一步**：§12.29 第 3 项「会员资料收尾」（门户头像上传接文件中心、会员会话管理），
 或先做第 4 项多语言后半段（需要先定内容翻译模型）。
+
+### 12.33 会员资料收尾：头像上传 + 登录设备（✅ 已完成，2026-11-27）
+
+**为什么做**：门户个人中心的头像只能手填地址或文件 ID，没有上传入口；
+会员也看不到自己在哪些设备上登录过，`docs/31` §9 一直挂着这两条。
+
+**落地**：
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 服务 | `MemberAvatarService` | 图片进文件中心（`biz_type=member`），会员表只存 `fileId`；非图片、空文件、文件模块关闭都有明确错误 |
+| 接口 | `POST /api/app/profile/avatar` | multipart，字段名 `file`；返回最新资料 |
+| 服务 | `MemberSessionService` / `MemberSessionStore` | 会话枚举、踢单台、踢其它；Sa-Token 静态调用收在 Store 里，Service 可单测 |
+| 接口 | `GET /api/app/profile/sessions`、`DELETE /{sessionId}`、`DELETE /sessions/others` | 只下发 `SHA-256(Token)` 前 16 位做句柄，不下发原始 Token |
+| 门户 | `pages/account.vue` + `useMemberAuth` | 「上传图片」按钮；「登录设备」面板：设备名 / IP / 登录时间 / 当前设备标记 / 退出 |
+| 公共 | `StpMemberUtil` | 补 4 个会员域包装方法（Token 列表、剩余有效期、按 Token 取 Session、踢单 Token） |
+| 公共 | `MemberLoginHelper` | Token-Session 补 `loginTime`，供设备列表展示 |
+
+**验收（本机实跑）**：
+
+```text
+mvn -o test                       331 项 / 55 类，0 失败（新增 7 项会话测试）
+member-profile-check.mjs          17/17
+门户构建                          nuxt build 通过；/account SSR 含「登录设备」「上传图片」
+```
+
+脚本覆盖：多端登录 → 会话列表 → 句柄不是 Token → 不能踢当前设备 → 踢另一台后旧 Token 失效 →
+「退出其他设备」→ 头像上传回填 `fileId` 且公开访问 200 → 非图片被拒 → 匿名被拒。
+
+**已知限制**：不做头像裁剪、不回收旧头像文件（文件中心无引用计数）；
+会话列表不含“最后活跃时间”（Sa-Token 不逐请求记录）。详见 `docs/30` §18.4。
+
+### 12.34 多语言后半段方案（2026-11-27 制定，未实装）
+
+**现状**：`lx-module-i18n` 已经把后端文案搬进数据库，并给了门户只读接口
+`/api/portal/i18n/{lang}/{namespace}`（见 `docs/15` §20.1）。但**门户前端文案仍是
+硬编码中文**，CMS 内容也没有多语言，URL 不带语言前缀——所以“门户能切语言”这件事还没发生。
+
+**为什么先出方案**：这一刀横跨门户全部页面、CMS 数据模型与 SEO，直接开写会边写边改表。
+按下面的顺序拆三刀，每刀都能独立验收。
+
+#### 12.34.1 三刀拆分
+
+| 刀 | 范围 | 关键动作 | 前置 |
+|---|---|---|---|
+| A 门户文案键化（前端） | 门户所有界面文案走语言包，页头加语言切换 | 把文案收进 `zh-CN` / `en-US` 两份键表；SSR 读 Cookie `lx-portal-lang`，`Accept-Language` 兜底；缺键回退中文并记日志；加一条“模板里不许有硬编码中文”的检查脚本（白名单：示例内容、品牌名） | i18n 模块已可用（现状满足） |
+| B CMS 内容翻译 | 文章 / 单页可维护多语言版本，逐语言发布 | 新表 `cms_content_i18n`（`owner_type` / `owner_id` / `lang` / `title` / `summary` / `content` / `seo_*` / `status`，唯一键三者）；后台“翻译”页；门户接口接受 `?lang=`，缺翻译回退默认语言并标记 `translated=false` | 刀 A（语言标识统一） |
+| C URL 前缀与 SEO | `/{lang}/` 路由、hreflang、分语言 sitemap | 默认语言不带前缀（`/` = zh-CN，`/en/` = 英文）；切换语言保留当前路径；`hreflang` 含 `x-default`；`sitemap.xml` 出索引，`sitemap-{lang}.xml` 分语言；canonical 指当前语言 | 刀 B（内容能按语言出） |
+
+#### 12.34.2 必须先定的三件事
+
+| 决策 | 建议 | 影响 |
+|---|---|---|
+| 默认语言带不带 URL 前缀 | **不带**（`/` 中文，`/en/` 英文） | 已有链接与搜索引擎收录不变；切换语言时要处理 301 与 canonical |
+| 语言代码用 `en` 还是 `en-US` | URL 用 `en`，内部映射 `en-US`（与 `i18n_language.locale` 对齐） | 避免 URL 里出现大小写与连字符；映射表放 i18n 模块 |
+| 内容翻译要不要机翻草稿 | **第一版不要**，只做人工翻译；机翻留到有术语表之后 | 机翻直接进草稿会污染审核与 SEO 质量判断 |
+
+#### 12.34.3 刀 A 的落点与验收（推荐先做）
+
+- 门户新增 `composables/usePortalI18n.ts`：按 `lang` 拉 `/api/portal/i18n/{lang}/portal`，
+  失败回退内置 `zh-CN`；`useState('portal-lang')` 保存当前语言。
+- 页头加语言切换（中文 / English），写 Cookie + 刷新当前路径；SSR 首屏就是目标语言。
+- 文案键命名：`portal.common.*` / `portal.home.*` / `portal.article.*` / `portal.search.*` /
+  `portal.account.*` / `portal.message.*`；值写进 i18n 模块的语言包（后台可改）。
+- 检查脚本 `scripts/check-portal-i18n.mjs`：扫 `pages/`、`layouts/`、`components/` 里的中文
+  字面量，白名单放行 `docs` 示例、品牌名、`aria-label` 例外；有漏网即失败。
+- 验收：`nuxt build` 通过；`/` 与 `/en` 两种语言首屏文案正确；切换语言后当前页不丢；
+  缺键时回退中文且控制台无 `undefined`；脚本退出码 0。
+
+#### 12.34.4 刀 B / 刀 C 的数据与接口草案
+
+- 表：`cms_content_i18n(content_id, tenant_id, owner_type, owner_id, lang, title, summary,
+  content, seo_title, seo_keywords, seo_description, status, update_time)`，
+  唯一键 `(owner_type, owner_id, lang)`，索引 `(lang, status)`。
+- 后台接口：`GET/PUT /api/admin/cms/article/{id}/i18n/{lang}`、
+  `POST .../i18n/{lang}/publish`（逐语言发布）；权限码沿用 `platform:cms:article:*`。
+- 门户接口：`/api/portal/cms/articles?...&lang=en`，返回 `translated` 标记；
+  缺翻译回退默认语言，**不返回 404**（避免外链突然失效）。
+- 缓存：门户响应 `Vary: X-Lang` 或按 `lang` 分 key；刀 C 再做 sitemap 分文件。
+
+#### 12.34.5 不建议现在做的
+
+- 不做服务端模板引擎与静态化（`docs/20` §21.6 仍是 P6，等客户场景）。
+- 不做 RTL（阿拉伯语）与日期 / 货币格式化：等真有该语言客户再上，`docs/15` §18 已列风险。
+- 不在刀 A 顺带改 CMS 数据模型：两刀混在一起，出问题难定位。

@@ -22,6 +22,8 @@ public final class MemberLoginHelper {
     /** 写在 Token-Session，区分同一账号不同设备 */
     public static final String SESSION_LOGIN_IP = "loginIp";
     public static final String SESSION_USER_AGENT = "userAgent";
+    /** 登录时间（毫秒），会员中心“登录设备”展示 */
+    public static final String SESSION_LOGIN_TIME = "loginTime";
 
     private MemberLoginHelper() {
     }
@@ -70,6 +72,7 @@ public final class MemberLoginHelper {
         }
         tokenSession.set(SESSION_LOGIN_IP, loginIp);
         tokenSession.set(SESSION_USER_AGENT, userAgent);
+        tokenSession.set(SESSION_LOGIN_TIME, System.currentTimeMillis());
     }
 
     private static String getSessionString(String key) {

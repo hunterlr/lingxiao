@@ -6410,3 +6410,57 @@ member-message-ui-check.mjs         9/9
 | 站内信只发站内 | 不推短信 / 邮件 / 微信订阅消息 |
 | 正文单语言 | 站内信是业务数据，不进 `i18n_*` 翻译 |
 | 无过期清理 | 量大时用 job 模块按 `create_time` 清理 |
+
+## 67. 会员资料收尾：头像上传与登录设备（2026-11-27）
+
+### 67.1 一句话结论
+
+门户个人中心补上「上传图片」和「登录设备」：头像进文件中心、会员表只存 `fileId`；
+设备列表能看 IP / 登录时间 / 设备名，能踢单台或一键退出其它设备，
+对外只给 Token 的哈希句柄，不下发原始 Token。
+
+### 67.2 代码落点
+
+| 层 | 文件 |
+|---|---|
+| 服务 | `MemberAvatarService`、`MemberSessionService`、`MemberSessionStore` |
+| 接口 | `MemberProfileController` 新增 `/avatar`、`/sessions`、`/sessions/{id}`、`/sessions/others` |
+| 公共 | `StpMemberUtil` 补 4 个包装方法；`MemberLoginHelper` 在 Token-Session 记 `loginTime` |
+| 门户 | `pages/account.vue`（上传按钮 + 设备面板）、`useMemberAuth`（4 个方法）、`types/member.ts`、`main.css` |
+| 文案 | `messages*.properties` 新增头像 / 会话相关错误与校验键 |
+
+### 67.3 关键决策
+
+1. **会话句柄用哈希，不用 Token**：前端拿到的 `sessionId` 是 `SHA-256(token)` 前 16 位；
+   服务端踢人时重算比对，不额外存映射表，也不给 XSS 留“直接偷别的会话”的机会。
+2. **当前设备不允许在列表里踢**：等价于退出登录，容易让用户以为“踢完还能用”，统一提示走退出。
+3. **设备名只做展示**：按 UA 归并 `Windows · Chrome` 这类文案，认不出叫「未知设备」，
+   不参与任何风控判断。
+4. **头像旧文件不删**：文件中心没有引用计数，误删风险高于收益。
+5. **Sa-Token 调用收在 Store 里**：`MemberSessionService` 只依赖 `MemberSessionStore`，
+   单测 mock 即可，不需要启动 Sa-Token 上下文（沿用 `MemberTokenIssuer` 的做法）。
+
+### 67.4 验证
+
+```text
+mvn -o test                 331 项 / 55 类，0 失败
+member-profile-check.mjs    17/17
+nuxt build                  通过；/account SSR 含「登录设备」「上传图片」
+```
+
+### 67.5 踩坑
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `cn.hutool.crypto.digest` 找不到 | 会员模块只引了 `hutool-core` / `hutool-captcha`，没有 crypto | 用 JDK 自带 `MessageDigest` 算 SHA-256，不为一行摘要加依赖 |
+| 单测断言异常文案失败 | `ServiceException.keyed` 存的是 messageKey，单测里没接 i18n 解析不出中文 | 断言异常类型 + 副作用（没有调用 logout），不去匹配文案 |
+| 会话列表比预期多一条 | 注册接口本身就会签发 Token，等于多一次登录 | 断言改成“至少 2 条 / 踢后少一条”，不写死总数 |
+| 参数开关改不动 | 后台参数更新接口要求整对象，脚本只传了 `configValue` | 验收脚本改用 SQL 直接切开关，脚本只负责业务断言 |
+
+### 67.6 遗留
+
+| 项 | 说明 |
+|---|---|
+| 头像裁剪 | 未做；需要时前端引 `vue-cropper`，服务端已有衍生图能力 |
+| 旧头像回收 | 无引用计数，暂不清理 |
+| 最后活跃时间 | Sa-Token 不逐请求记录，列表只给登录时间与剩余有效期 |

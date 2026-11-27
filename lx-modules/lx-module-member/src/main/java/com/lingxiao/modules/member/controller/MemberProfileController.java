@@ -9,19 +9,28 @@ import com.lingxiao.modules.member.dto.MemberInfoVO;
 import com.lingxiao.modules.member.dto.MemberPasswordChangeRequest;
 import com.lingxiao.modules.member.dto.MemberPasswordSetRequest;
 import com.lingxiao.modules.member.dto.MemberProfileUpdateRequest;
+import com.lingxiao.modules.member.dto.MemberSessionVO;
 import com.lingxiao.modules.member.security.MemberLoginHelper;
+import com.lingxiao.modules.member.service.MemberAvatarService;
 import com.lingxiao.modules.member.service.MemberContactService;
+import com.lingxiao.modules.member.service.MemberSessionService;
 import com.lingxiao.modules.member.service.MemberUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
+import java.util.List;
 
 /**
  * 会员个人中心（{@code /api/app/profile/**}）。
@@ -37,6 +46,8 @@ public class MemberProfileController {
 
     private final MemberUserService userService;
     private final MemberContactService contactService;
+    private final MemberAvatarService avatarService;
+    private final MemberSessionService sessionService;
 
     @GetMapping
     public R<MemberInfoVO> info() {
@@ -78,5 +89,33 @@ public class MemberProfileController {
     public R<MemberInfoVO> changeContact(@Valid @RequestBody MemberContactChangeRequest request) {
         contactService.change(MemberLoginHelper.getMemberId(), request);
         return R.ok(userService.getInfo());
+    }
+
+    /** 头像上传：图片进文件中心，会员表只存 fileId，返回最新资料。 */
+    @Log(title = "会员个人中心", businessType = BusinessType.UPDATE)
+    @PostMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public R<MemberInfoVO> uploadAvatar(@RequestPart("file") MultipartFile file) {
+        return R.ok(avatarService.upload(MemberLoginHelper.getMemberId(), file));
+    }
+
+    /** 登录设备列表；只返回会话句柄，不返回 Token。 */
+    @GetMapping("/sessions")
+    public R<List<MemberSessionVO>> sessions() {
+        return R.ok(sessionService.list(MemberLoginHelper.getMemberId()));
+    }
+
+    /** 退出指定设备；当前设备不允许在这里踢，提示用“退出登录”。 */
+    @Log(title = "会员个人中心", businessType = BusinessType.DELETE)
+    @DeleteMapping("/sessions/{sessionId}")
+    public R<Void> kickSession(@PathVariable String sessionId) {
+        sessionService.kick(MemberLoginHelper.getMemberId(), sessionId);
+        return R.ok();
+    }
+
+    /** 退出除当前设备外的所有会话。 */
+    @Log(title = "会员个人中心", businessType = BusinessType.DELETE)
+    @DeleteMapping("/sessions/others")
+    public R<Integer> kickOtherSessions() {
+        return R.ok(sessionService.kickOthers(MemberLoginHelper.getMemberId()));
     }
 }

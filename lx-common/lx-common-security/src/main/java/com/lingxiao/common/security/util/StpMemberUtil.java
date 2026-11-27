@@ -92,4 +92,29 @@ public final class StpMemberUtil {
     public static SaSession getTokenSession() {
         return STP_LOGIC.getTokenSession();
     }
+
+    /**
+     * 指定会员当前仍然有效的 Token 列表。
+     *
+     * <p>多端登录开启时可能有多条；会员中心“登录设备”用它枚举会话。
+     * 只返回 Token 值，业务层不要把它直接下发前端，用哈希做句柄。</p>
+     */
+    public static java.util.List<String> getTokenValueListByLoginId(Object loginId) {
+        return STP_LOGIC.getTokenValueListByLoginId(loginId);
+    }
+
+    /** 指定 Token 的剩余有效期（秒）；已失效返回 -2（Sa-Token 约定），未找到为 -1。 */
+    public static long getTokenTimeout(String tokenValue) {
+        return STP_LOGIC.getTokenTimeout(tokenValue);
+    }
+
+    /** 读取指定 Token 的 Token-Session；不创建，避免枚举会话时凭空造 Session。 */
+    public static SaSession getTokenSessionByToken(String tokenValue) {
+        return STP_LOGIC.getTokenSessionByToken(tokenValue, false);
+    }
+
+    /** 踢掉指定 Token 对应的单个会话，不影响同账号其它设备。 */
+    public static void logoutByTokenValue(String tokenValue) {
+        STP_LOGIC.logoutByTokenValue(tokenValue);
+    }
 }

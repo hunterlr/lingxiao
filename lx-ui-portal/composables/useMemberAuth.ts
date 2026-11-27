@@ -52,29 +52,26 @@ export function memberErrorMessage(error: unknown, fallback = '操作失败，�
 }
 
 /**
- * 第三方登录错误码文案。
+ * 第三方登录错误码。
  *
- * <p>回调失败时后端只回一个稳定短码（不放上游错误原文），门户按码翻译；
+ * <p>后端只回稳定短码（不放上游错误原文），门户按码翻译；
  * 未知码统一落到“请稍后重试”，避免把平台内部信息展示给用户。</p>
  */
-const OAUTH_ERRORS: Record<string, string> = {
-  disabled: '第三方登录已关闭，请使用账号密码登录。',
-  provider_disabled: '该第三方登录平台已停用，请更换其它方式。',
-  not_configured: '该第三方登录平台尚未配置完成，请联系管理员。',
-  not_bound: '该第三方账号尚未绑定会员，请先用账号密码登录后在个人中心绑定。',
-  already_bound: '当前账号已绑定该平台，请先在个人中心解绑。',
-  bind_conflict: '该第三方账号已绑定其他会员，请更换账号。',
-  account_disabled: '会员账号已停用，请联系管理员。',
-  member_missing: '会员不存在或已被删除。',
-  provider_error: '第三方授权失败，请稍后重试。',
-  state_invalid: '授权已过期，请重新发起第三方登录。',
-  failed: '第三方登录失败，请稍后重试。'
-}
+const OAUTH_ERROR_CODES = [
+  'disabled',
+  'provider_disabled',
+  'not_configured',
+  'not_bound',
+  'already_bound',
+  'bind_conflict',
+  'account_disabled',
+  'member_missing',
+  'provider_error',
+  'state_invalid',
+  'failed'
+] as const
 
-export function oauthErrorMessage(code: unknown, fallback = '第三方登录失败，请稍后重试'): string {
-  const key = typeof code === 'string' ? code : ''
-  return OAUTH_ERRORS[key] || fallback
-}
+
 
 const TOKEN_COOKIE = 'lx-portal-member-token'
 const TOKEN_NAME_COOKIE = 'lx-portal-member-token-name'
@@ -94,6 +91,7 @@ const COOKIE_MAX_AGE = 7 * 24 * 60 * 60
  */
 export function useMemberAuth() {
   const requestFetch = useRequestFetch()
+  const { t } = usePortalI18n()
   const token = useCookie<string | null>(TOKEN_COOKIE, {
     path: '/',
     sameSite: 'lax',
@@ -147,6 +145,15 @@ export function useMemberAuth() {
       throw new MemberApiError(response.code, response.msg || '请求失败')
     }
     return response.data
+  }
+
+  /** 第三方登录错误码文案（跟随当前门户语言）。 */
+  function oauthErrorText(code: unknown): string {
+    const key = typeof code === 'string' ? code : ''
+    if (key && (OAUTH_ERROR_CODES as readonly string[]).includes(key)) {
+      return t(`auth.oauth.${key}`)
+    }
+    return t('auth.oauth.failed')
   }
 
   function applySession(session: MemberSession) {
@@ -537,6 +544,7 @@ export function useMemberAuth() {
     markMessageRead,
     markAllMessagesRead,
     uploadAvatar,
+    oauthErrorText,
     fetchSessions,
     kickSession,
     kickOtherSessions

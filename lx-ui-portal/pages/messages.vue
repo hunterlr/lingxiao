@@ -2,21 +2,21 @@
   <div class="message-page">
     <header class="message-head">
       <div>
-        <p class="eyebrow">个人中心</p>
-        <h1 class="message-title">我的消息</h1>
-        <p class="message-sub">评论审核结果和站内通知都在这里。</p>
+        <p class="eyebrow">{{ t('messages.eyebrow') }}</p>
+        <h1 class="message-title">{{ t('messages.title') }}</h1>
+        <p class="message-sub">{{ t('messages.sub') }}</p>
       </div>
       <div class="message-head-actions">
-        <NuxtLink to="/account" class="button ghost">返回个人中心</NuxtLink>
+        <NuxtLink to="/account" class="button ghost">{{ t('messages.back') }}</NuxtLink>
         <button type="button" class="button" :disabled="unreadCount === 0 || markingAll" @click="markAll">
-          {{ markingAll ? '处理中…' : '全部已读' }}
+          {{ t('messages.markAll') }}
         </button>
       </div>
     </header>
 
     <p v-if="error" class="message-tip">{{ error }}</p>
-    <p v-else-if="loading" class="message-tip">加载中…</p>
-    <p v-else-if="!items.length" class="message-tip">还没有消息。评论通过审核后会在这里通知你。</p>
+    <p v-else-if="loading" class="message-tip">{{ t('messages.loading') }}</p>
+    <p v-else-if="!items.length" class="message-tip">{{ t('messages.empty') }}</p>
 
     <ul v-else class="message-list">
       <li
@@ -36,7 +36,7 @@
             :to="`/article/${item.bizId}`"
             class="message-action"
           >
-            查看文章
+            {{ t('messages.viewArticle') }}
           </NuxtLink>
           <button
             v-if="item.readFlag === '0'"
@@ -45,17 +45,17 @@
             :disabled="readingId === String(item.msgId)"
             @click="markOne(item)"
           >
-            标记已读
+            {{ t('messages.markRead') }}
           </button>
         </div>
       </li>
     </ul>
 
     <div v-if="total > pageSize" class="message-pager">
-      <button type="button" class="button ghost" :disabled="page === 1 || loading" @click="changePage(-1)">上一页</button>
+      <button type="button" class="button ghost" :disabled="page === 1 || loading" @click="changePage(-1)">{{ t('messages.prev') }}</button>
       <span>{{ page }} / {{ totalPages }}</span>
       <button type="button" class="button ghost" :disabled="page >= totalPages || loading" @click="changePage(1)">
-        下一页
+        {{ t('messages.next') }}
       </button>
     </div>
   </div>
@@ -73,6 +73,7 @@ import { MemberApiError, memberErrorMessage } from '~/composables/useMemberAuth'
  */
 
 const route = useRoute()
+const { t } = usePortalI18n()
 const { isLoggedIn, ensureProfile, unreadCount, fetchMessages, markMessageRead, markAllMessagesRead } =
   useMemberAuth()
 
@@ -101,11 +102,11 @@ async function load(target = page.value) {
     page.value = target
   } catch (cause) {
     if (cause instanceof MemberApiError && cause.code === 1003) {
-      error.value = '消息中心已关闭，请稍后再来。'
+      error.value = t('messages.disabled')
     } else if (cause instanceof MemberApiError && (cause.code === 1002 || cause.code === 2002)) {
       await navigateTo(`/login?redirect=${encodeURIComponent('/messages')}`, { replace: true })
     } else {
-      error.value = memberErrorMessage(cause, '消息加载失败，请稍后重试')
+      error.value = memberErrorMessage(cause, t('messages.loadFailed'))
     }
   } finally {
     loading.value = false
@@ -118,7 +119,7 @@ async function markOne(item: MemberMessageItem) {
     await markMessageRead(item.msgId)
     item.readFlag = '1'
   } catch (cause) {
-    error.value = memberErrorMessage(cause, '标记已读失败，请稍后重试')
+    error.value = memberErrorMessage(cause, t('messages.markFailed'))
   } finally {
     readingId.value = ''
   }
@@ -130,7 +131,7 @@ async function markAll() {
     await markAllMessagesRead()
     items.value = items.value.map((item) => ({ ...item, readFlag: '1' }))
   } catch (cause) {
-    error.value = memberErrorMessage(cause, '操作失败，请稍后重试')
+    error.value = memberErrorMessage(cause, t('messages.actionFailed'))
   } finally {
     markingAll.value = false
   }
@@ -149,5 +150,5 @@ function formatTime(value?: string | null) {
 
 await load(1)
 
-useSeoMeta({ title: '我的消息', robots: 'noindex' })
+useSeoMeta({ title: () => t('messages.seoTitle'), robots: 'noindex' })
 </script>

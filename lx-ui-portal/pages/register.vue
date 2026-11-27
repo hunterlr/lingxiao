@@ -2,21 +2,21 @@
   <div class="auth-page">
     <section class="auth-intro">
       <p class="eyebrow">JOIN</p>
-      <h1>注册会员，收藏你的阅读轨迹</h1>
-      <p>
-        注册后自动登录。手机号和邮箱是否必填由站点会员设置决定，
-        提交时若缺失会给出明确提示。
-      </p>
+      <h1>{{ t('register.introTitle') }}</h1>
+      <p>{{ t('register.introDesc') }}</p>
       <ul class="auth-points">
-        <li>用户名用于登录，注册后不可修改</li>
-        <li>昵称会展示在个人中心与后续评论中</li>
-        <li>密码至少 6 位，具体复杂度以站点策略为准</li>
+        <li>{{ t('register.point1') }}</li>
+        <li>{{ t('register.point2') }}</li>
+        <li>{{ t('register.point3') }}</li>
       </ul>
     </section>
 
     <section class="auth-card">
-      <h2>注册新账号</h2>
-      <p class="auth-sub">已有账号？<NuxtLink to="/login">直接登录</NuxtLink></p>
+      <h2>{{ t('register.title') }}</h2>
+      <p class="auth-sub">
+        {{ t('register.hasAccount') }}
+        <NuxtLink to="/login">{{ t('register.loginNow') }}</NuxtLink>
+      </p>
 
       <p v-if="memberDisabled" class="form-alert error" role="alert">{{ disabledMessage }}</p>
       <p v-else-if="oauthError" class="form-alert error" role="alert">{{ oauthError }}</p>
@@ -24,7 +24,7 @@
 
       <form @submit.prevent="onSubmit">
         <div class="form-field">
-          <label for="register-username">用户名</label>
+          <label for="register-username">{{ t('register.username') }}</label>
           <input
             id="register-username"
             v-model="form.username"
@@ -32,13 +32,13 @@
             type="text"
             autocomplete="username"
             maxlength="64"
-            placeholder="用于登录，注册后不可修改"
+            :placeholder="t('register.usernamePlaceholder')"
             required
           />
         </div>
 
         <div class="form-field">
-          <label for="register-nickname">昵称</label>
+          <label for="register-nickname">{{ t('register.nickname') }}</label>
           <input
             id="register-nickname"
             v-model="form.nickname"
@@ -46,13 +46,13 @@
             type="text"
             autocomplete="nickname"
             maxlength="64"
-            placeholder="不填时默认使用用户名"
+            :placeholder="t('register.nicknamePlaceholder')"
           />
         </div>
 
         <div class="form-row">
           <div class="form-field">
-            <label for="register-mobile">手机号</label>
+            <label for="register-mobile">{{ t('register.mobile') }}</label>
             <input
               id="register-mobile"
               v-model="form.mobile"
@@ -60,11 +60,11 @@
               type="tel"
               autocomplete="tel"
               maxlength="32"
-              placeholder="选填"
+              :placeholder="t('auth.common.optional')"
             />
           </div>
           <div class="form-field">
-            <label for="register-email">邮箱</label>
+            <label for="register-email">{{ t('register.email') }}</label>
             <input
               id="register-email"
               v-model="form.email"
@@ -72,14 +72,14 @@
               type="email"
               autocomplete="email"
               maxlength="128"
-              placeholder="选填"
+              :placeholder="t('auth.common.optional')"
             />
           </div>
         </div>
 
         <div class="form-row">
           <div class="form-field">
-            <label for="register-password">密码</label>
+            <label for="register-password">{{ t('auth.common.password') }}</label>
             <input
               id="register-password"
               v-model="form.password"
@@ -88,12 +88,12 @@
               autocomplete="new-password"
               minlength="6"
               maxlength="64"
-              placeholder="至少 6 位"
+              :placeholder="t('auth.common.passwordMinPlaceholder')"
               required
             />
           </div>
           <div class="form-field">
-            <label for="register-password-confirm">确认密码</label>
+            <label for="register-password-confirm">{{ t('register.confirmPassword') }}</label>
             <input
               id="register-password-confirm"
               v-model="form.confirmPassword"
@@ -102,14 +102,14 @@
               autocomplete="new-password"
               minlength="6"
               maxlength="64"
-              placeholder="再次输入密码"
+              :placeholder="t('register.confirmPlaceholder')"
               required
             />
           </div>
         </div>
 
         <div v-if="captcha?.enabled" class="form-field">
-          <label for="register-captcha">图形验证码</label>
+          <label for="register-captcha">{{ t('auth.common.captcha') }}</label>
           <div class="captcha-row">
             <input
               id="register-captcha"
@@ -118,17 +118,17 @@
               type="text"
               autocomplete="off"
               maxlength="8"
-              placeholder="请输入图片中的字符"
+              :placeholder="t('auth.common.captchaPlaceholder')"
               required
             />
             <button
               type="button"
               class="captcha-image"
-              :aria-label="captchaLoading ? '正在刷新验证码' : '点击刷新验证码'"
+              :aria-label="captchaLoading ? t('auth.common.captchaLoadingLabel') : t('auth.common.captchaRefreshLabel')"
               @click="refreshCaptcha"
             >
-              <img v-if="captcha.image" :src="captcha.image" alt="图形验证码" />
-              <span v-else>刷新</span>
+              <img v-if="captcha.image" :src="captcha.image" :alt="t('auth.common.captchaAlt')" />
+              <span v-else>{{ t('auth.common.refresh') }}</span>
             </button>
           </div>
         </div>
@@ -136,17 +136,17 @@
         <div class="form-field">
           <label class="checkbox-field">
             <input v-model="form.agreement" type="checkbox" name="agreement" />
-            <span>我已阅读并同意用户协议与隐私说明</span>
+            <span>{{ t('register.agreement') }}</span>
           </label>
         </div>
 
         <div class="form-actions">
           <button type="submit" class="button" :disabled="submitting || memberDisabled">
-            {{ submitting ? '注册中…' : '注册并登录' }}
+            {{ submitting ? t('register.submitting') : t('register.submit') }}
           </button>
           <div class="form-links">
-            <NuxtLink to="/login">已有账号</NuxtLink>
-            <NuxtLink to="/forgot-password">忘记密码</NuxtLink>
+            <NuxtLink to="/login">{{ t('register.haveAccount') }}</NuxtLink>
+            <NuxtLink to="/forgot-password">{{ t('auth.common.forgot') }}</NuxtLink>
           </div>
         </div>
       </form>
@@ -158,10 +158,11 @@
 
 <script setup lang="ts">
 import type { MemberCaptcha } from '~/types/member'
-import { MemberApiError, memberErrorMessage, oauthErrorMessage } from '~/composables/useMemberAuth'
+import { MemberApiError, memberErrorMessage } from '~/composables/useMemberAuth'
 
 const route = useRoute()
-const { register, token, profile, ensureProfile, fetchCaptcha } = useMemberAuth()
+const { t } = usePortalI18n()
+const { register, token, profile, ensureProfile, fetchCaptcha, oauthErrorText } = useMemberAuth()
 
 const form = reactive({
   username: '',
@@ -178,10 +179,10 @@ const captchaLoading = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
 const memberDisabled = ref(false)
-const disabledMessage = ref('会员功能已关闭，请稍后再试。')
+const disabledMessage = ref(t('auth.common.disabled'))
 const oauthError = computed(() => {
   const code = route.query.oauthError
-  return typeof code === 'string' && code ? oauthErrorMessage(code) : ''
+  return typeof code === 'string' && code ? oauthErrorText(code) : ''
 })
 
 function onOAuthError(message: string) {
@@ -198,7 +199,7 @@ async function refreshCaptcha() {
       memberDisabled.value = true
       disabledMessage.value = memberErrorMessage(error, disabledMessage.value)
     } else {
-      errorMessage.value = memberErrorMessage(error, '验证码加载失败，请稍后重试')
+      errorMessage.value = memberErrorMessage(error, t('auth.common.captchaFailed'))
     }
   } finally {
     captchaLoading.value = false
@@ -209,23 +210,23 @@ async function onSubmit() {
   errorMessage.value = ''
   const username = form.username.trim()
   if (!username) {
-    errorMessage.value = '请输入用户名'
+    errorMessage.value = t('register.usernameRequired')
     return
   }
   if (!form.password || form.password.length < 6) {
-    errorMessage.value = '密码至少 6 位'
+    errorMessage.value = t('register.passwordShort')
     return
   }
   if (form.password !== form.confirmPassword) {
-    errorMessage.value = '两次输入的密码不一致'
+    errorMessage.value = t('register.passwordMismatch')
     return
   }
   if (!form.agreement) {
-    errorMessage.value = '请先阅读并同意用户协议'
+    errorMessage.value = t('register.agreementRequired')
     return
   }
   if (captcha.value?.enabled && (!captcha.value.key || !form.captchaCode.trim())) {
-    errorMessage.value = '请输入图形验证码'
+    errorMessage.value = t('auth.common.captchaRequired')
     return
   }
 
@@ -247,7 +248,7 @@ async function onSubmit() {
       memberDisabled.value = true
       disabledMessage.value = memberErrorMessage(error, disabledMessage.value)
     }
-    errorMessage.value = memberErrorMessage(error, '注册失败，请稍后重试')
+    errorMessage.value = memberErrorMessage(error, t('register.failed'))
     form.captchaCode = ''
     if (captcha.value?.enabled) await refreshCaptcha()
   } finally {
@@ -260,7 +261,7 @@ if (token.value && profile.value) {
   await navigateTo('/account', { replace: true })
 }
 
-useSeoMeta({ title: '注册会员', robots: 'noindex' })
+useSeoMeta({ title: () => t('register.seoTitle'), robots: 'noindex' })
 
 onMounted(refreshCaptcha)
 </script>

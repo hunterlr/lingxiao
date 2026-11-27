@@ -47,6 +47,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ error: [message: string] }>()
 
+const { t } = usePortalI18n()
 const { fetchOAuthProviders, fetchOAuthAuthorizeUrl } = useMemberAuth()
 
 const providers = ref<MemberOAuthProvider[]>([])
@@ -62,7 +63,7 @@ const visibleProviders = computed(() => {
 const visible = computed(() => visibleProviders.value.length > 0)
 
 const dividerText = computed(() =>
-  props.mode === 'bind' ? '绑定其它第三方账号' : '或使用第三方账号登录'
+  props.mode === 'bind' ? t('memberOauth.dividerBind') : t('memberOauth.dividerLogin')
 )
 
 function initial(name: string): string {
@@ -77,7 +78,7 @@ async function start(item: MemberOAuthProvider) {
     const result = await fetchOAuthAuthorizeUrl(item.provider, props.mode, props.redirect || undefined)
     window.location.assign(result.authorizeUrl)
   } catch (error) {
-    errorText.value = memberErrorMessage(error, '暂时无法发起第三方登录，请稍后重试')
+    errorText.value = memberErrorMessage(error, t('memberOauth.failed'))
     emit('error', errorText.value)
     loadingProvider.value = ''
   }

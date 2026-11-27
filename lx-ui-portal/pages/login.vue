@@ -2,33 +2,31 @@
   <div class="auth-page">
     <section class="auth-intro">
       <p class="eyebrow">MEMBER</p>
-      <h1>登录会员，继续你的阅读</h1>
-      <p>
-        用用户名、手机号或邮箱登录。会员资料与后台内容账号完全隔离，
-        门户不会读取后台管理数据。
-      </p>
+      <h1>{{ t('auth.login.introTitle') }}</h1>
+      <p>{{ t('auth.login.introDesc') }}</p>
       <ul class="auth-points">
-        <li>登录后可维护昵称、头像与性别</li>
-        <li>支持自助修改密码与找回密码</li>
-        <li>会话过期后只需重新登录，不影响已发布内容</li>
+        <li>{{ t('auth.login.point1') }}</li>
+        <li>{{ t('auth.login.point2') }}</li>
+        <li>{{ t('auth.login.point3') }}</li>
       </ul>
     </section>
 
     <section class="auth-card">
-      <h2>会员登录</h2>
-      <p class="auth-sub">还没有账号？<NuxtLink to="/register">立即注册</NuxtLink></p>
+      <h2>{{ t('auth.login.title') }}</h2>
+      <p class="auth-sub">
+        {{ t('auth.login.noAccount') }}
+        <NuxtLink to="/register">{{ t('auth.login.registerNow') }}</NuxtLink>
+      </p>
 
       <p v-if="notice" class="form-alert info" role="status">{{ notice }}</p>
       <p v-if="bindNotice" class="form-alert info" role="status">{{ bindNotice }}</p>
-      <p v-if="memberDisabled" class="form-alert error" role="alert">
-        {{ disabledMessage }}
-      </p>
+      <p v-if="memberDisabled" class="form-alert error" role="alert">{{ disabledMessage }}</p>
       <p v-else-if="oauthError" class="form-alert error" role="alert">{{ oauthError }}</p>
       <p v-else-if="errorMessage" class="form-alert error" role="alert">{{ errorMessage }}</p>
 
       <form @submit.prevent="onSubmit">
         <div class="form-field">
-          <label for="login-account">账号</label>
+          <label for="login-account">{{ t('auth.common.account') }}</label>
           <input
             id="login-account"
             v-model="form.account"
@@ -36,13 +34,13 @@
             type="text"
             autocomplete="username"
             maxlength="128"
-            placeholder="用户名 / 手机号 / 邮箱"
+            :placeholder="t('auth.login.accountPlaceholder')"
             required
           />
         </div>
 
         <div class="form-field">
-          <label for="login-password">密码</label>
+          <label for="login-password">{{ t('auth.common.password') }}</label>
           <input
             id="login-password"
             v-model="form.password"
@@ -50,13 +48,13 @@
             type="password"
             autocomplete="current-password"
             maxlength="64"
-            placeholder="请输入密码"
+            :placeholder="t('auth.login.passwordPlaceholder')"
             required
           />
         </div>
 
         <div v-if="captcha?.enabled" class="form-field">
-          <label for="login-captcha">图形验证码</label>
+          <label for="login-captcha">{{ t('auth.common.captcha') }}</label>
           <div class="captcha-row">
             <input
               id="login-captcha"
@@ -66,29 +64,29 @@
               inputmode="text"
               autocomplete="off"
               maxlength="8"
-              placeholder="请输入图片中的字符"
+              :placeholder="t('auth.common.captchaPlaceholder')"
               required
             />
             <button
               type="button"
               class="captcha-image"
-              :aria-label="captchaLoading ? '正在刷新验证码' : '点击刷新验证码'"
+              :aria-label="captchaLoading ? t('auth.common.captchaLoadingLabel') : t('auth.common.captchaRefreshLabel')"
               @click="refreshCaptcha"
             >
-              <img v-if="captcha.image" :src="captcha.image" alt="图形验证码" />
-              <span v-else>刷新</span>
+              <img v-if="captcha.image" :src="captcha.image" :alt="t('auth.common.captchaAlt')" />
+              <span v-else>{{ t('auth.common.refresh') }}</span>
             </button>
           </div>
-          <p class="form-hint">看不清可以点击图片刷新，验证码一次性使用。</p>
+          <p class="form-hint">{{ t('auth.login.captchaHint') }}</p>
         </div>
 
         <div class="form-actions">
           <button type="submit" class="button" :disabled="submitting || memberDisabled">
-            {{ submitting ? '登录中…' : '登录' }}
+            {{ submitting ? t('auth.common.submitting') : t('auth.login.submit') }}
           </button>
           <div class="form-links">
-            <NuxtLink to="/forgot-password">忘记密码</NuxtLink>
-            <NuxtLink to="/register">注册新账号</NuxtLink>
+            <NuxtLink to="/forgot-password">{{ t('auth.common.forgot') }}</NuxtLink>
+            <NuxtLink to="/register">{{ t('auth.common.createAccount') }}</NuxtLink>
           </div>
         </div>
       </form>
@@ -100,10 +98,11 @@
 
 <script setup lang="ts">
 import type { MemberCaptcha } from '~/types/member'
-import { MemberApiError, memberErrorMessage, oauthErrorMessage } from '~/composables/useMemberAuth'
+import { MemberApiError, memberErrorMessage } from '~/composables/useMemberAuth'
 
 const route = useRoute()
-const { login, token, profile, ensureProfile, fetchCaptcha, bindOAuthTicket } = useMemberAuth()
+const { t } = usePortalI18n()
+const { login, token, profile, ensureProfile, fetchCaptcha, bindOAuthTicket, oauthErrorText } = useMemberAuth()
 
 const form = reactive({ account: '', password: '', captchaCode: '' })
 const captcha = ref<MemberCaptcha | null>(null)
@@ -111,15 +110,15 @@ const captchaLoading = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
 const memberDisabled = ref(false)
-const disabledMessage = ref('会员功能已关闭，请稍后再试。')
+const disabledMessage = ref(t('auth.login.disabled'))
 const notice = computed(() => {
-  if (route.query.reset === '1') return '密码已重置，请使用新密码登录。'
-  if (route.query.changed === '1') return '密码已修改，请使用新密码登录。'
+  if (route.query.reset === '1') return t('auth.login.resetNotice')
+  if (route.query.changed === '1') return t('auth.login.changedNotice')
   return ''
 })
 const oauthError = computed(() => {
   const code = route.query.oauthError
-  return typeof code === 'string' && code ? oauthErrorMessage(code) : ''
+  return typeof code === 'string' && code ? oauthErrorText(code) : ''
 })
 
 function onOAuthError(message: string) {
@@ -147,9 +146,7 @@ const bindProvider = computed(() => {
   return typeof value === 'string' ? value : ''
 })
 const bindNotice = computed(() =>
-  bindTicket.value && !token.value
-    ? '该第三方账号关联的邮箱或手机号已注册会员。请先用原账号登录，登录后会自动完成绑定。'
-    : ''
+  bindTicket.value && !token.value ? t('auth.login.bindNotice') : ''
 )
 
 /** 登录态就绪后尝试完成绑定；失败返回 false，由调用方决定提示方式。 */
@@ -179,7 +176,7 @@ async function refreshCaptcha() {
       memberDisabled.value = true
       disabledMessage.value = memberErrorMessage(error, disabledMessage.value)
     } else {
-      errorMessage.value = memberErrorMessage(error, '验证码加载失败，请稍后重试')
+      errorMessage.value = memberErrorMessage(error, t('auth.login.captchaFailed'))
     }
   } finally {
     captchaLoading.value = false
@@ -190,11 +187,11 @@ async function onSubmit() {
   errorMessage.value = ''
   const account = form.account.trim()
   if (!account || !form.password) {
-    errorMessage.value = '请输入账号和密码'
+    errorMessage.value = t('auth.login.accountRequired')
     return
   }
   if (captcha.value?.enabled && (!captcha.value.key || !form.captchaCode.trim())) {
-    errorMessage.value = '请输入图形验证码'
+    errorMessage.value = t('auth.login.captchaRequired')
     return
   }
 
@@ -218,7 +215,7 @@ async function onSubmit() {
       memberDisabled.value = true
       disabledMessage.value = memberErrorMessage(error, disabledMessage.value)
     }
-    errorMessage.value = memberErrorMessage(error, '登录失败，请稍后重试')
+    errorMessage.value = memberErrorMessage(error, t('auth.login.failed'))
     form.captchaCode = ''
     if (captcha.value?.enabled) await refreshCaptcha()
   } finally {
@@ -237,7 +234,7 @@ if (token.value && profile.value) {
   }
 }
 
-useSeoMeta({ title: '会员登录', robots: 'noindex' })
+useSeoMeta({ title: () => t('auth.login.seoTitle'), robots: 'noindex' })
 
 onMounted(refreshCaptcha)
 </script>

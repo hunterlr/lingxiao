@@ -2,33 +2,30 @@
   <div class="auth-page">
     <section class="auth-intro">
       <p class="eyebrow">OAUTH</p>
-      <h1>正在完成第三方登录</h1>
-      <p>
-        授权成功后门户会换取会员会话。Token 不会出现在地址栏，
-        回调地址里只有一次性的临时凭证。
-      </p>
+      <h1>{{ t('callback.introTitle') }}</h1>
+      <p>{{ t('callback.introDesc') }}</p>
       <ul class="auth-points">
-        <li>临时凭证两分钟内有效，且只能使用一次</li>
-        <li>会员会话与后台账号完全隔离</li>
-        <li>如果授权失败，可以返回登录页重试</li>
+        <li>{{ t('callback.point1') }}</li>
+        <li>{{ t('callback.point2') }}</li>
+        <li>{{ t('callback.point3') }}</li>
       </ul>
     </section>
 
     <section class="auth-card">
-      <h2>{{ errorMessage ? '登录未完成' : '正在登录…' }}</h2>
+      <h2>{{ errorMessage ? t('callback.headingError') : t('callback.headingPending') }}</h2>
       <p v-if="errorMessage" class="form-alert error" role="alert">{{ errorMessage }}</p>
-      <p v-else class="panel-description">正在校验第三方授权，请稍候，不要关闭页面。</p>
+      <p v-else class="panel-description">{{ t('callback.pendingHint') }}</p>
 
       <div v-if="errorMessage" class="form-actions">
-        <NuxtLink class="button" :to="loginTarget">返回登录</NuxtLink>
-        <NuxtLink class="button ghost" to="/">返回首页</NuxtLink>
+        <NuxtLink class="button" :to="loginTarget">{{ t('callback.backLogin') }}</NuxtLink>
+        <NuxtLink class="button ghost" to="/">{{ t('callback.backHome') }}</NuxtLink>
       </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { memberErrorMessage, oauthErrorMessage } from '~/composables/useMemberAuth'
+import { memberErrorMessage } from '~/composables/useMemberAuth'
 
 /**
  * 第三方登录回调页。
@@ -38,7 +35,8 @@ import { memberErrorMessage, oauthErrorMessage } from '~/composables/useMemberAu
  * 避免 SSR 与 hydration 重复消费 ticket。</p>
  */
 const route = useRoute()
-const { exchangeOAuthTicket } = useMemberAuth()
+const { t } = usePortalI18n()
+const { exchangeOAuthTicket, oauthErrorText } = useMemberAuth()
 
 const errorMessage = ref('')
 const loginTarget = computed(() => {
@@ -58,21 +56,21 @@ function safeRedirect(): string {
 
 onMounted(async () => {
   if (readQuery('oauthError')) {
-    errorMessage.value = oauthErrorMessage(readQuery('oauthError'))
+    errorMessage.value = oauthErrorText(readQuery('oauthError'))
     return
   }
   const ticket = readQuery('ticket')
   if (!ticket) {
-    errorMessage.value = '登录凭证缺失，请重新发起第三方登录。'
+    errorMessage.value = t('callback.missingTicket')
     return
   }
   try {
     await exchangeOAuthTicket(ticket)
     await navigateTo(safeRedirect(), { replace: true })
   } catch (error) {
-    errorMessage.value = memberErrorMessage(error, '第三方登录失败，请重试。')
+    errorMessage.value = memberErrorMessage(error, t('callback.failed'))
   }
 })
 
-useSeoMeta({ title: '第三方登录', robots: 'noindex' })
+useSeoMeta({ title: () => t('callback.seoTitle'), robots: 'noindex' })
 </script>

@@ -6517,3 +6517,55 @@ SSR（zh / en-US 各一次）              首页、栏目、文章、搜索关�
 | 会员中心文案（刀 A2） | 登录 / 注册 / 找回 / 个人中心 / 消息 / 第三方回调仍在 `PENDING` |
 | CMS 内容翻译（刀 B） | 表与接口方案见 `docs/13` §12.34.4 |
 | URL 前缀与 hreflang（刀 C） | 方案见 §12.34，等 B 完成 |
+
+## 69. 会员中心文案双语（刀 A2，2026-11-27）
+
+### 69.1 一句话结论
+
+登录 / 注册 / 找回密码 / 个人中心 / 消息中心 / 第三方回调全部走语言包，
+键从 109 扩到 366，检查脚本不再豁免任何文件；`/account` 在英文下是
+「Profile / Signed-in devices」，中文下是「基本资料 / 登录设备」。
+
+### 69.2 代码落点
+
+| 层 | 文件 |
+|---|---|
+| 语言包 | `i18n/zh-CN.ts`、`i18n/en-US.ts`（+257 键） |
+| 组合式 | `useMemberAuth`：OAuth 错误码改键映射、新增 `oauthErrorText()` |
+| 页面 | `login`、`register`、`forgot-password`、`account`、`messages`、`oauth/callback` |
+| 组件 | `MemberOAuthButtons` |
+| 守卫 | `scripts/check-portal-i18n.mjs`：`PENDING` 清空；动态键前缀 `auth.oauth.` 放行 |
+
+### 69.3 关键决策
+
+1. **OAuth 错误码按前缀动态翻译**：`t('auth.oauth.' + code)`，码表在组合式里，
+   页面只调用 `oauthErrorText(code)`；检查脚本按前缀放行这类动态键。
+2. **`account.vue` 用“文本节点替换”而不是整段替换**：只动 `>文本<`、`attr="值"`、
+   `'字面量'` 三种形态，标签结构原样保留。
+3. **参数化文案单独处理**：`{count}` / `{value}` / `{date}` 这类用 `t(key, { ... })`，
+   不把变量写死进语言包。
+
+### 69.4 验证
+
+```text
+check-portal-i18n.mjs   通过（27 文件 / 366 键，0 豁免）
+nuxt build              通过
+verify-ssr.mjs          15/15（中英各取登录 / 注册 / 找回 / 个人中心 / 消息，含 html lang）
+```
+
+### 69.5 踩坑
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `account.vue` 编译报 `Attribute name cannot contain ...` | 整段标签被当作 oldText，替换成 moustache 后 `<label>` / `<option>` 结构丢失 | `git checkout` 还原，改脚本只替换文本节点与属性值 |
+| `message.vue` 报 `v-else/v-else-if has no adjacent v-if` | 同上，`<p v-else-if>` 被整段替换 | 还原后按“保留标签”的方式重做 |
+| 语言包出现 `'…'头像已更新'` 这类脏值 | 修正脚本的正则把 `'前缀 + 值` 当成一个值 | 按 key 整行重写脏行，并加“同一行不得有多余文本”的检查 |
+| 中文字典里混进多行字符串 | 多行 oldText 泄漏进 `zh` 值，esbuild 报未闭合字符串 | 单行化后重写该条 |
+| SSR 验收里 Token 突然 1002 | 会员默认单会话，重新登录会踢掉旧 Token | 验收脚本前先重新登录，再立刻发请求 |
+
+### 69.6 遗留
+
+| 项 | 说明 |
+|---|---|
+| CMS 内容翻译（刀 B） | 表与接口方案见 `docs/13` §12.34.4 |
+| URL 前缀 / hreflang / 分语言 sitemap（刀 C） | 方案见 §12.34，等 B 完成 |

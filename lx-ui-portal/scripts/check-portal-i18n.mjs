@@ -17,16 +17,8 @@ import path from 'node:path'
 
 const ROOT = process.cwd()
 const SCAN = ['pages', 'layouts', 'components', 'error.vue']
-/** 第二刀再处理的文件；不要为了过检查把它们塞进白名单以外的例外 */
-const PENDING = new Set([
-  'pages/account.vue',
-  'pages/login.vue',
-  'pages/register.vue',
-  'pages/forgot-password.vue',
-  'pages/messages.vue',
-  'pages/oauth/callback.vue',
-  'components/MemberOAuthButtons.vue'
-])
+/** 会员中心已于 2026-11-27（刀 A2）完成键化；保留空集合便于以后临时豁免 */
+const PENDING = new Set([])
 /** 品牌名允许保留中文（页脚署名与 Logo 占位字） */
 const ALLOW_WORDS = ['凌霄', '凌']
 
@@ -97,8 +89,12 @@ for (const file of files) {
   }
 }
 
+// 动态拼接的键（如 t(`auth.oauth.${code}`)）扫描不到，按前缀放行
+const DYNAMIC_PREFIXES = ['auth.oauth.']
 for (const key of zh.keys()) {
-  if (!used.has(key)) warnings.push(`未使用的键: ${key}`)
+  if (used.has(key)) continue
+  if (DYNAMIC_PREFIXES.some((prefix) => key.startsWith(prefix))) continue
+  warnings.push(`未使用的键: ${key}`)
 }
 
 console.log(`扫描 ${files.length - PENDING.size} 个文件（跳过 ${PENDING.size} 个待改造文件）`)

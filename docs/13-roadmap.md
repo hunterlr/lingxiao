@@ -1357,7 +1357,39 @@ nuxt build                              通过
 页头切换按钮                            两种语言页面都渲染 lang-button
 ```
 
-**A2 待做**：登录 / 注册 / 找回密码 / 个人中心 / 消息中心 / 第三方回调，
-脚本 `PENDING` 清单里已经列出，改完从清单删除即可。
+**A2 已完成**（§12.36）：会员中心文案同样双语，脚本 `PENDING` 已清空。
 
-**下一步**：A2（会员中心文案）→ 刀 B（CMS 内容翻译）→ 刀 C（URL 前缀与 SEO）。
+**下一步**：刀 B（CMS 内容翻译）→ 刀 C（URL 前缀与 SEO）。
+
+### 12.36 刀 A2：会员中心文案双语（✅ 已完成，2026-11-27）
+
+**范围**：登录 / 注册 / 找回密码 / 个人中心 / 消息中心 / 第三方回调，
+以及第三方登录按钮与 11 个 OAuth 错误码。
+
+**落地**：
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 语言包 | `i18n/zh-CN.ts` / `en-US.ts` | 从 109 键扩到 **366 键**，中英一致 |
+| 组合式 | `useMemberAuth` | OAuth 错误码改为键映射（`auth.oauth.*`），新增 `oauthErrorText()`；`t()` 复用门户语言 |
+| 页面 | `login` / `register` / `forgot-password` / `account` / `messages` / `oauth/callback` | 文案全部键化；`account.vue` 用“只换文本节点”的方式改造，保留标签结构 |
+| 组件 | `MemberOAuthButtons` | 分割线与失败提示走键 |
+| 守卫 | `scripts/check-portal-i18n.mjs` | `PENDING` 清空，27 个文件全部纳入检查 |
+
+**验收（本机 SSR 实测，脚本 `.local/a2/verify-ssr.mjs`）**：
+
+```text
+node scripts/check-portal-i18n.mjs   通过（zh=366 en=366，0 待改造文件）
+nuxt build                           通过
+/login /register /forgot-password    zh 与 en-US 关键文案正确；英文页无中文残留
+/account（带会员 Cookie）            zh「基本资料 / 登录设备」、en「Profile / Signed-in devices」
+/messages（带会员 Cookie）           zh「我的消息」、en「My messages」
+<html lang>                          zh-CN / en-US 正确
+verify-ssr.mjs                       15/15
+```
+
+**踩坑**：模板替换若把整段标签当 oldText，会把 `<label>` / `<option>` / `<a>` 一起吞掉；
+`account.vue` 出现过一次，用 `git checkout` 还原后改成“只替换文本节点 + 属性值”的方式重做。
+这条已写进 `docs/21` §69.5，后续改造要照这个来。
+
+**下一步**：刀 B（CMS 内容翻译，`docs/13` §12.34.4）→ 刀 C（URL 前缀与 SEO）。

@@ -314,11 +314,166 @@ button {
   white-space: nowrap;
 }
 
+/* 页头消息入口：未读角标叠在铃铛右上角 */
+.member-bell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.member-bell:hover,
+.member-bell.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.member-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--warm);
+  color: #fff;
+  font-size: 10px;
+  line-height: 17px;
+  text-align: center;
+  font-weight: 700;
+}
+
 /* ==================== 主体 ==================== */
 
 .page-main {
   min-height: 50vh;
   padding: 44px 0 80px;
+}
+
+/* ==================== 我的消息 ==================== */
+
+.message-page {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.message-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.message-title {
+  margin: 0 0 6px;
+  font-family: var(--font-serif);
+  font-size: clamp(24px, 4vw, 30px);
+}
+
+.message-sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.message-head-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.message-tip {
+  padding: 28px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  text-align: center;
+}
+
+.message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.message-item {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.message-item.is-unread {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.message-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.message-item-head strong {
+  font-size: 15px;
+}
+
+.message-time {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.message-content {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre-line;
+}
+
+.message-item-foot {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.message-action {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.message-action:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+.message-pager {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 22px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .eyebrow {

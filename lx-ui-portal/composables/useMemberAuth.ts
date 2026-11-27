@@ -7,6 +7,7 @@ import type {
   MemberForgotPasswordForm,
   MemberInteraction,
   MemberLoginForm,
+  MemberMessageItem,
   MemberOAuthAuthorize,
   MemberOAuthBinding,
   MemberOAuthProviders,
@@ -407,6 +408,47 @@ export function useMemberAuth() {
     })
   }
 
+  // ==================== 站内消息 ====================
+
+  /**
+   * 未读数。
+   *
+   * <p>放在 `useState` 里而不是每次新建：页头角标、消息列表页、标记已读
+   * 都读同一份，标完已读不用再请求一次就能更新角标。</p>
+   */
+  const unreadCount = useState<number>('portal-member-unread', () => 0)
+
+  function fetchMessages(pageNum = 1, pageSize = 10): Promise<PageResult<MemberMessageItem>> {
+    return request<PageResult<MemberMessageItem>>('/messages', { query: { pageNum, pageSize } })
+  }
+
+  function refreshUnread(): Promise<number> {
+    if (!token.value) {
+      unreadCount.value = 0
+      return Promise.resolve(0)
+    }
+    return request<number>('/messages/unread-count')
+      .then((value) => {
+        unreadCount.value = Number(value || 0)
+        return unreadCount.value
+      })
+      .catch(() => unreadCount.value)
+  }
+
+  function markMessageRead(msgId: string | number): Promise<void> {
+    return request<void>(`/messages/${encodeURIComponent(String(msgId))}/read`, {
+      method: 'PUT'
+    }).then(() => {
+      unreadCount.value = Math.max(0, unreadCount.value - 1)
+    })
+  }
+
+  function markAllMessagesRead(): Promise<void> {
+    return request<void>('/messages/read-all', { method: 'PUT' }).then(() => {
+      unreadCount.value = 0
+    })
+  }
+
   const isLoggedIn = computed(() => Boolean(token.value))
 
   return {
@@ -437,6 +479,11 @@ export function useMemberAuth() {
     setFavorite,
     setLike,
     fetchComments,
-    submitComment
+    submitComment,
+    unreadCount,
+    fetchMessages,
+    refreshUnread,
+    markMessageRead,
+    markAllMessagesRead
   }
 }

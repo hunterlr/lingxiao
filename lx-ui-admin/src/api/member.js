@@ -82,6 +82,20 @@ export function deleteMemberComment(commentId) {
   return http.delete(`/admin/member/comment/${commentId}`)
 }
 
+/* ==================== 会员站内消息 ==================== */
+
+export function listMemberMessages(params) {
+  return http.get('/admin/member/message/list', { params })
+}
+
+export function sendMemberMessage(data) {
+  return http.post('/admin/member/message/send', data)
+}
+
+export function deleteMemberMessage(msgId) {
+  return http.delete(`/admin/member/message/${msgId}`)
+}
+
 /* ==================== 会员第三方登录 ==================== */
 
 export function listMemberOAuthProviders() {

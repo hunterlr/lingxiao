@@ -2,7 +2,7 @@
 
 > 本文回答两个问题：**哪些逻辑必须用单测锁住？没有数据库的机器上怎么自动验证？**
 >
-> 结论：v1.0 基线 + v1.1 CMS + v1.2 会员 + v1.3 / v1.4 的模型 / 模板 / 多语言共 **312 个单测（53 个测试类）**，
+> 结论：v1.0 基线 + v1.1 CMS + v1.2 会员 + v1.3 / v1.4 的模型 / 模板 / 多语言共 **324 个单测（54 个测试类）**，
 > 完全不依赖 MySQL / Redis，`mvn test` 一条命令跑完（JDK 8 本机约 30 秒）；
 > GitHub Actions 覆盖 JDK 8/11/17、后台构建 + 语言包自检、门户构建。
 
@@ -68,11 +68,11 @@ mvn -B -ntp -DskipTests package
 
 ---
 
-## 3. 当前测试清单（312 项 / 53 个类，2026-11-27 实测）
+## 3. 当前测试清单（324 项 / 54 个类，2026-11-27 实测）
 
 > 按模块汇总：`lx-common-core` 25 / 6 类，`lx-common-web` 21 / 3 类，`lx-framework` 10 / 2 类，
 > `lx-module-system` 25 / 6 类，`lx-module-file` 4 / 1 类，`lx-module-job` 7 / 1 类，
-> `lx-module-generator` 18 / 3 类，`lx-module-cms` 84 / 12 类，`lx-module-member` 101 / 14 类，
+> `lx-module-generator` 18 / 3 类，`lx-module-cms` 84 / 12 类，`lx-module-member` 113 / 15 类，
 > `lx-module-i18n` 13 / 4 类，`lx-boot` 4 / 1 类。
 > 新增测试后请同步本表与 README 里的数字（取自 `mvn test` 输出，不要手算）。
 
@@ -127,16 +127,17 @@ mvn -B -ntp -DskipTests package
 | `lx-module-member` | `MemberAvatarLocalizerTest` | 2 | 内网 / 回环 / 非法协议的头像地址直接忽略，空地址不下载 |
 | `lx-module-member` | `MemberMergeServiceTest` | 3 | 预览只统计不改数据、执行合并去重并停用旧账号写审计、不能合并到自身 |
 | `lx-module-member` | `MemberContactServiceTest` | 13 | 已设密码必须提交当前密码、发码只存哈希并作废旧码、唯一性 / 格式在发码前拒绝、通道停用或异常时作废验证码、验证码一次性与过期 |
+| `lx-module-member` | `MemberMessageServiceTest` | 12 | 只读 / 只标自己的消息、已读幂等、审核通知去重与开关跳过、群发去重与会员存在性校验、空标题超长正文拒绝、后台列表补会员信息 |
 | `lx-module-i18n` | `I18nMessageSourceTest` | 4 | （与 `lx-common-web` 的同名类不在同一个包）数据库已发布值 > 资源包 > 默认文案并记录缺失、中文 Locale 归一到 `zh-CN` |
 | `lx-module-i18n` | `I18nTranslationServiceTest` | 3 | 占位符不一致拒绝保存、新增译文只写草稿、编辑已发布译文不动线上值 |
 | `lx-module-i18n` | `I18nPackServiceTest` | 2 | 发布生成新版本 / 快照 / 校验和，回滚按快照恢复译文并切换当前版本 |
 | `lx-module-i18n` | `I18nCsvCodecTest` | 4 | 解析 BOM / 引号 / 逗号 / 换行，引号内换行不拆行，未闭合引号按格式错误处理 |
 
-合计：**Tests run: 312, Failures: 0, Errors: 0, Skipped: 0**（2026-11-27 在 JDK 8 上 `mvn -o test` 实测）。
+合计：**Tests run: 324, Failures: 0, Errors: 0, Skipped: 0**（2026-11-27 在 JDK 8 上 `mvn -o test` 实测）。
 
-> JDK 11 上一次有记录的全量基线是 2026-11-22 的 205 项；之后新增的 107 项只在本地 JDK 8 跑过，
-> JDK 11 / 17 由 CI 矩阵覆盖。历史基线：257、244（11-23），232、218、205（11-22），
-> 182、156、148、141、134、126、112（11-22），99（11-21），66（11-15）。
+> JDK 11 上一次有记录的全量基线是 2026-11-22 的 205 项；之后新增的 119 项只在本地 JDK 8 跑过，
+> JDK 11 / 17 由 CI 矩阵覆盖。历史基线：312（11-27 门户收口）、257、244（11-23），
+> 232、218、205（11-22），182、156、148、141、134、126、112（11-22），99（11-21），66（11-15）。
 
 ---
 

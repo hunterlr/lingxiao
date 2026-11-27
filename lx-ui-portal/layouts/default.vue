@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const route = useRoute()
 const api = usePortalApi()
-const { profile, isLoggedIn, ensureProfile } = useMemberAuth()
+const { profile, isLoggedIn, ensureProfile, unreadCount, refreshUnread } = useMemberAuth()
 
 const { data: site } = await useAsyncData('portal-site', api.fetchSite)
 const { data: categories } = await useAsyncData('portal-categories', api.fetchCategories)
@@ -9,6 +9,18 @@ const { data: categories } = await useAsyncData('portal-categories', api.fetchCa
 const { data: nav } = await useAsyncData('portal-nav-main', () => api.fetchNav('main').catch(() => null))
 // 有 Token 才请求会员资料；失败不会阻断内容页
 await ensureProfile()
+// 已登录时顺带取未读数，角标首屏就有；未登录不发请求
+if (isLoggedIn.value) {
+  await refreshUnread()
+}
+// 客户端登录 / 退出后同步角标，避免要刷新整页才出现
+onMounted(() => {
+  if (isLoggedIn.value) refreshUnread()
+})
+watch(isLoggedIn, (value) => {
+  if (value) refreshUnread()
+  else unreadCount.value = 0
+})
 
 const siteName = computed(() => site.value?.siteName || '凌霄门户')
 const theme = computed(() => site.value?.theme || 'default')
@@ -102,6 +114,21 @@ useSeoMeta({
         </form>
 
         <div class="member-actions">
+          <NuxtLink
+            v-if="isLoggedIn"
+            to="/messages"
+            class="member-bell"
+            :class="{ 'is-active': route.path === '/messages' }"
+            :aria-label="unreadCount ? `消息中心，${unreadCount} 条未读` : '消息中心'"
+          >
+            <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
+              <path
+                d="M3 6.5A1.5 1.5 0 0 1 4.5 5h15A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5v-11Zm1.9-.5 7.1 5.4L19.1 6H4.9Z"
+                fill="currentColor"
+              />
+            </svg>
+            <span v-if="unreadCount > 0" class="member-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+          </NuxtLink>
           <NuxtLink v-if="isLoggedIn" to="/account" class="member-chip" :aria-label="`个人中心：${memberName}`">
             <img
               v-if="memberAvatar"

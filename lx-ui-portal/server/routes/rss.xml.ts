@@ -25,9 +25,10 @@ interface PageResult<T> {
 
 export default defineEventHandler(async (event: H3Event) => {
   const { siteUrl } = feedConfig(event)
+  // 与 sitemap 一致：站点未配置时输出空频道（200），不把 5xx 暴露给订阅者
   const [site, latest] = await Promise.all([
-    portalGet<Site>(event, ''),
-    portalGet<PageResult<Article>>(event, '/articles', { pageNum: 1, pageSize: 30 })
+    portalGetOr<Site>(event, '', undefined, {}),
+    portalGetOr<PageResult<Article>>(event, '/articles', { pageNum: 1, pageSize: 30 }, { records: [] })
   ])
 
   const items = latest.records.map((article) => {

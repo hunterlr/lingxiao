@@ -23,7 +23,7 @@ export function feedConfig(event: H3Event) {
   }
 }
 
-/** 读取门户公开数据；业务错误统一转 502，避免把内部细节写进 XML。 */
+/** 读取门户公开数据；内容不可见（1004）转 404，其余业务错误转 502。 */
 export async function portalGet<T>(
   event: H3Event,
   path: string,
@@ -33,9 +33,36 @@ export async function portalGet<T>(
   const url = `${backendBase}/api/portal/cms/sites/${encodeURIComponent(siteKey)}${path}`
   const response = await $fetch<ApiEnvelope<T>>(url, { query })
   if (response.code !== 0) {
-    throw createError({ statusCode: 502, statusMessage: '内容服务返回错误' })
+    // 1004 = 站点 / 栏目 / 内容不可见。sitemap 与 RSS 不能因此整站 502：
+    // 运维还没建站点时，爬虫应该拿到一个空订阅源，而不是“服务故障”。
+    throw createError({
+      statusCode: response.code === 1004 ? 404 : 502,
+      statusMessage: '内容服务返回错误'
+    })
   }
   return response.data
+}
+
+/**
+ * 读公开数据；内容不可见时用兜底值。
+ *
+ * <p>只吞 404（站点未配置 / 内容未发布），其它错误照常抛出，
+ * 避免把后端故障伪装成“空内容”。</p>
+ */
+export async function portalGetOr<T>(
+  event: H3Event,
+  path: string,
+  query: Record<string, unknown> | undefined,
+  fallback: T
+): Promise<T> {
+  try {
+    return await portalGet<T>(event, path, query)
+  } catch (error) {
+    if ((error as { statusCode?: number })?.statusCode === 404) {
+      return fallback
+    }
+    throw error
+  }
 }
 
 /** XML 文本转义：标题、摘要、URL 都可能包含 & < > " '。 */

@@ -6,6 +6,7 @@ import cn.dev33.satoken.interceptor.SaInterceptor;
 import com.lingxiao.common.security.util.StpMemberUtil;
 import com.lingxiao.modules.member.security.MemberCommentEnabledInterceptor;
 import com.lingxiao.modules.member.security.MemberEnabledInterceptor;
+import com.lingxiao.modules.member.security.MemberMessageEnabledInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -42,6 +43,7 @@ public class MemberSaTokenConfigure implements WebMvcConfigurer {
 
     private final MemberEnabledInterceptor memberEnabledInterceptor;
     private final MemberCommentEnabledInterceptor memberCommentEnabledInterceptor;
+    private final MemberMessageEnabledInterceptor memberMessageEnabledInterceptor;
 
     @PostConstruct
     public void initTokenConfig() {
@@ -72,6 +74,11 @@ public class MemberSaTokenConfigure implements WebMvcConfigurer {
         // 必须在登录校验之前，匿名读评论关闭时也能直接得到明确提示。
         registry.addInterceptor(memberCommentEnabledInterceptor)
                 .addPathPatterns("/api/app/comments/**", "/api/app/public/comments/**");
+
+        // 消息中心开关只作用于门户消息接口；后台消息管理在关闭时仍可用。
+        // 登录校验在它之后，未登录访问关闭的功能也能拿到明确的“已关闭”提示。
+        registry.addInterceptor(memberMessageEnabledInterceptor)
+                .addPathPatterns("/api/app/messages/**");
 
         registry.addInterceptor(new SaInterceptor(handler -> {
                     // 只对匹配到 Controller 的请求做登录校验；会员模块关闭时

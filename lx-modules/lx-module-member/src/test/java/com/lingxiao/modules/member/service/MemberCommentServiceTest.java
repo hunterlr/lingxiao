@@ -39,6 +39,7 @@ class MemberCommentServiceTest {
 
     private MemCommentMapper commentMapper;
     private MemUserMapper userMapper;
+    private MemberMessageService messageService;
     private MemberCommentService service;
 
     @BeforeAll
@@ -52,7 +53,8 @@ class MemberCommentServiceTest {
     void setUp() {
         commentMapper = mock(MemCommentMapper.class);
         userMapper = mock(MemUserMapper.class);
-        service = new MemberCommentService(commentMapper, userMapper);
+        messageService = mock(MemberMessageService.class);
+        service = new MemberCommentService(commentMapper, userMapper, messageService);
     }
 
     @Test
@@ -130,12 +132,18 @@ class MemberCommentServiceTest {
     void auditUpdatesRecord() {
         MemComment comment = new MemComment();
         comment.setCommentId(1L);
+        comment.setMemberId(9L);
+        comment.setArticleId(100L);
+        comment.setContent("不错");
         comment.setStatus(MemberCommentService.STATUS_PENDING);
         when(commentMapper.selectById(1L)).thenReturn(comment);
 
         service.audit(1L, MemberCommentService.STATUS_APPROVED, "内容合规", 7L);
 
         verify(commentMapper).update(any(), any());
+        // 审核结果会通知评论作者，带上审核前的状态用于去重
+        verify(messageService).notifyCommentAudited(9L, 100L, MemberCommentService.STATUS_APPROVED,
+                "不错", MemberCommentService.STATUS_PENDING);
     }
 
     @Test

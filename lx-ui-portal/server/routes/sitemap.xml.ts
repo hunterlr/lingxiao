@@ -41,15 +41,16 @@ function flatten(nodes: Category[] = []): Category[] {
 
 export default defineEventHandler(async (event: H3Event) => {
   const { siteUrl } = feedConfig(event)
-  const categories = await portalGet<Category[]>(event, '/categories')
-  const tags = await portalGet<Tag[]>(event, '/tags')
+  // 站点还没建好时返回空 sitemap（200），而不是 502：爬虫会把 5xx 当成整站故障
+  const categories = await portalGetOr<Category[]>(event, '/categories', undefined, [])
+  const tags = await portalGetOr<Tag[]>(event, '/tags', undefined, [])
 
   const articles: Article[] = []
   for (let pageNum = 1; pageNum <= 10; pageNum += 1) {
-    const result = await portalGet<PageResult<Article>>(event, '/articles', {
+    const result = await portalGetOr<PageResult<Article>>(event, '/articles', {
       pageNum,
       pageSize: 50
-    })
+    }, { records: [] })
     articles.push(...result.records)
     if (result.records.length < 50) break
   }

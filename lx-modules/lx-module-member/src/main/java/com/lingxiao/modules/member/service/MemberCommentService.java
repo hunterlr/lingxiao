@@ -56,6 +56,7 @@ public class MemberCommentService {
 
     private final MemCommentMapper commentMapper;
     private final MemUserMapper userMapper;
+    private final MemberMessageService messageService;
 
     /** 门户公开列表：只返回已通过评论，按时间倒序。 */
     public PageResult<MemberCommentVO> pageApproved(Long articleId, long pageNum, long pageSize) {
@@ -144,6 +145,10 @@ public class MemberCommentService {
                 .set(MemComment::getAuditBy, operatorId)
                 .set(MemComment::getAuditTime, LocalDateTime.now())
                 .set(MemComment::getAuditRemark, trimToNull(remark)));
+        // 状态没变就不重复通知：管理员连点两次“通过”只产生一条站内信。
+        // 审核备注不进消息——后台对运营的承诺是备注不展示给会员。
+        messageService.notifyCommentAudited(existing.getMemberId(), existing.getArticleId(),
+                status, existing.getContent(), existing.getStatus());
         log.info("后台审核评论: commentId={}, status={}, operator={}",
                 existing.getCommentId(), status, operatorId);
     }

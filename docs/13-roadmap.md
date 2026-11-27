@@ -1096,7 +1096,7 @@ Flyway `V1~V42`；后台语言包自检 `missing=none`。
 | 顺序 | 切片 | 范围 | 排序理由 | 适合交给谁 |
 |---|---|---|---|---|
 | 1 | ~~v1.3 门户交付收口~~ | 缺口 A + B + C + D：打包带门户、门户进程脚本与 systemd、Nginx 门户 server、prod 配置显式模块开关、CI 加门户构建与语言包自检、快照刷到 V42 | ✅ **已完成（2026-11-27，见 §12.31）** | — |
-| 2 | 会员消息通知 | 站内信表、评论审核结果通知、门户未读角标 | §12.20、§12.21 两次写了“下一步：消息通知”后顺延；完全沿用会员模块现有模式 | 便宜模型 |
+| 2 | ~~会员消息通知~~ | 站内信表、评论审核结果通知、门户未读角标 | ✅ **已完成（2026-11-27，见 §12.32）**，顺带修掉 sitemap 502 | — |
 | 3 | 会员资料收尾 | 门户头像上传接文件中心（`/api/app/profile/avatar`）、会员会话管理（在线设备 / 踢下线） | `docs/31` §9 遗留；与第 2 项同模块，连着做省上下文 | 便宜模型 |
 | 4 | 多语言后半段 | 门户前端接 `/api/portal/i18n/**` → CMS 内容翻译 → `/{lang}/` 前缀 + hreflang + 多语言 sitemap | 内容翻译模型要先定（`docs/15` §10），**设计用强模型，实现可下放** | 先设计后实现 |
 | 5 | 工作流 / 多库 / SaaS | P4、P2.5 多库、P6 | 都要先出方案与选型验证（`docs/08` / `14` / `10`），不适合直接写代码 | 强模型设计 |
@@ -1205,3 +1205,41 @@ systemd）、Windows 的 `portal.ps1`（沙箱里 `Start-Process` 起 Node 受�
 
 **下一步**：§12.29 第 2 项「会员消息通知」（站内信 + 评论审核结果通知 + 门户未读角标），
 顺带修上面的 sitemap 502。
+
+### 12.32 会员站内消息 + 门户 sitemap 收口（✅ 已完成，2026-11-27）
+
+**为什么做这一项**：评论审核完没人通知作者，用户只能反复回文章页看；
+门户页头也没有任何“有新消息”的入口。这是 §12.20 / §12.21 连续两次写进“下一步”
+却一直顺延的缺口。
+
+**落地**：
+
+| 层 | 文件 | 说明 |
+|---|---|---|
+| 迁移 | `V43__member_message.sql` | `mem_message`（`read_flag` 未读 / 已读，`biz_type + biz_id` 关联文章）；`mem.message.enabled`（config 34）；菜单 4060~4062 |
+| 服务 | `MemberMessageService` | 我的消息分页、未读数、单条 / 全部已读、后台列表与群发、逻辑删除、审核通知 |
+| 触发 | `MemberCommentService#audit` | 审核状态变化时给评论作者写站内信；重复审核不重复通知 |
+| 开关 | `MemberMessageEnabledInterceptor` | `mem.message.enabled=false` 时 `/api/app/messages/**` 返回 1003，后台不受影响 |
+| 会员接口 | `MemberMessageController` | `/api/app/messages`、`/unread-count`、`/{id}/read`、`/read-all` |
+| 后台接口 | `MemberMessageAdminController` | `/api/admin/member/message/list|send|{id}` |
+| 后台页面 | `views/member/message/index.vue` | 列表 + 按会员远程搜索群发 + 删除；中英文案齐 |
+| 门户 | `layouts/default.vue`、`pages/messages.vue`、`useMemberAuth` | 页头角标（SSR 首屏就有）、`/messages` 列表页、标记已读 / 全部已读 |
+| 修复 | `server/utils/cms-feed.ts`、`sitemap.xml.ts`、`rss.xml.ts` | 内容不可见（1004）转 404；站点未建时输出空 `urlset` / 空频道并返回 200，不再 502 |
+
+**验收（本机实跑）**：
+
+```text
+mvn -o test                      324 项 / 54 类，0 失败（新增 12 项消息测试）
+Flyway                           开发库 V42 → V43，42 之后的迁移正常补执行
+member-message-check.mjs         23/23（注册 → 评论 → 审核 → 通知 → 已读 → 群发 → 删除 → 越权）
+member-message-ui-check.mjs      9/9（页头角标数字、/messages 正文、匿名 302 回登录）
+开关关闭态                      /api/app/messages 返回 1003「消息中心已关闭…」
+sitemap / rss                    无站点时 200 + 空订阅源（不再 502）
+后台 / 门户构建                  vite build、nuxt build 均通过；check-i18n-keys missing=none
+```
+
+**已知限制**：站内信只发站内，不推短信 / 邮件；正文单语言；表只增不删，
+量大时用 job 模块按 `create_time` 清理。详见 `docs/30` §17.5。
+
+**下一步**：§12.29 第 3 项「会员资料收尾」（门户头像上传接文件中心、会员会话管理），
+或先做第 4 项多语言后半段（需要先定内容翻译模型）。

@@ -81,6 +81,7 @@ LingXiao is a **modular monolith** foundation for back-office systems. It is not
 - Clear business errors when the member or comment switch is off; the portal degrades without blank pages
 - Third-party login for 27 providers, enabled per platform in the admin with write-only credentials; one-time tickets exchange for the member token
 - Third-party avatars are copied into the file center; accounts sharing a phone or email are never merged silently — the member confirms the binding, or an admin merges with an audit record
+- In-app messages: comment review results notify the author automatically; the portal shows an unread badge and a message list, and admins can broadcast system notices to selected members
 - Signed-in phone / email change verifies ownership of the new value and asks for the current password when one is set
 
 **Localization (v1.4 module)**
@@ -107,7 +108,7 @@ LingXiao is a **modular monolith** foundation for back-office systems. It is not
 **Engineering**
 
 - Maven multi-module with auto-configuration and three-layer module switches; **disabled means not loaded** (beans, endpoints, migrations and frontend routes all go away)
-- 312 unit tests in 53 test classes that need neither MySQL nor Redis; GitHub Actions covers JDK 8 / 11 / 17 plus the admin frontend build
+- 324 unit tests in 54 test classes that need neither MySQL nor Redis; GitHub Actions covers JDK 8 / 11 / 17 plus the admin frontend build
 - One jar runs on JDK 8, 11 and 17
 - Production profile and packaging scripts included: `java -jar` + Nginx; prod disables the generator, API docs and SQL logging
 
@@ -237,8 +238,8 @@ lingxiao/
 /api/admin/monitor/job/**               scheduled jobs and execution logs
 /api/admin/cms/**                        sites / categories / articles / tags / models / pages / navigation / blocks / banners / templates
 /api/portal/cms/**                      public read-only portal API (sites / categories / articles / tags / pages / navigation / blocks / search / preview)
-/api/admin/member/**                    members / message channels / comment review / third-party login (v1.2 module)
-/api/app/**                             member registration / sign-in / reset / profile / favorites / likes / comments / third-party login
+/api/admin/member/**                    members / message channels / comment review / third-party login / in-app messages (v1.2 module)
+/api/app/**                             member registration / sign-in / reset / profile / favorites / likes / comments / third-party login / messages
 /api/admin/i18n/**                      languages / translations / language packs (v1.4 module)
 /api/portal/i18n/**                     public language packs for the portal
 /api/admin/tool/gen/**                  code generation
@@ -276,7 +277,7 @@ Responses are uniform `{ code, msg, data }`: `0` success, `1xxx` general and val
 |---|---|---|
 | v1.0 | Admin foundation: permissions, files, jobs, monitoring, generator, deployment | ✅ Done |
 | v1.1 | i18n L1 (bilingual UI), CMS module (admin flows, portal API, media picker) | ✅ Done |
-| v1.2 | Membership (accounts, profile, security, message channels, favorites, likes, comments with review, third-party login) | ✅ Done |
+| v1.2 | Membership (accounts, profile, security, message channels, favorites, likes, comments with review, third-party login, in-app messages) | ✅ Done |
 | v1.3 | Nuxt 3 content portal (home / category / detail / search / member center / SEO) | ✅ Features done; deployment scripts and CI coverage pending |
 | v1.4 | Internationalization and approvals: database language packs ✅, CMS templates ✅; workflow (Flowable), multi-database | 🚧 In progress |
 | v2.0 | SaaS multi-tenancy | Planned |

@@ -948,3 +948,67 @@ mvn -o test
 | 换绑审计 | 仅存旧值快照，未单独写操作流水；需要时可结合 `@Log` 操作日志与 `mem_contact_change` 追溯 |
 | 生产通道 | 开发通道仍只写日志；上线前实现 `MemberSmsSender` / `MemberEmailSender` 并切到 `prod` |
 | 多节点限流 | 仍是单机内存窗口；多实例部署需换 Redis / 网关限流 |
+
+## 17. v1.2 第七刀：站内消息（2026-11-27）
+
+把“评论审核结果没人通知”这个断点补上：审核通过 / 拒绝都会给评论作者写一条站内信，
+门户页头出未读角标、`/messages` 看列表；后台可以按会员手动群发系统通知。
+
+### 17.1 迁移与开关
+
+| 项 | 内容 |
+|---|---|
+| `V43__member_message.sql` | `mem_message`；`mem.message.enabled`（config_id 34）；菜单 4060~4062 |
+| 表字段 | `msg_id / tenant_id / member_id / msg_type / title / content / biz_type / biz_id / read_flag / read_time` + 审计字段 |
+| 索引 | `(tenant_id, member_id, read_flag, create_time)`、`(tenant_id, member_id, create_time)` |
+| 权限码 | `platform:member:message:list|send|remove` |
+
+`msg_type` 目前三种：`comment_approved` / `comment_rejected` / `system`。
+
+### 17.2 接口
+
+| 端 | 接口 | 说明 |
+|---|---|---|
+| 会员 | `GET /api/app/messages` | 我的消息分页（单页最多 50），时间倒序 |
+| 会员 | `GET /api/app/messages/unread-count` | 未读数，页头角标用 |
+| 会员 | `PUT /api/app/messages/{msgId}/read` | 标记单条已读；只能标自己的，重复标记幂等 |
+| 会员 | `PUT /api/app/messages/read-all` | 全部已读 |
+| 后台 | `GET /api/admin/member/message/list` | 标题 / 正文 / 会员关键字 + 已读状态筛选 |
+| 后台 | `POST /api/admin/member/message/send` | 按会员群发，一次最多 200 人 |
+| 后台 | `DELETE /api/admin/member/message/{msgId}` | 逻辑删除 |
+
+### 17.3 关键决策
+
+1. **只在状态真正变化时通知**：`audit` 把审核前的状态一起传给消息服务，
+   管理员连点两次“通过”只产生一条站内信。
+2. **审核备注不进消息**：后台审核界面承诺“备注不会展示给会员”，站内信是会员可见内容，
+   所以只给结果和评论摘要（60 字截断）。
+3. **消息正文是纯文本**：门户用 `{{ }}` 输出，由 Vue 转义；不拼 HTML，避免开新注入面。
+4. **开关只管门户**：`mem.message.enabled=false` 时门户消息接口返回 1003、
+   评论审核也不再产生新消息；后台仍可查看与清理历史，和评论开关的口径一致。
+5. **只存 ID**：`biz_type=article` + `biz_id`，不复制文章标题、不建外键；
+   门户“查看文章”直接跳 `/article/{id}`，文章下线时由 CMS 自己兜 404。
+6. **后台群发先校验会员存在**：一次查 `selectBatchIds`，数量不一致直接报错，
+   避免一半成功一半失败的半成品消息。
+
+### 17.4 验收（2026-11-27，本机）
+
+```text
+mvn -o test                                    324 项 / 54 类，0 失败（新增 12 项消息测试）
+Flyway                                         好库从 V42 迁到 V43，1 个迁移 0.07s
+member-message-check.mjs                       23/23
+member-message-ui-check.mjs                    9/9
+```
+
+接口脚本覆盖：注册 / 登录 → 初始空列表 → 发评论 → 后台审核 → 未读 1 → 标题与业务关联 →
+重复审核不重复通知 → 标已读 / 幂等 / 匿名被拒 → 后台群发与删除 → 会员 Token 调后台被拒。
+门户脚本覆盖：页头消息入口与角标数字、`/messages` 标题正文与未读样式、匿名访问 302 回登录。
+
+### 17.5 遗留
+
+| 项 | 说明 |
+|---|---|
+| 消息通知只有站内 | 不推短信 / 邮件 / 微信订阅消息；需要时在 `MemberMessageService` 后面挂通道 |
+| 没有“未读 → 邮件提醒”的汇总 | 同上 |
+| 消息正文单语言 | 站内信是业务数据，不参与 `i18n_*` 翻译；多语言内容翻译阶段再评估 |
+| 无过期清理 | `mem_message` 只增不删；量大时按 `create_time` 加定时清理（复用 job 模块） |

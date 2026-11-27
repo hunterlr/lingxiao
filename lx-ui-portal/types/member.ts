@@ -162,3 +162,16 @@ export interface MemberOAuthBinding {
   avatar?: string | null
   lastLoginTime?: string | null
 }
+
+/** 门户站内消息；正文是纯文本，按原样展示（Vue 自动转义）。 */
+export interface MemberMessageItem {
+  msgId: string | number
+  msgType: string
+  title: string
+  content: string
+  bizType?: string | null
+  bizId?: string | number | null
+  readFlag: string
+  readTime?: string | null
+  createTime?: string | null
+}

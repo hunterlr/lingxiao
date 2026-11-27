@@ -6344,3 +6344,69 @@ Nitro 代理                                  /api/portal/cms/sites/main 200
 | 门户无站点时 `sitemap.xml` / `rss.xml` 返回 502 | 改成空 `urlset` + 200，排进下一项一起做 |
 | 快照里没有演示内容 | 有意为之，门户需先在后台建站点 |
 | 本机 `release/lingxiao-1.4.0` 残留目录删不掉 | 句柄释放后手工删或忽略（不入库） |
+
+## 66. 会员站内消息 + 门户订阅源收口（2026-11-27）
+
+### 66.1 一句话结论
+
+评论审核结果现在会通知作者：后台审核立刻写一条站内信，门户页头出未读角标、
+`/messages` 能看到列表并标记已读；后台还能按会员群发系统通知。
+顺带把“站点没建时 sitemap / rss 返回 502”改成空订阅源 200。
+
+### 66.2 代码落点
+
+| 层 | 文件 |
+|---|---|
+| 迁移 | `V43__member_message.sql`（表 + 开关 + 菜单 4060~4062） |
+| 实体 / Mapper | `MemMessage` / `MemMessageMapper` |
+| DTO | `MemberMessageVO` / `MemberMessageAdminVO` / `MemberMessageSendRequest` |
+| 服务 | `MemberMessageService`（分页、未读、已读、群发、删除、审核通知） |
+| 拦截器 | `MemberMessageEnabledInterceptor`（`/api/app/messages/**`，注册在 `MemberSaTokenConfigure`） |
+| 接口 | `MemberMessageController`、`MemberMessageAdminController` |
+| 触发 | `MemberCommentService#audit` 调 `notifyCommentAudited` |
+| 后台 | `views/member/message/index.vue` + `api/member.js` + 中英文案 |
+| 门户 | `layouts/default.vue`（角标）、`pages/messages.vue`、`useMemberAuth` 四个消息方法、`types/member.ts` |
+| 订阅源 | `server/utils/cms-feed.ts`（1004 → 404，`portalGetOr` 兜底）、`sitemap.xml.ts`、`rss.xml.ts` |
+
+### 66.3 关键决策
+
+1. **通知去重靠“审核前状态”**：`audit` 把 `existing.getStatus()` 传下去，
+   状态没变直接返回。比在消息表里查“是否已通知过”便宜，也不会漏。
+2. **审核备注不进消息**：后台审核框写着“备注不会展示给会员”，
+   所以消息只带结果与 60 字评论摘要；这条边界写进了服务注释与 `docs/30` §17.3。
+3. **消息页放 `/messages` 而不是 `/account/messages`**：`pages/account.vue` 已经是
+   叶子路由，`pages/account/messages.vue` 会被 Nuxt 当成它的子路由，
+   结果是 `/account/messages` 渲染出个人中心的守卫页（踩坑见 §66.5）。
+4. **未读数放 `useState`**：页头角标、列表页、标记已读共用一份，
+   标完已读不用再请求一次就能更新角标。
+5. **sitemap 只吞 404，不吞 502**：站点未配置（1004 → 404）给空订阅源，
+   后端真的挂了仍然是 502，避免把故障伪装成“没有内容”。
+
+### 66.4 验证
+
+```text
+mvn -o test（JDK 8）                 324 项 / 54 类，0 失败
+Flyway                              V43 applied（0.066s），表 / 菜单 / 参数落库
+member-message-check.mjs            23/23
+member-message-ui-check.mjs         9/9
+后台 / 门户构建                      vite build、nuxt build 通过；i18n missing=none
+关闭态                              mem.message.enabled=false → /api/app/messages 1003
+```
+
+### 66.5 踩坑
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `mvn package` 报 `Unable to rename lingxiao.jar` | 后端进程占着 jar | 先停应用再打包 |
+| 审核接口 9000，日志是 `NumberFormatException: "undefined"` | 脚本里会员登录字段写成了 `username`，实际是 `account`，导致后续 commentId 为 `undefined` | 改脚本字段；这类 9000 多半是上游断言失败后的连锁反应 |
+| `/account/messages` 打开是“需要登录”的个人中心 | `pages/account.vue` + `pages/account/messages.vue` 构成父子路由，父页没有 `<NuxtPage>` | 改成顶层 `pages/messages.vue`，页头链接同步 |
+| 消息里“原因”和“评论内容”粘在一起 | 拼接没加分隔符，且备注本不该给会员看 | 去掉备注，改用 `\n` 分行，门户 `white-space: pre-line` |
+| PageResult 的 `total` 在 JSON 里是字符串 | 全局 Long → String，避免前端精度丢失 | 断言里统一 `Number()`，前端同理 |
+
+### 66.6 遗留
+
+| 项 | 说明 |
+|---|---|
+| 站内信只发站内 | 不推短信 / 邮件 / 微信订阅消息 |
+| 正文单语言 | 站内信是业务数据，不进 `i18n_*` 翻译 |
+| 无过期清理 | 量大时用 job 模块按 `create_time` 清理 |

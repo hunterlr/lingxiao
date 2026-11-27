@@ -25,6 +25,15 @@
     <name>lx-dependencies</name>
     <description>凌霄依赖版本 BOM</description>
 
+    <!-- 不继承根 pom，所以单独声明；与根 pom 保持一致 -->
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/license/mit</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
     <properties>
         <lingxiao.version>1.4.0-SNAPSHOT</lingxiao.version>
         <mybatis-plus.version>3.5.3.2</mybatis-plus.version>

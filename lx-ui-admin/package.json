@@ -2,6 +2,7 @@
   "name": "lx-ui-admin",
   "version": "1.4.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "凌霄后台管理前端（Vue3 + Vite + Element Plus）",
   "scripts": {

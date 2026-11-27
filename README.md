@@ -9,6 +9,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-2.7.18-6DB33F)](pom.xml)
 [![Vue](https://img.shields.io/badge/Vue-3.5-42B883)](lx-ui-admin/package.json)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%20%7C%208.0-4479A1)](deploy/sql/init-db.sql)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 [中文](README.md) · [English](README.en.md)
 
@@ -315,7 +316,10 @@ cd ../lx-ui-portal && npm run build         # 动了门户时
 
 ## 许可
 
-本项目尚未附开源协议，默认保留所有权利。如需商用或二次分发，请先联系作者。
+[MIT](LICENSE) © 2026 hunterlr。可自由使用、修改、商用与二次分发，只需在副本中保留版权声明与许可声明。
+
+第三方依赖（Maven / npm）沿用各自的许可证，不在本协议范围内；其中 MySQL 驱动
+`mysql-connector-j` 为 GPLv2 + Universal FOSS Exception，随依赖引入，不并入本项目代码。
 
 ---
 

@@ -13,7 +13,7 @@
 
       设计约束（与 docs/17-v1-plan.md 对齐）：
         - 主线 Spring Boot 2.7.18 + JDK 8 字节码，同一个 jar 兼容 JDK 8/11/17；
-        - v1.0 只做后台基座，不建 CMS / 会员 / 门户模块；
+        - v1.0 只做后台基座；CMS / 会员 / 多语言从 v1.1 起作为可插拔模块接入；
         - 模块之间只通过 api 包或领域事件通信，禁止直接依赖对方 Mapper。
     -->
     <parent>
@@ -29,6 +29,15 @@
     <packaging>pom</packaging>
     <name>lingxiao</name>
     <description>凌霄后台基座：模块化单体、可插拔模块、私有化部署</description>
+
+    <!-- 子模块继承本声明；协议全文见仓库根 LICENSE -->
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/license/mit</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
 
     <modules>
         <module>lx-dependencies</module>

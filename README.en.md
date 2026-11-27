@@ -9,6 +9,7 @@
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-2.7.18-6DB33F)](pom.xml)
 [![Vue](https://img.shields.io/badge/Vue-3.5-42B883)](lx-ui-admin/package.json)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%20%7C%208.0-4479A1)](deploy/sql/init-db.sql)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 [中文](README.md) · [English](README.en.md)
 
@@ -304,7 +305,10 @@ Style follows the existing modules: Java with 4-space indentation and Javadoc on
 
 ## License
 
-No license has been attached yet, so all rights are reserved. Please contact the author before commercial use or redistribution.
+[MIT](LICENSE) © 2026 hunterlr. Use, modify, commercialize and redistribute freely; keep the copyright and permission notice in copies.
+
+Third-party dependencies (Maven / npm) keep their own licenses and are not covered by this one.
+The MySQL driver `mysql-connector-j` is GPLv2 with the Universal FOSS Exception; it is pulled in as a dependency and is not part of this project's code.
 
 ---
 

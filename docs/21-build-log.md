@@ -6237,3 +6237,42 @@ npm run build（后台 / 门户）                    通过
 | 连续五个切片没有回填本文件，`docs/13` §12 成为唯一进度记录 | 已补本节；把“`docs/21` 追加小节”写进仓库根 `AGENTS.md` 的交付前检查 |
 | `docs/20` §21.8 的“下一窗口提示词”指向已完成的第三刀 | 已标注失效；当前提示词统一放 `docs/13` §12.30 |
 | 门户做完但 `deploy/`、CI 都没跟上 | 记为缺口，排进 `docs/13` §12.29 第 1 项 |
+
+## 64. 文档复核、版本号与开源协议（2026-11-27）
+
+### 64.1 做了什么
+
+| 提交 | 内容 |
+|---|---|
+| `4e80b4e` | 文档复核：新增仓库根 `AGENTS.md`，README 中英同步现状，`docs/13` 补缺口清单 / 待办池 / 启动提示词，本文件补 §63 |
+| `29a43ce` | 版本号 `1.0.0-SNAPSHOT` → `1.4.0-SNAPSHOT`：根 pom、BOM（`lingxiao.version`）、全部子模块、两个前端 `package.json` 与 lock 文件；打包脚本默认版本与 `deploy/` 示例对齐为 1.4.0 |
+| 本次 | 新增 `LICENSE`（MIT）；README 中英、`package.json`、根 pom 与 BOM 声明协议 |
+
+### 64.2 取舍
+
+- **版本取 1.4.0 而不是 1.3.0**：路线图上 v1.4 的数据库语言包与 CMS 模板已经完成，
+  版本号对齐到“进行中的那个版本”，发正式版时去掉 `-SNAPSHOT` 即可。
+- **快照不改名**：`lingxiao-1.0.0.sql` 停在 V17，改名成 1.4.0 会让人误以为它是新数据；
+  等按 `docs/13` §12.29 第 1 项重新导出后再换名字。
+- **选 MIT**：前后端直接依赖都是 MIT / Apache-2.0（`ueditor-plus-main` 为 Apache-2.0），
+  MIT 与之兼容；`mysql-connector-j` 是 GPLv2 + Universal FOSS Exception，作为依赖引入、
+  不并入本项目代码，已在 README 许可一节写明。
+- **没有逐个给模块 pom 写 `<licenses>`**：子模块继承根 pom 的声明；只有不继承根 pom 的
+  `lx-dependencies` 单独写了一份。
+
+### 64.3 验证
+
+```text
+mvn -o -DskipTests package（JDK 8）    BUILD SUCCESS，01:30
+lingxiao.jar 内 application.yml        lx.app.version = 1.4.0-SNAPSHOT
+MANIFEST.MF                            Implementation-Version: 1.4.0-SNAPSHOT
+BOOT-INF/lib                           16 个内部 jar 全部为 1.4.0-SNAPSHOT，无 1.0.0 残留
+mvn -o test（JDK 8）                   312 项 / 53 类，0 失败
+```
+
+### 64.4 踩坑
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| 改版本号后 `mvn package` 报 `No compiler is provided in this environment` | 默认 `java` 是 JRE（`jre1.8.0_351`）；之前单测能过是因为类文件没过期，这次依赖版本变了触发重编译 | 构建前设 `JAVA_HOME` 指向 `jdk1.8.0_351`；已写进 `AGENTS.md` |
+| 沙箱用户执行 `git` 报 `dubious ownership`，且没有提交身份 | 仓库属于另一个系统用户 | 逐次用 `-c safe.directory=… -c user.name=… -c user.email=…`，不改全局配置 |

@@ -2,6 +2,7 @@
   "name": "lx-ui-portal",
   "version": "1.4.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "凌霄 CMS 门户（Nuxt 3，只读消费 /api/portal/cms/**）",
   "scripts": {

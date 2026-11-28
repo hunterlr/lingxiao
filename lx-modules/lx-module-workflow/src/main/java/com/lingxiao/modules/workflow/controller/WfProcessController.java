@@ -5,6 +5,7 @@ import com.lingxiao.common.core.domain.R;
 import com.lingxiao.common.log.annotation.Log;
 import com.lingxiao.common.log.enums.BusinessType;
 import com.lingxiao.common.security.annotation.RequiresPermission;
+import com.lingxiao.common.security.util.LoginHelper;
 import com.lingxiao.modules.workflow.dto.ProcessDefVO;
 import com.lingxiao.modules.workflow.entity.WfCategory;
 import com.lingxiao.modules.workflow.service.WfProcessService;
@@ -57,15 +58,17 @@ public class WfProcessController {
     @PostMapping("/import")
     public R<ProcessDefVO> importBpmn(@RequestParam("file") MultipartFile file,
                                       @RequestParam(required = false) String categoryKey,
-                                      @RequestParam(required = false) String remark) throws IOException {
-        return R.ok(processService.importBpmn(file.getOriginalFilename(), file.getBytes(), categoryKey, remark));
+                                      @RequestParam(required = false) String remark,
+                                      @RequestParam(required = false) String formKey) throws IOException {
+        return R.ok(processService.importBpmn(file.getOriginalFilename(), file.getBytes(), categoryKey, remark, formKey,
+                LoginHelper.getUserId()));
     }
 
     @RequiresPermission("platform:workflow:process:status")
     @Log(title = "流程定义", businessType = BusinessType.UPDATE)
     @PutMapping("/{defId}/status")
     public R<Void> changeStatus(@PathVariable Long defId, @RequestParam String status) {
-        processService.changeStatus(defId, status);
+        processService.changeStatus(defId, status, LoginHelper.getUserId());
         return R.ok();
     }
 

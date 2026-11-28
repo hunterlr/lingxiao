@@ -273,6 +273,7 @@ public class FlowableWorkflowEngine implements WorkflowEngine {
         vo.setInitiator(stringVar(vars.get("initiator")));
         vo.setInitiatorName(stringVar(vars.get("initiatorName")));
         vo.setTimeline(buildTimeline(instance, vars));
+        vo.setAssigneeNames(namesOf(vars));
         return vo;
     }
 
@@ -416,6 +417,21 @@ public class FlowableWorkflowEngine implements WorkflowEngine {
             return processKeyOf(processDefinitionId);
         }
         return StringUtils.hasText(definition.getName()) ? definition.getName() : definition.getKey();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, String> namesOf(Map<String, Object> vars) {
+        Object namesVar = vars.get(VAR_NAMES);
+        if (!(namesVar instanceof Map)) {
+            return new HashMap<>();
+        }
+        Map<String, String> result = new HashMap<>();
+        ((Map<String, Object>) namesVar).forEach((k, v) -> {
+            if (v != null) {
+                result.put(k, String.valueOf(v));
+            }
+        });
+        return result;
     }
 
     @SuppressWarnings("unchecked")

@@ -77,30 +77,37 @@
       </div>
     </div>
 
-    <el-dialog v-model="startVisible" :title="t('page.workflow.mine.start')" width="560px" append-to-body destroy-on-close>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-        <el-form-item :label="t('page.workflow.processName')" prop="processKey">
-          <el-select v-model="form.processKey" style="width: 100%" :placeholder="t('page.workflow.mine.processPlaceholder')">
+    <el-dialog v-model="startVisible" :title="t('page.workflow.mine.start')" width="640px" append-to-body destroy-on-close>
+      <el-form label-width="100px">
+        <el-form-item :label="t('page.workflow.processName')" required>
+          <el-select
+            v-model="form.processKey"
+            style="width: 100%"
+            :placeholder="t('page.workflow.mine.processPlaceholder')"
+            @change="handleProcessChange"
+          >
             <el-option v-for="item in processes" :key="item.processKey" :label="item.name" :value="item.processKey" />
           </el-select>
         </el-form-item>
-        <el-form-item :label="t('page.workflow.title')" prop="title">
+        <el-form-item :label="t('page.workflow.title')" required>
           <el-input v-model="form.title" maxlength="200" show-word-limit :placeholder="t('page.workflow.mine.titlePlaceholder')" />
         </el-form-item>
         <el-form-item :label="t('page.workflow.remark')">
-          <el-input v-model="form.remark" type="textarea" :rows="3" maxlength="500" :placeholder="t('page.workflow.mine.remarkPlaceholder')" />
-        </el-form-item>
-        <el-form-item :label="t('page.workflow.approver')" prop="approver">
-          <el-select v-model="form.approver" filterable style="width: 100%" :placeholder="t('page.workflow.mine.approverPlaceholder')">
-            <el-option v-for="user in users" :key="user.userId" :label="userLabel(user)" :value="user.userId" />
-          </el-select>
-        </el-form-item>
-        <el-form-item :label="t('page.workflow.approver2')">
-          <el-select v-model="form.approver2" filterable clearable style="width: 100%" :placeholder="t('page.workflow.mine.approver2Placeholder')">
-            <el-option v-for="user in users" :key="user.userId" :label="userLabel(user)" :value="user.userId" />
-          </el-select>
+          <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="500" :placeholder="t('page.workflow.mine.remarkPlaceholder')" />
         </el-form-item>
       </el-form>
+
+      <el-divider v-if="schema" content-position="left">{{ schemaName }}</el-divider>
+      <div v-loading="schemaLoading">
+        <WorkflowFormRenderer
+          v-if="schema"
+          :schema="schema"
+          :model-value="formModel"
+          :users="users"
+        />
+        <el-empty v-else-if="form.processKey" :description="t('page.workflow.form.notBound')" :image-size="60" />
+      </div>
+
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="startVisible = false">{{ t('common.cancel') }}</el-button>
@@ -118,15 +125,16 @@ import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
-import { listMyInstances, listProcessDefs, startInstance, withdrawInstance } from '@/api/workflow'
+import { getProcessForm, listMyInstances, listProcessDefs, startInstance, withdrawInstance } from '@/api/workflow'
 import { listUsers } from '@/api/user'
+import WorkflowFormRenderer from '@/components/WorkflowFormRenderer.vue'
 import WorkflowInstanceDrawer from '@/components/WorkflowInstanceDrawer.vue'
 
 /**
  * 我发起的：进度、详情、撤回。
  *
- * <p>第一刀没有表单引擎，发起时只需要标题、说明和两级审批人；
- * 审批人姓名随请求一起提交，详情页不用回查用户表。</p>
+ * <p>发起表单由流程绑定的动态表单决定（字段 key 即流程变量名）；
+ * 审批人不再写死，而是表单里的 user 字段。</p>
  */
 const { t } = useI18n()
 
@@ -176,26 +184,25 @@ const statusType = (status) => {
 /* ==================== 发起 ==================== */
 const startVisible = ref(false)
 const starting = ref(false)
-const formRef = ref(null)
+const schemaLoading = ref(false)
 const processes = ref([])
 const users = ref([])
+const schema = ref(null)
+const schemaName = ref('')
+const formModel = ref({})
 
-const emptyForm = () => ({ processKey: '', title: '', remark: '', approver: null, approver2: null })
-const form = reactive(emptyForm())
-
-const rules = {
-  processKey: [{ required: true, message: t('page.workflow.mine.processRequired'), trigger: 'change' }],
-  title: [{ required: true, message: t('page.workflow.mine.titleRequired'), trigger: 'blur' }],
-  approver: [{ required: true, message: t('page.workflow.mine.approverRequired'), trigger: 'change' }]
-}
+const form = reactive({ processKey: '', title: '', remark: '' })
 
 const userLabel = (user) => (user.nickname ? `${user.nickname}（${user.username}）` : user.username)
 
 async function openStart() {
-  Object.assign(form, emptyForm())
+  Object.assign(form, { processKey: '', title: '', remark: '' })
+  schema.value = null
+  schemaName.value = ''
+  formModel.value = {}
   startVisible.value = true
   if (!processes.value.length) {
-    const data = await listProcessDefs({ pageNum: 1, pageSize: 100, categoryKey: undefined })
+    const data = await listProcessDefs({ pageNum: 1, pageSize: 100 })
     processes.value = (data?.records || []).filter((item) => item.status === '0')
   }
   if (!users.value.length) {
@@ -204,25 +211,79 @@ async function openStart() {
   }
 }
 
-function userOf(userId) {
-  return users.value.find((user) => user.userId === userId)
+/** 切换流程：拉表单 schema，按字段类型初始化模型 */
+async function handleProcessChange(processKey) {
+  schema.value = null
+  formModel.value = {}
+  schemaName.value = ''
+  if (!processKey) return
+  schemaLoading.value = true
+  try {
+    const data = await getProcessForm(processKey)
+    if (!data) return
+    schema.value = data.schema
+    schemaName.value = data.formName
+    const model = {}
+    for (const field of data.schema?.fields || []) {
+      if (field.type === 'switch') model[field.key] = false
+      else if (field.type === 'user') model[field.key] = field.multiple ? [] : ''
+      else model[field.key] = ''
+    }
+    formModel.value = model
+  } finally {
+    schemaLoading.value = false
+  }
+}
+
+const currentUserFields = () => (schema.value?.fields || []).filter((field) => field.type === 'user')
+
+/** 表单 user 字段的 ID → 姓名，写进 assigneeNames，详情页不用回查用户表 */
+function buildAssigneeNames() {
+  const names = {}
+  for (const field of currentUserFields()) {
+    const value = formModel.value[field.key]
+    const ids = Array.isArray(value) ? value : value ? [value] : []
+    for (const id of ids) {
+      const user = users.value.find((item) => String(item.userId) === String(id))
+      if (user) names[String(id)] = user.nickname || user.username
+    }
+  }
+  return names
+}
+
+function validateRequired() {
+  for (const field of schema.value?.fields || []) {
+    if (!field.required) continue
+    const value = formModel.value[field.key]
+    const empty = value == null || value === '' || (Array.isArray(value) && value.length === 0)
+    if (empty) {
+      ElMessage.warning(t('page.workflow.form.fieldRequired', { label: field.label }))
+      return false
+    }
+  }
+  return true
 }
 
 async function submitStart() {
-  if (!formRef.value) return
-  await formRef.value.validate()
+  if (!form.processKey) {
+    ElMessage.warning(t('page.workflow.mine.processRequired'))
+    return
+  }
+  if (!form.title) {
+    ElMessage.warning(t('page.workflow.mine.titleRequired'))
+    return
+  }
+  if (schema.value && !validateRequired()) {
+    return
+  }
   starting.value = true
   try {
-    const approver1 = userOf(form.approver)
-    const approver2 = form.approver2 ? userOf(form.approver2) : null
     await startInstance({
       processKey: form.processKey,
       title: form.title,
       remark: form.remark,
-      approver: form.approver,
-      approverName: approver1?.nickname || approver1?.username,
-      approver2: form.approver2 || null,
-      approver2Name: approver2 ? approver2.nickname || approver2.username : null
+      formData: schema.value ? { ...formModel.value } : {},
+      assigneeNames: buildAssigneeNames()
     })
     ElMessage.success(t('page.workflow.mine.startSuccess'))
     startVisible.value = false

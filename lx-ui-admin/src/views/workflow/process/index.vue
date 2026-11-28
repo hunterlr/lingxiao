@@ -41,6 +41,9 @@
           <template #default="{ row }"><span class="text-mono">{{ row.processKey }}</span></template>
         </el-table-column>
         <el-table-column prop="categoryName" :label="t('page.workflow.category')" width="110" />
+        <el-table-column prop="formName" :label="t('page.workflow.form.binding')" width="150">
+          <template #default="{ row }">{{ row.formName || '-' }}</template>
+        </el-table-column>
         <el-table-column prop="processVersion" :label="t('page.workflow.version')" width="90" align="center">
           <template #default="{ row }">v{{ row.processVersion }}</template>
         </el-table-column>
@@ -103,6 +106,16 @@
             </template>
           </el-upload>
         </el-form-item>
+        <el-form-item :label="t('page.workflow.form.binding')">
+          <el-select v-model="importForm.formKey" clearable style="width: 100%" :placeholder="t('page.workflow.process.formNone')">
+            <el-option
+              v-for="item in publishedForms"
+              :key="item.formKey"
+              :label="`${item.name}（${item.formKey}）`"
+              :value="item.formKey"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item :label="t('page.workflow.category')">
           <el-select v-model="importForm.categoryKey" style="width: 100%">
             <el-option v-for="item in categories" :key="item.categoryKey" :label="item.name" :value="item.categoryKey" />
@@ -129,10 +142,11 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Search, Upload } from '@element-plus/icons-vue'
 import {
   changeProcessStatus,
-  deleteProcess,
   importProcess,
   listProcessCategories,
-  listProcessDefs
+  listProcessDefs,
+  listForms,
+  removeProcess
 } from '@/api/workflow'
 import { useAuthStore } from '@/store/auth'
 
@@ -168,6 +182,11 @@ async function loadList() {
   }
 }
 
+async function loadPublishedForms() {
+  const data = await listForms({ pageNum: 1, pageSize: 100 })
+  publishedForms.value = (data?.records || []).filter((item) => item.version > 0)
+}
+
 function handleReset() {
   query.keyword = ''
   query.categoryKey = ''
@@ -196,7 +215,7 @@ async function handleDelete(row) {
     t('common.deleteTitle'),
     { type: 'warning' }
   )
-  await deleteProcess(row.defId)
+  await removeProcess(row.defId)
   ElMessage.success(t('common.deleteSuccess'))
   loadList()
 }
@@ -206,7 +225,8 @@ const importVisible = ref(false)
 const importing = ref(false)
 const uploadRef = ref(null)
 const file = ref(null)
-const importForm = reactive({ categoryKey: 'common', remark: '' })
+const importForm = reactive({ categoryKey: 'common', remark: '', formKey: '' })
+const publishedForms = ref([])
 
 const onFileChange = (uploadFile) => {
   file.value = uploadFile.raw
@@ -216,6 +236,8 @@ function openImport() {
   file.value = null
   importForm.categoryKey = categories.value[0]?.categoryKey || 'common'
   importForm.remark = ''
+  importForm.formKey = ''
+  loadPublishedForms()
   importVisible.value = true
   uploadRef.value?.clearFiles()
 }
@@ -229,6 +251,7 @@ async function submitImport() {
   formData.append('file', file.value)
   if (importForm.categoryKey) formData.append('categoryKey', importForm.categoryKey)
   if (importForm.remark) formData.append('remark', importForm.remark)
+  if (importForm.formKey) formData.append('formKey', importForm.formKey)
   importing.value = true
   try {
     await importProcess(formData)

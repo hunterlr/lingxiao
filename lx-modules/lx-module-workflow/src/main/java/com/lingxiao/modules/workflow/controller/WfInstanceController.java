@@ -7,6 +7,7 @@ import com.lingxiao.common.log.enums.BusinessType;
 import com.lingxiao.common.security.annotation.RequiresPermission;
 import com.lingxiao.common.security.util.LoginHelper;
 import com.lingxiao.modules.workflow.dto.InstanceDetailVO;
+import com.lingxiao.modules.workflow.dto.InstanceFormVO;
 import com.lingxiao.modules.workflow.dto.InstanceVO;
 import com.lingxiao.modules.workflow.dto.StartProcessRequest;
 import com.lingxiao.modules.workflow.service.WfRuntimeService;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.validation.Valid;
+import java.util.Map;
 
 /**
  * 后台工作流 — 流程实例（{@code /api/admin/workflow/instance/**}）。
@@ -41,6 +43,20 @@ public class WfInstanceController {
         Long userId = LoginHelper.getUserId();
         String name = LoginHelper.getNickname();
         return R.ok(runtimeService.start(request, userId, name == null ? LoginHelper.getUsername() : name));
+    }
+
+    /** 发起页用：取流程绑定的表单定义（没绑定返回 null）。 */
+    @RequiresPermission("platform:workflow:instance:start")
+    @GetMapping("/form")
+    public R<Map<String, Object>> form(@RequestParam String processKey) {
+        return R.ok(runtimeService.formOfProcess(processKey));
+    }
+
+    /** 详情抽屉用：实例表单快照（没有表单返回 null）。 */
+    @RequiresPermission("platform:workflow:instance:mine")
+    @GetMapping("/{processInstanceId}/form")
+    public R<InstanceFormVO> instanceForm(@PathVariable String processInstanceId) {
+        return R.ok(runtimeService.instanceForm(processInstanceId));
     }
 
     @RequiresPermission("platform:workflow:instance:mine")

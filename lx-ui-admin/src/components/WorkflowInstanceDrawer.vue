@@ -1,5 +1,5 @@
 <template>
-  <el-drawer v-model="visible" :title="t('page.workflow.detailTitle')" size="520px" append-to-body destroy-on-close>
+  <el-drawer v-model="visible" :title="t('page.workflow.detailTitle')" size="560px" append-to-body destroy-on-close>
     <div v-loading="loading" class="wf-detail">
       <el-descriptions :column="1" border size="small">
         <el-descriptions-item :label="t('page.workflow.title')">{{ detail.title || '-' }}</el-descriptions-item>
@@ -12,6 +12,16 @@
         <el-descriptions-item :label="t('page.workflow.endTime')">{{ detail.endTime || '-' }}</el-descriptions-item>
         <el-descriptions-item v-if="detail.remark" :label="t('page.workflow.remark')">{{ detail.remark }}</el-descriptions-item>
       </el-descriptions>
+
+      <template v-if="instanceForm">
+        <div class="wf-timeline-title">{{ instanceFormTitle }}</div>
+        <WorkflowFormRenderer
+          :schema="instanceForm.schema"
+          :model-value="instanceForm.data"
+          readonly
+          :user-names="detail.assigneeNames || {}"
+        />
+      </template>
 
       <div class="wf-timeline-title">{{ t('page.workflow.timeline') }}</div>
       <el-timeline>
@@ -37,13 +47,13 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { getInstance } from '@/api/workflow'
+import { getInstance, getInstanceForm } from '@/api/workflow'
+import WorkflowFormRenderer from '@/components/WorkflowFormRenderer.vue'
 
 /**
- * 流程详情抽屉：发起信息 + 时间线。
+ * 流程详情抽屉：表单快照 + 发起信息 + 时间线。
  *
- * <p>待办、已办、我发起的三个页面共用；时间线由后端按时间排好，
- * 前端只负责把 action 映射成文案与颜色。</p>
+ * <p>表单按实例快照只读渲染，不读当前表单定义——历史单不会“换脸”。</p>
  */
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -59,6 +69,11 @@ const visible = computed({
 
 const loading = ref(false)
 const detail = ref({})
+const instanceForm = ref(null)
+
+const instanceFormTitle = computed(() =>
+  t('page.workflow.form.instanceTitle', { name: detail.value?.processName || '', version: instanceForm.value?.formVersion })
+)
 
 watch(
   () => [props.modelValue, props.processInstanceId],
@@ -66,7 +81,9 @@ watch(
     if (!open || !id) return
     loading.value = true
     try {
-      detail.value = (await getInstance(id)) || {}
+      const [detailData, formData] = await Promise.all([getInstance(id), getInstanceForm(id)])
+      detail.value = detailData || {}
+      instanceForm.value = formData || null
     } finally {
       loading.value = false
     }

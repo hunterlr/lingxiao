@@ -1,5 +1,6 @@
 package com.lingxiao.modules.workflow.config;
 
+import com.lingxiao.modules.workflow.service.WfFormService;
 import com.lingxiao.modules.workflow.service.WfProcessService;
 import lombok.extern.slf4j.Slf4j;
 import org.flowable.common.engine.impl.history.HistoryLevel;
@@ -60,9 +61,12 @@ public class WorkflowModuleConfig {
      * 让整个后台起不来。</p>
      */
     @Bean
-    public ApplicationRunner workflowDemoDeployer(WfProcessService processService) {
+    public ApplicationRunner workflowDemoDeployer(WfProcessService processService,
+                                                  WfFormService formService) {
         return args -> {
             try {
+                // 表单先于流程：示例流程要绑定示例表单
+                formService.ensureDemoForm();
                 processService.ensureDemoProcess();
             } catch (Exception e) {
                 log.warn("内置示例流程部署失败，跳过：{}", e.getMessage());

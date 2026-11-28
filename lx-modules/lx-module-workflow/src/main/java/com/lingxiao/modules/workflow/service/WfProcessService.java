@@ -1,16 +1,18 @@
 package com.lingxiao.modules.workflow.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.lingxiao.common.core.domain.PageResult;
 import com.lingxiao.common.core.enums.ErrorCode;
 import com.lingxiao.common.core.exception.ServiceException;
-import com.lingxiao.common.security.util.LoginHelper;
 import com.lingxiao.modules.workflow.dto.DeploymentInfo;
 import com.lingxiao.modules.workflow.dto.ProcessDefVO;
 import com.lingxiao.modules.workflow.entity.WfCategory;
+import com.lingxiao.modules.workflow.entity.WfForm;
 import com.lingxiao.modules.workflow.entity.WfProcessDef;
 import com.lingxiao.modules.workflow.mapper.WfCategoryMapper;
+import com.lingxiao.modules.workflow.mapper.WfFormMapper;
 import com.lingxiao.modules.workflow.mapper.WfProcessDefMapper;
 import com.lingxiao.modules.workflow.spi.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +53,8 @@ public class WfProcessService {
 
     private final WfCategoryMapper categoryMapper;
 
+    private final WfFormMapper formMapper;
+
     private final WorkflowEngine engine;
 
     public PageResult<ProcessDefVO> page(long pageNum, long pageSize, String keyword, String categoryKey) {
@@ -69,6 +73,11 @@ public class WfProcessService {
                 .stream()
                 .collect(Collectors.toMap(WfCategory::getCategoryKey, WfCategory::getName, (a, b) -> a));
 
+        Map<String, String> formNames = formMapper.selectList(new LambdaQueryWrapper<WfForm>()
+                        .eq(WfForm::getDelFlag, "0"))
+                .stream()
+                .collect(Collectors.toMap(WfForm::getFormKey, WfForm::getName, (a, b) -> a));
+
         List<ProcessDefVO> rows = result.getRecords().stream().map(def -> {
             ProcessDefVO vo = new ProcessDefVO();
             vo.setDefId(def.getDefId());
@@ -76,6 +85,8 @@ public class WfProcessService {
             vo.setName(def.getName());
             vo.setCategoryKey(def.getCategoryKey());
             vo.setCategoryName(categoryNames.get(def.getCategoryKey()));
+            vo.setFormKey(def.getFormKey());
+            vo.setFormName(formNames.get(def.getFormKey()));
             vo.setProcessVersion(def.getProcessVersion());
             vo.setDeploymentId(def.getDeploymentId());
             vo.setStatus(def.getStatus());
@@ -95,7 +106,8 @@ public class WfProcessService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public ProcessDefVO importBpmn(String fileName, byte[] bytes, String categoryKey, String remark) {
+    public ProcessDefVO importBpmn(String fileName, byte[] bytes, String categoryKey, String remark, String formKey,
+                                   Long operatorId) {
         if (!StringUtils.hasText(fileName) || bytes == null || bytes.length == 0) {
             throw new ServiceException(ErrorCode.BAD_REQUEST, "请上传 BPMN 文件");
         }
@@ -108,13 +120,14 @@ public class WfProcessService {
         def.setProcessKey(info.getProcessKey());
         def.setName(info.getName());
         def.setCategoryKey(StringUtils.hasText(categoryKey) ? categoryKey : DEMO_CATEGORY);
+        def.setFormKey(StringUtils.hasText(formKey) ? formKey : null);
         def.setProcessVersion(info.getVersion());
         def.setDeploymentId(info.getDeploymentId());
         def.setDefinitionId(info.getDefinitionId());
         def.setResourceName(info.getResourceName());
         def.setStatus("0");
         def.setRemark(remark);
-        def.setCreateBy(LoginHelper.getUserId());
+        def.setCreateBy(operatorId);
         def.setCreateTime(LocalDateTime.now());
         def.setDelFlag("0");
         defMapper.insert(def);
@@ -122,13 +135,13 @@ public class WfProcessService {
         return toVO(def, null);
     }
 
-    public void changeStatus(Long defId, String status) {
+    public void changeStatus(Long defId, String status, Long operatorId) {
         if (!"0".equals(status) && !"1".equals(status)) {
             throw new ServiceException(ErrorCode.BAD_REQUEST, "状态只能是 0（启用）或 1（停用）");
         }
         WfProcessDef def = mustGet(defId);
         def.setStatus(status);
-        def.setUpdateBy(LoginHelper.getUserId());
+        def.setUpdateBy(operatorId);
         def.setUpdateTime(LocalDateTime.now());
         defMapper.updateById(def);
     }
@@ -169,6 +182,11 @@ public class WfProcessService {
                 .eq(WfProcessDef::getProcessKey, DEMO_PROCESS_KEY)
                 .eq(WfProcessDef::getDelFlag, "0"));
         if (exists != null && exists > 0) {
+            // 从第一刀升级上来：老示例流程还没绑表单，这里补一次，避免用户手动重导入
+            defMapper.update(null, new LambdaUpdateWrapper<WfProcessDef>()
+                    .eq(WfProcessDef::getProcessKey, DEMO_PROCESS_KEY)
+                    .isNull(WfProcessDef::getFormKey)
+                    .set(WfProcessDef::getFormKey, WfFormService.DEMO_FORM_KEY));
             return;
         }
         ClassPathResource resource = new ClassPathResource(DEMO_RESOURCE);
@@ -184,6 +202,7 @@ public class WfProcessService {
             def.setProcessKey(info.getProcessKey());
             def.setName(info.getName());
             def.setCategoryKey(DEMO_CATEGORY);
+            def.setFormKey(WfFormService.DEMO_FORM_KEY);
             def.setProcessVersion(info.getVersion());
             def.setDeploymentId(info.getDeploymentId());
             def.setDefinitionId(info.getDefinitionId());
@@ -213,6 +232,7 @@ public class WfProcessService {
         vo.setName(def.getName());
         vo.setCategoryKey(def.getCategoryKey());
         vo.setCategoryName(categoryNames == null ? null : categoryNames.get(def.getCategoryKey()));
+        vo.setFormKey(def.getFormKey());
         vo.setProcessVersion(def.getProcessVersion());
         vo.setDeploymentId(def.getDeploymentId());
         vo.setStatus(def.getStatus());

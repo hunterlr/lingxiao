@@ -27,7 +27,7 @@ export function changeProcessStatus(defId, status) {
   return http.put(`/admin/workflow/process/${defId}/status`, null, { params: { status } })
 }
 
-export function deleteProcess(defId) {
+export function removeProcess(defId) {
   return http.delete(`/admin/workflow/process/${defId}`)
 }
 
@@ -49,6 +49,16 @@ export function withdrawInstance(processInstanceId) {
   return http.put(`/admin/workflow/instance/${processInstanceId}/withdraw`)
 }
 
+/** 发起页用：取流程绑定的表单定义（没绑定返回 null） */
+export function getProcessForm(processKey) {
+  return http.get('/admin/workflow/instance/form', { params: { processKey } })
+}
+
+/** 详情页用：实例表单快照 */
+export function getInstanceForm(processInstanceId) {
+  return http.get(`/admin/workflow/instance/${processInstanceId}/form`)
+}
+
 /* ==================== 任务 ==================== */
 
 export function listTodo(params) {
@@ -65,4 +75,30 @@ export function completeTask(taskId, data) {
 
 export function rejectTask(taskId, data) {
   return http.post(`/admin/workflow/task/${taskId}/reject`, data)
+}
+
+/* ==================== 表单 ==================== */
+
+export function listForms(params) {
+  return http.get('/admin/workflow/form/list', { params })
+}
+
+export function getForm(formId) {
+  return http.get(`/admin/workflow/form/${formId}`)
+}
+
+export function addForm(data) {
+  return http.post('/admin/workflow/form', data)
+}
+
+export function updateForm(formId, data) {
+  return http.put(`/admin/workflow/form/${formId}`, data)
+}
+
+export function publishForm(formId) {
+  return http.post(`/admin/workflow/form/${formId}/publish`)
+}
+
+export function removeForm(formId) {
+  return http.delete(`/admin/workflow/form/${formId}`)
 }

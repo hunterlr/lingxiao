@@ -3,6 +3,7 @@ package com.lingxiao.modules.workflow.service;
 import com.lingxiao.common.core.exception.ServiceException;
 import com.lingxiao.modules.workflow.entity.WfProcessDef;
 import com.lingxiao.modules.workflow.mapper.WfCategoryMapper;
+import com.lingxiao.modules.workflow.mapper.WfFormMapper;
 import com.lingxiao.modules.workflow.mapper.WfProcessDefMapper;
 import com.lingxiao.modules.workflow.spi.WorkflowEngine;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +33,7 @@ class WfProcessServiceTest {
     void setUp() {
         defMapper = mock(WfProcessDefMapper.class);
         engine = mock(WorkflowEngine.class);
-        service = new WfProcessService(defMapper, mock(WfCategoryMapper.class), engine);
+        service = new WfProcessService(defMapper, mock(WfCategoryMapper.class), mock(WfFormMapper.class), engine);
     }
 
     @Test
@@ -70,7 +71,7 @@ class WfProcessServiceTest {
     @Test
     void importRejectsNonBpmnFile() {
         ServiceException e = assertThrows(ServiceException.class,
-                () -> service.importBpmn("leave.txt", new byte[]{1}, null, null));
+                () -> service.importBpmn("leave.txt", new byte[]{1}, null, null, null, 1L));
 
         assertTrue(e.getMessage().contains("bpmn"));
         verify(engine, never()).deploy(any(), any());

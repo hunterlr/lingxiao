@@ -777,3 +777,34 @@ B3  文章提交审核 → 门户列表 / 详情 404 或不可见 → 同意后�
 文案中英双份；单测覆盖校验器与版本快照。
 交付：代码 + 单测 + .local/wf-form-check.mjs + 后台构建 + 文档，commit 不 push。
 ```
+
+### 14.10 B1 落地记录（2026-11-28，已完成）
+
+与 §14.2 的差异，都是实现时才定下来的：
+
+| 方案 | 实际 | 原因 |
+|---|---|---|
+| `wf_form` 带 `status` 列 | 去掉，用 `version` 判断：0=从未发布 | 两列表达同一件事，容易不一致；发布即生成快照，`version>0` 就是“有线上版本” |
+| 发起时存原始 `formData` | 存**校验归一后**的值 | 抽屉里要显示去掉首尾空格、类型正确的值，否则同一份数据两处显示不一致 |
+| 服务里取当前登录人 | `operatorId` 由 Controller 传入 | 单测在无 Web 上下文时 `LoginUtil` 抛 `InvalidContextException`；服务层不该依赖 Sa-Token |
+| 改已发布表单 = 新版本 | 编辑改草稿、发布才生成快照；表单标识发布后不可改 | 与 CMS 内容的“草稿 / 发布”模型一致，运营不会误改线上 |
+| 示例流程绑定表单 | `ensureDemoForm` 先建表单并发布 v1，`ensureDemoProcess` 再部署流程并写 `form_key`；老库启动时补一次 `form_key` | 从第一刀升级上来不能要求用户手动重导入 |
+
+**实测**
+
+```text
+mvn -o test          357 项 / 60 类，0 失败（新增 11 项：校验器 6、表单服务 4、发起改造后 3 - 旧 2）
+Flyway               V47 → V48；wf_form / wf_form_version / wf_instance_form + wf_process_def.form_key
+示例表单             demo_leave_form v1，四字段：approver / approver2 / days / reason
+wf-form-check.mjs    23/23（列表 / 详情 / 按流程取表单 / 必填与范围拒绝 / 发起 / 快照 / 版本 / 删除保护 / 定义校验）
+workflow-check.mjs   23/23（第一刀回归，入参已改为 formData）
+关闭态（wfoff 库）   表单接口 404、无 wf_form 三表、菜单 0 条
+后台构建             vite build 通过；check-i18n-keys missing=none（1677 键）
+```
+
+**已知限制**
+
+- 没有联动规则与字段权限矩阵；审批节点表单只读，不能“审批人补填字段”。
+- `user` 字段只校验非空，不校验用户是否存在 / 是否停用（工作流不依赖 system 模块）。
+- 附件字段没做。
+- 前端仍只到构建层，未做浏览器点击走查。

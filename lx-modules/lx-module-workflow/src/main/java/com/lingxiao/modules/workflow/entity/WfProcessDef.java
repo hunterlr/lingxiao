@@ -30,6 +30,9 @@ public class WfProcessDef implements Serializable {
 
     private String categoryKey;
 
+    /** 绑定的表单 key，空 = 无表单 */
+    private String formKey;
+
     /** 引擎里的版本号，列名是 version（不能和乐观锁字段重名） */
     @TableField("version")
     private Integer processVersion;

@@ -1544,3 +1544,23 @@ vite build           通过
 CMS 审核中是否用状态 `4`、会签默认通过比例、驳回是否仍即终止。
 
 确认后从 B1 开始，提示词在 `docs/08` §14.9。
+
+### 12.41 工作流第二刀 B1：动态表单（✅ 已完成，2026-11-28）
+
+按 `docs/08` §14.2 实现，落地差异见 §14.10。
+
+**交付**
+
+| 层 | 内容 |
+|---|---|
+| 表 | `V48`：`wf_form`（草稿）/ `wf_form_version`（发布快照）/ `wf_instance_form`（实例快照）/ `wf_process_def.form_key` |
+| 校验 | `WfFormValidator`：9 种字段、必填 / 长度 / 范围 / 选项 / 正则 / 日期；系统保留键（title / remark / initiator / initiatorName / assigneeNames）禁止用作字段 key |
+| 发起 | `formData` 取代 `approver/approver2`；校验归一值写流程变量，同时落实例快照 |
+| 接口 | `/form` 列表 / 详情 / 新增 / 编辑 / 发布 / 删除；`/instance/form`；`/instance/{id}/form` |
+| 页面 | 表单管理（字段列表编辑器 + 实时预览）、发起弹窗按 schema 渲染、详情抽屉只读渲染 |
+
+**验收**：`mvn -o test` 357 项 / 60 类；`wf-form-check.mjs` 23/23；`workflow-check.mjs` 23/23；
+关闭态 404 且无 `wf_form*`；`vite build` 与 `check-i18n-keys` 通过。
+
+**下一步**：B2 会签与条件分支（表单字段 `key` 即变量已就位，`assignees` 多选字段与
+`approveRatio` 直接可用）。

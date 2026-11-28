@@ -3,14 +3,15 @@ package com.lingxiao.modules.workflow.dto;
 import lombok.Data;
 
 import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 发起流程的请求体（后台）。
  *
- * <p>第一刀没有表单引擎，示例流程固定两级审批，所以审批人直接放在请求里；
- * 前端从用户选择器拿到 ID 与姓名一起提交，详情页就不用跨模块查 sys_user。</p>
+ * <p>第二刀起不再有固定的 approver / approver2 字段：审批人、金额、事由都由
+ * 流程绑定的动态表单提供，字段 key 即流程变量名。</p>
  */
 @Data
 public class StartProcessRequest {
@@ -24,14 +25,9 @@ public class StartProcessRequest {
 
     private String remark;
 
-    /** 一级审批人 */
-    @NotNull(message = "{valid.workflow.approver.required}")
-    private Long approver;
+    /** 表单值，按 schema 校验后才写进流程变量 */
+    private Map<String, Object> formData = new HashMap<>();
 
-    private String approverName;
-
-    /** 二级审批人；单级流程可不传 */
-    private Long approver2;
-
-    private String approver2Name;
+    /** 用户 ID → 姓名；详情页按它显示审批人，不跨模块回查 sys_user */
+    private Map<String, String> assigneeNames = new HashMap<>();
 }

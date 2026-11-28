@@ -6661,3 +6661,36 @@ admin / portal build 通过；check-i18n-keys、check-portal-i18n 均通过
 - `mvn -o test` 346 项 / 58 类全绿；`lx-ui-admin` 的 `vite build` 通过。
 
 **没做**：浏览器点击走查（本环境没有浏览器工具）。页面交互需要人工过一遍。
+
+## 72. 工作流第二刀 B1：动态表单（2026-11-28）
+
+方案见 `docs/08` §14.2，落地差异见 §14.10，完成记录见 `docs/13` §12.41。这里记过程。
+
+**数据模型**
+
+- 三张表：`wf_form`（草稿）/ `wf_form_version`（发布快照）/ `wf_instance_form`（实例快照），
+  外加 `wf_process_def.form_key`。字段不拆表，`schema_json` 是唯一真源。
+- 发布即写快照；发起读快照而不是读草稿，所以“改了一半没发布”不会影响新单。
+- 实例快照存**归一后**的值（去空格、类型正确），抽屉与表单两处显示一致。
+
+**实现中改的三处**
+
+1. `wf_form.status` 砍掉：`version=0` 就表示从未发布，两列表达一件事只会不一致。
+2. 服务层不再调 `LoginHelper`：单测没有 Web 上下文，`InvalidContextException` 直接炸；
+   改成 Controller 传 `operatorId`，服务层不依赖 Sa-Token。
+3. 示例表单先于示例流程部署，且老库启动时补写 `form_key`——升级不需要人工重导入。
+
+**踩到的坑**
+
+- `@ConditionalOnProperty` 又漏了一次：重写 `WfRuntimeService` 时把注解丢了，关闭态启动报
+  “required a bean of type WfProcessService”。B1 的关闭态验证就是被这条逼出来的。
+- 前端 `deleteForm` / `deleteProcess` 函数名在 API 重构时没同步，`vite build` 直接报
+  “is not exported”，改名为 `removeForm` / `removeProcess` 解决。
+
+**验证**
+
+- `wf-form-check.mjs` 23/23、`workflow-check.mjs` 23/23（第一刀入参已改为 `formData`）。
+- 关闭态（`lingxiao_wfoff`，workflow=false）：`/workflow/form/list` 404、三张表不存在、菜单 0 条。
+- `mvn -o test` 357 项 / 60 类全绿；后台 `vite build` 通过；`check-i18n-keys` 1677 键、missing=none。
+
+**没做**：联动规则、字段权限矩阵、附件字段、审批节点改表单；浏览器点击走查。

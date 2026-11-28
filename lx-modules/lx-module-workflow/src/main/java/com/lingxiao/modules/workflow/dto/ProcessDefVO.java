@@ -26,6 +26,10 @@ public class ProcessDefVO implements Serializable {
 
     private String categoryName;
 
+    private String formKey;
+
+    private String formName;
+
     private Integer processVersion;
 
     private String deploymentId;

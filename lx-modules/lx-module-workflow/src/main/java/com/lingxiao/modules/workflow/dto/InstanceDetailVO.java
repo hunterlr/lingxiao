@@ -4,7 +4,9 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 流程实例详情：列表字段 + 说明 + 时间线。
@@ -20,4 +22,7 @@ public class InstanceDetailVO extends InstanceVO {
     private String initiatorName;
 
     private List<TimelineVO> timeline = new ArrayList<>();
+
+    /** 用户 ID → 姓名，表单只读展示用 */
+    private Map<String, String> assigneeNames = new LinkedHashMap<>();
 }

@@ -225,9 +225,15 @@ async function handleProcessChange(processKey) {
     schemaName.value = data.formName
     const model = {}
     for (const field of data.schema?.fields || []) {
-      if (field.type === 'switch') model[field.key] = false
-      else if (field.type === 'user') model[field.key] = field.multiple ? [] : ''
-      else model[field.key] = ''
+      if (field.type === 'switch') {
+        model[field.key] = false
+      } else if (field.type === 'user') {
+        model[field.key] = field.multiple ? [] : ''
+      } else if (field.defaultValue != null && field.defaultValue !== '') {
+        model[field.key] = field.type === 'number' ? Number(field.defaultValue) : field.defaultValue
+      } else {
+        model[field.key] = ''
+      }
     }
     formModel.value = model
   } finally {

@@ -371,13 +371,23 @@ public class FlowableWorkflowEngine implements WorkflowEngine {
             item.setAssignee(task.getAssignee());
             item.setAssigneeName(nameOfAssignee(vars.get(VAR_NAMES), task.getAssignee()));
             item.setComment(comments.get(task.getId()));
-            if (task.getEndTime() != null) {
+            if (task.getEndTime() != null && task.getDeleteReason() == null) {
+                // 正常办理完成
                 item.setAction("同意");
                 item.setTime(toLocal(task.getEndTime()));
-            } else if (instance.getEndTime() != null) {
-                String reason = instance.getDeleteReason();
-                item.setAction(reason != null && reason.startsWith(REJECT_PREFIX) ? "驳回" : "撤回");
-                item.setTime(toLocal(instance.getEndTime()));
+            } else if (task.getEndTime() != null || instance.getEndTime() != null) {
+                // 被删除：会签 / 或签达标后剩余任务、驳回与撤回时的在办任务
+                String reason = task.getDeleteReason() != null
+                        ? task.getDeleteReason() : instance.getDeleteReason();
+                if (reason != null && reason.startsWith(REJECT_PREFIX)) {
+                    item.setAction("驳回");
+                } else if (reason != null && reason.startsWith(WITHDRAW_PREFIX)) {
+                    item.setAction("撤回");
+                } else {
+                    item.setAction("未办理");
+                }
+                item.setTime(task.getEndTime() != null
+                        ? toLocal(task.getEndTime()) : toLocal(instance.getEndTime()));
             } else {
                 item.setAction("待办理");
             }

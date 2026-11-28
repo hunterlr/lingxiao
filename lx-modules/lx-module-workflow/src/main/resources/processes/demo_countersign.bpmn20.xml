@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             targetNamespace="http://lingxiao.com/workflow">
+
+  <!--
+    内置示例：三人会签。
+    approvers 来自表单的 user 多选字段（List<String>，元素变量 approver）；
+    approvePercent 来自表单的数字字段（0~100），达到比例即通过、其余任务自动结束。
+    用乘法而不是除法：JUEL 的整数除法会退化成 Double，和 BigDecimal 比较容易踩坑。
+  -->
+  <process id="demo_countersign" name="示例：三人会签" isExecutable="true">
+    <startEvent id="start" name="发起"/>
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="countersign"/>
+
+    <userTask id="countersign" name="会签审批" flowable:assignee="${approver}">
+      <multiInstanceLoopCharacteristics isSequential="false"
+                                       flowable:collection="${approvers}"
+                                       flowable:elementVariable="approver">
+        <completionCondition>${nrOfCompletedInstances * 100 >= nrOfInstances * approvePercent}</completionCondition>
+      </multiInstanceLoopCharacteristics>
+    </userTask>
+
+    <sequenceFlow id="flow2" sourceRef="countersign" targetRef="end"/>
+    <endEvent id="end" name="结束"/>
+  </process>
+</definitions>

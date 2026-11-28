@@ -1619,6 +1619,7 @@ export default {
       actionReject: "Rejected",
       actionWithdraw: "Withdrawn",
       actionPending: "Pending",
+      actionUnhandled: "Skipped",
       form: {
         keywordPlaceholder: "Search by form name or key",
         hint: "A field key is the process variable name. Publish after editing so new requests use the new version.",

@@ -1564,3 +1564,22 @@ CMS 审核中是否用状态 `4`、会签默认通过比例、驳回是否仍即
 
 **下一步**：B2 会签与条件分支（表单字段 `key` 即变量已就位，`assignees` 多选字段与
 `approveRatio` 直接可用）。
+
+### 12.42 工作流第二刀 B2：会签、或签与条件分支（✅ 已完成，2026-11-28）
+
+按 `docs/08` §14.3 实现，落地差异见 §14.11。
+
+**交付**
+
+| 项 | 内容 |
+|---|---|
+| 示例流程 | `demo_countersign`（会签，比例通过）/ `demo_orsign`（或签，首人通过）/ `demo_amount`（排他网关，金额 > 5000 走总经理） |
+| 变量约定 | 表单字段 key 即变量：`approvers`（user 多选）、`approvePercent`（0~100）、`amount`、`approver`、`boss` |
+| 部署 | `DEMOS` 静态列表循环部署，缺哪个补哪个；老库只补 `form_key`，不重复部署 |
+| 时间线 | 区分正常完成 / 被删除：按 `deleteReason` 判驳回、撤回、未办理；会签达标后剩余任务显示“未办理” |
+| 前端 | 表单支持 `defaultValue`（比例默认 50），时间线新增“未办理”文案 |
+
+**验收**：`wf-sign-check.mjs` 28/28（会签比例、会签驳回、或签首人、金额分支、会签中途撤回被拒）；
+B1 与第一刀各 23/23 回归；`mvn -o test` 357 项 / 60 类；`vite build` 与 `check-i18n-keys` 通过。
+
+**下一步**：B3 CMS 审核接入（`wf_business` + `WorkflowBusinessHandler` + 文章状态 `4 审核中`）。

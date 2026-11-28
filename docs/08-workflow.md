@@ -646,7 +646,9 @@ B3 的文章审核单需要表单承载“审核意见 + 期望发布时间”�
 **变量约定（关键）**
 
 - 表单字段 `key` 原样进流程变量；`user` 多选字段写 `List<String>`（用户 ID），单选写 `String`。
-- 会签人字段固定叫 `approvers`，通过比例字段叫 `approveRatio`（0~1，默认 0.5）。
+- 会签人字段固定叫 `approvers`（user 多选）；通过比例字段叫 `approvePercent`（0~100，默认 50）。
+  用百分比而不是 0~1 的小数：JUEL 的整数除法会退化成 Double，和 BigDecimal 比较容易踩坑，
+  完成条件写成乘法 `${nrOfCompletedInstances * 100 >= nrOfInstances * approvePercent}`。
 - 审批人姓名用 `assigneeNames` 映射（第一刀已有），会签时把多人的名字一起写进去。
 
 **示例流程（随模块资源打包，启用时未部署则自动部署）**
@@ -808,3 +810,41 @@ workflow-check.mjs   23/23（第一刀回归，入参已改为 formData）
 - `user` 字段只校验非空，不校验用户是否存在 / 是否停用（工作流不依赖 system 模块）。
 - 附件字段没做。
 - 前端仍只到构建层，未做浏览器点击走查。
+
+### 14.11 B2 落地记录（2026-11-28，已完成）
+
+与 §14.3 的差异与实测：
+
+| 方案 | 实际 | 原因 |
+|---|---|---|
+| 比例字段 `approveRatio`（0~1） | `approvePercent`（0~100） | JUEL 的 `/` 在整数上会退化成 Double，再和 BigDecimal 比较容易出错；改成两边都乘 100 只做整数比较 |
+| 示例流程逐个手写部署 | `DEMOS` 静态列表 + 循环部署，缺哪个补哪个，老库只补 `form_key` | 4 个示例要能独立升级，不能互相牵连 |
+| 时间线里“没办的任务” | 区分“正常办理完成”和“被删除”：按任务 / 实例的 `deleteReason` 判驳回、撤回、未办理 | 会签达标后剩余任务被引擎删除，`endTime` 也有值，只看 `endTime` 会显示成“同意” |
+
+**四个示例（都随模块打包，启用时缺则部署）**
+
+| key | 形态 | 表单字段 |
+|---|---|---|
+| `demo_leave` | 串行两级 | approver / approver2 / days / reason |
+| `demo_countersign` | 会签，按比例通过 | approvers（多选）/ approvePercent / reason |
+| `demo_orsign` | 或签，首人通过 | approvers（多选）/ reason |
+| `demo_amount` | 排他网关 | amount / approver（主管）/ boss（总经理）/ reason |
+
+**实测**
+
+```text
+wf-sign-check.mjs    28/28：会签 3 人 2 人通过即完成、剩余任务清空、时间线含“未办理”；
+                     会签驳回整单终止且其余任务清理；或签首人通过即完成；
+                     金额 6000 走总经理、3000 走主管；会签已办一人后不能撤回
+wf-form-check.mjs    23/23（B1 回归）
+workflow-check.mjs   23/23（第一刀回归）
+mvn -o test          357 项 / 60 类，0 失败（B2 是引擎行为，没有新增单测，靠上面三套集成脚本兜）
+vite build           通过；check-i18n-keys 1678 键 missing=none
+```
+
+**已知限制**
+
+- 没有可视化条件编辑器，表达式里的变量名要和表单字段 key 手工对齐。
+- 会签没有“逐人会签意见汇总”视图，时间线按任务逐条列。
+- 驳回仍是整单终止，不支持“退回上一节点”。
+- 前端未做浏览器点击走查。

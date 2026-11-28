@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             targetNamespace="http://lingxiao.com/workflow">
+
+  <!-- 内置示例：或签。任意一人同意即通过，其余任务由引擎自动删除。 -->
+  <process id="demo_orsign" name="示例：或签" isExecutable="true">
+    <startEvent id="start" name="发起"/>
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="orsign"/>
+
+    <userTask id="orsign" name="或签审批" flowable:assignee="${approver}">
+      <multiInstanceLoopCharacteristics isSequential="false"
+                                       flowable:collection="${approvers}"
+                                       flowable:elementVariable="approver">
+        <completionCondition>${nrOfCompletedInstances >= 1}</completionCondition>
+      </multiInstanceLoopCharacteristics>
+    </userTask>
+
+    <sequenceFlow id="flow2" sourceRef="orsign" targetRef="end"/>
+    <endEvent id="end" name="结束"/>
+  </process>
+</definitions>

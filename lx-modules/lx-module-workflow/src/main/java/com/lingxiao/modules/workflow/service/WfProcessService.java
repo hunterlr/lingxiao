@@ -27,6 +27,7 @@ import org.springframework.util.StringUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -42,12 +43,27 @@ import java.util.stream.Collectors;
 @ConditionalOnProperty(name = "lx.module.modules.workflow.enabled", havingValue = "true")
 public class WfProcessService {
 
-    /** 内置示例流程：模块启用且没部署过时自动部署一次 */
+    /** 内置示例流程 key（两级审批），保留给文档与排查引用 */
     public static final String DEMO_PROCESS_KEY = "demo_leave";
 
-    private static final String DEMO_RESOURCE = "processes/demo_leave.bpmn20.xml";
-
+    /** 内置示例统一挂到“通用”分类 */
     private static final String DEMO_CATEGORY = "common";
+
+    /**
+     * 内置示例流程：每项 = 资源文件 + 绑定的表单 + 说明。
+     *
+     * <p>顺序即部署顺序；表单必须先于流程部署（见 WorkflowModuleConfig）。</p>
+     */
+    private static final List<DemoProcess> DEMOS = Arrays.asList(
+            new DemoProcess("demo_leave", "processes/demo_leave.bpmn20.xml",
+                    WfFormService.DEMO_FORM_KEY, "内置示例：两级审批"),
+            new DemoProcess("demo_countersign", "processes/demo_countersign.bpmn20.xml",
+                    WfFormService.DEMO_COUNTERSIGN_FORM_KEY, "内置示例：三人会签，按比例通过"),
+            new DemoProcess("demo_orsign", "processes/demo_orsign.bpmn20.xml",
+                    WfFormService.DEMO_ORSIGN_FORM_KEY, "内置示例：或签，首人通过"),
+            new DemoProcess("demo_amount", "processes/demo_amount.bpmn20.xml",
+                    WfFormService.DEMO_AMOUNT_FORM_KEY, "内置示例：金额大于 5000 走总经理")
+    );
 
     private final WfProcessDefMapper defMapper;
 
@@ -174,46 +190,72 @@ public class WfProcessService {
     }
 
     /**
-     * 内置示例流程只部署一次：库里已有 demo_leave 就直接返回，避免每次重启多一个版本。
+     * 内置示例流程：每个 key 只部署一次；老库升级时补写 form_key，不重复部署。
      */
     @Transactional(rollbackFor = Exception.class)
     public void ensureDemoProcess() {
+        for (DemoProcess demo : DEMOS) {
+            ensureDemoProcess(demo);
+        }
+    }
+
+    private void ensureDemoProcess(DemoProcess demo) {
         Long exists = defMapper.selectCount(new LambdaQueryWrapper<WfProcessDef>()
-                .eq(WfProcessDef::getProcessKey, DEMO_PROCESS_KEY)
+                .eq(WfProcessDef::getProcessKey, demo.processKey)
                 .eq(WfProcessDef::getDelFlag, "0"));
         if (exists != null && exists > 0) {
-            // 从第一刀升级上来：老示例流程还没绑表单，这里补一次，避免用户手动重导入
+            // 从第一刀 / B1 升级上来：老示例流程可能还没绑表单，补一次，不要求人工重导入
             defMapper.update(null, new LambdaUpdateWrapper<WfProcessDef>()
-                    .eq(WfProcessDef::getProcessKey, DEMO_PROCESS_KEY)
+                    .eq(WfProcessDef::getProcessKey, demo.processKey)
                     .isNull(WfProcessDef::getFormKey)
-                    .set(WfProcessDef::getFormKey, WfFormService.DEMO_FORM_KEY));
+                    .set(WfProcessDef::getFormKey, demo.formKey));
             return;
         }
-        ClassPathResource resource = new ClassPathResource(DEMO_RESOURCE);
+        ClassPathResource resource = new ClassPathResource(demo.resource);
         if (!resource.exists()) {
-            log.warn("内置示例流程资源缺失：{}", DEMO_RESOURCE);
+            log.warn("内置示例流程资源缺失：{}", demo.resource);
             return;
         }
         try (InputStream in = resource.getInputStream()) {
             byte[] bytes = StreamUtils.copyToByteArray(in);
-            DeploymentInfo info = engine.deploy(DEMO_RESOURCE, bytes);
+            DeploymentInfo info = engine.deploy(demo.resource, bytes);
 
             WfProcessDef def = new WfProcessDef();
             def.setProcessKey(info.getProcessKey());
             def.setName(info.getName());
             def.setCategoryKey(DEMO_CATEGORY);
-            def.setFormKey(WfFormService.DEMO_FORM_KEY);
+            def.setFormKey(demo.formKey);
             def.setProcessVersion(info.getVersion());
             def.setDeploymentId(info.getDeploymentId());
             def.setDefinitionId(info.getDefinitionId());
             def.setResourceName(info.getResourceName());
             def.setStatus("0");
-            def.setRemark("内置示例：两级审批");
+            def.setRemark(demo.remark);
             def.setCreateTime(LocalDateTime.now());
             def.setDelFlag("0");
             defMapper.insert(def);
+            log.info("内置示例流程已部署：{}（绑定表单 {}）", demo.processKey, demo.formKey);
         } catch (IOException e) {
             throw new ServiceException(ErrorCode.INTERNAL_ERROR, "读取内置示例流程失败：" + e.getMessage());
+        }
+    }
+
+    /** 内置示例的静态描述，避免为 4 条记录再建一张表 */
+    private static final class DemoProcess {
+
+        private final String processKey;
+
+        private final String resource;
+
+        private final String formKey;
+
+        private final String remark;
+
+        private DemoProcess(String processKey, String resource, String formKey, String remark) {
+            this.processKey = processKey;
+            this.resource = resource;
+            this.formKey = formKey;
+            this.remark = remark;
         }
     }
 

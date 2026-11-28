@@ -48,6 +48,15 @@ public class WfFormService {
     /** 内置示例表单 key，与 demo_leave 流程配套 */
     public static final String DEMO_FORM_KEY = "demo_leave_form";
 
+    /** 会签示例表单：approvers 多选 + approvePercent 比例 */
+    public static final String DEMO_COUNTERSIGN_FORM_KEY = "demo_countersign_form";
+
+    /** 或签示例表单 */
+    public static final String DEMO_ORSIGN_FORM_KEY = "demo_orsign_form";
+
+    /** 金额分支示例表单 */
+    public static final String DEMO_AMOUNT_FORM_KEY = "demo_amount_form";
+
     private final WfFormMapper formMapper;
 
     private final WfFormVersionMapper versionMapper;
@@ -246,31 +255,36 @@ public class WfFormService {
     }
 
     /**
-     * 内置示例表单：与 demo_leave 配套，首次启用时创建并发布 v1。
+     * 内置示例表单：四个流程各配一份，首次启用时创建并发布 v1。
+     *
+     * <p>会签 / 或签共用“人员多选”，条件分支用金额；字段 key 必须与示例 BPMN
+     * 里的变量名一致（approvers / approvePercent / amount / approver / boss）。</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public void ensureDemoForm() {
+        ensureForm(DEMO_FORM_KEY, "示例：请假申请", leaveSchema(), "内置示例，与 demo_leave 流程配套");
+        ensureForm(DEMO_COUNTERSIGN_FORM_KEY, "示例：会签申请", countersignSchema(),
+                "内置示例，与 demo_countersign 流程配套：会签人 + 通过比例");
+        ensureForm(DEMO_ORSIGN_FORM_KEY, "示例：或签申请", orsignSchema(),
+                "内置示例，与 demo_orsign 流程配套：任意一人通过即可");
+        ensureForm(DEMO_AMOUNT_FORM_KEY, "示例：报销申请", amountSchema(),
+                "内置示例，与 demo_amount 流程配套：金额大于 5000 走总经理");
+    }
+
+    private void ensureForm(String formKey, String name, FormSchema schema, String remark) {
         Long exists = formMapper.selectCount(new LambdaQueryWrapper<WfForm>()
-                .eq(WfForm::getFormKey, DEMO_FORM_KEY)
+                .eq(WfForm::getFormKey, formKey)
                 .eq(WfForm::getDelFlag, "0"));
         if (exists != null && exists > 0) {
             return;
         }
-        FormSchema schema = new FormSchema();
-        schema.setFields(Arrays.asList(
-                userField("approver", "一级审批人", false),
-                userField("approver2", "二级审批人", false),
-                numberField("days", "请假天数", new BigDecimal("0.5"), new BigDecimal("365")),
-                textareaField("reason", "请假事由", 500)
-        ));
-
         LocalDateTime now = LocalDateTime.now();
         WfForm form = new WfForm();
-        form.setFormKey(DEMO_FORM_KEY);
-        form.setName("示例：请假申请");
+        form.setFormKey(formKey);
+        form.setName(name);
         form.setSchemaJson(validator.toJson(schema));
         form.setVersion(1);
-        form.setRemark("内置示例，与 demo_leave 流程配套");
+        form.setRemark(remark);
         form.setCreateTime(now);
         form.setDelFlag("0");
         formMapper.insert(form);
@@ -281,7 +295,48 @@ public class WfFormService {
         version.setSchemaJson(form.getSchemaJson());
         version.setCreateTime(now);
         versionMapper.insert(version);
-        log.info("内置示例表单已发布：{} v1", DEMO_FORM_KEY);
+        log.info("内置示例表单已发布：{} v1", formKey);
+    }
+
+    private FormSchema leaveSchema() {
+        FormSchema schema = new FormSchema();
+        schema.setFields(Arrays.asList(
+                userField("approver", "一级审批人", false),
+                userField("approver2", "二级审批人", false),
+                numberField("days", "请假天数", new BigDecimal("0.5"), new BigDecimal("365")),
+                textareaField("reason", "请假事由", 500)
+        ));
+        return schema;
+    }
+
+    private FormSchema countersignSchema() {
+        FormSchema schema = new FormSchema();
+        schema.setFields(Arrays.asList(
+                userField("approvers", "会签人", true),
+                percentField("approvePercent", "通过比例（%）"),
+                textareaField("reason", "申请事由", 500)
+        ));
+        return schema;
+    }
+
+    private FormSchema orsignSchema() {
+        FormSchema schema = new FormSchema();
+        schema.setFields(Arrays.asList(
+                userField("approvers", "或签人", true),
+                textareaField("reason", "申请事由", 500)
+        ));
+        return schema;
+    }
+
+    private FormSchema amountSchema() {
+        FormSchema schema = new FormSchema();
+        schema.setFields(Arrays.asList(
+                numberField("amount", "报销金额", new BigDecimal("1"), new BigDecimal("1000000")),
+                userField("approver", "主管", false),
+                userField("boss", "总经理", false),
+                textareaField("reason", "报销事由", 500)
+        ));
+        return schema;
     }
 
     private FormField userField(String key, String label, boolean multiple) {
@@ -302,7 +357,20 @@ public class WfFormService {
         field.setRequired(true);
         field.setMin(min);
         field.setMax(max);
-        field.setPrecision(1);
+        field.setPrecision(2);
+        return field;
+    }
+
+    private FormField percentField(String key, String label) {
+        FormField field = new FormField();
+        field.setKey(key);
+        field.setLabel(label);
+        field.setType(WfFormValidator.TYPE_NUMBER);
+        field.setRequired(true);
+        field.setMin(BigDecimal.ONE);
+        field.setMax(new BigDecimal("100"));
+        field.setPrecision(0);
+        field.setDefaultValue("50");
         return field;
     }
 

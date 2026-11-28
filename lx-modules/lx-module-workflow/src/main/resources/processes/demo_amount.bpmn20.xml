@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             targetNamespace="http://lingxiao.com/workflow">
+
+  <!--
+    内置示例：金额条件分支。
+    amount 来自表单数字字段；表达式里的变量名必须与表单字段 key 一致，
+    部署时不做静态校验，改表单字段名要同步改这里。
+  -->
+  <process id="demo_amount" name="示例：金额分支" isExecutable="true">
+    <startEvent id="start" name="发起"/>
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="amountGate"/>
+
+    <exclusiveGateway id="amountGate" name="金额判断" default="toManager"/>
+    <sequenceFlow id="toBoss" sourceRef="amountGate" targetRef="bossApprove">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${amount > 5000}]]></conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="toManager" sourceRef="amountGate" targetRef="managerApprove"/>
+
+    <userTask id="bossApprove" name="总经理审批" flowable:assignee="${boss}"/>
+    <userTask id="managerApprove" name="主管审批" flowable:assignee="${approver}"/>
+
+    <sequenceFlow id="flow2" sourceRef="bossApprove" targetRef="end"/>
+    <sequenceFlow id="flow3" sourceRef="managerApprove" targetRef="end"/>
+    <endEvent id="end" name="结束"/>
+  </process>
+</definitions>

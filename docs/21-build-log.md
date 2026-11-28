@@ -6694,3 +6694,30 @@ admin / portal build 通过；check-i18n-keys、check-portal-i18n 均通过
 - `mvn -o test` 357 项 / 60 类全绿；后台 `vite build` 通过；`check-i18n-keys` 1677 键、missing=none。
 
 **没做**：联动规则、字段权限矩阵、附件字段、审批节点改表单；浏览器点击走查。
+
+## 73. 工作流第二刀 B2：会签、或签与条件分支（2026-11-28）
+
+方案见 `docs/08` §14.3，落地差异见 §14.11，完成记录见 `docs/13` §12.42。
+
+**做法**
+
+- 会签 / 或签：BPMN 多实例（`flowable:collection="${approvers}"` + `elementVariable`），
+  完成条件分别用 `nrOfCompletedInstances * 100 >= nrOfInstances * approvePercent` 与
+  `nrOfCompletedInstances >= 1`。用乘法避免 JUEL 整数除法退化成 Double。
+- 条件分支：排他网关 + `${amount > 5000}`，默认分支走主管；变量名直接取表单字段 key。
+- 示例流程从“只部署 demo_leave”改成 `DEMOS` 列表循环：4 个流程各配一份表单，缺哪个补哪个。
+
+**一个真实的坑**
+
+会签达标后，引擎会删掉剩余的多实例任务，这些任务的历史记录 `endTime` 也有值。
+原来时间线只看 `endTime`，第三个没办的人被显示成“同意”。改成先看 `deleteReason`：
+为空才是“同意”，非空按实例原因判“驳回 / 撤回 / 未办理”。这条写进了 §14.11。
+
+**验证**
+
+- `wf-sign-check.mjs` 28/28：会签 3 人 50% 通过、剩余任务清空、时间线含未办理；
+  会签驳回整单终止；或签首人通过即完成；金额 6000/3000 分别走总经理 / 主管；
+  会签办过一人后撤回被拒。
+- B1 与第一刀各 23/23 回归；`mvn -o test` 357 项 / 60 类；后台构建通过。
+
+**没做**：可视化条件编辑器、逐人会签意见汇总、退回上一节点、浏览器点击走查。

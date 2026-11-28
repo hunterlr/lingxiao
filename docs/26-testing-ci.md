@@ -70,6 +70,9 @@ mvn -B -ntp -DskipTests package
 
 ## 3. 当前测试清单（357 项 / 60 个类，2026-11-28 实测）
 
+> 工作流 B2（会签 / 或签 / 条件分支）是引擎行为，没有新增单测，由 `.local/wf-sign-check.mjs`
+> 的 28 条集成断言覆盖（脚本入库在 `.local`，不入 git）。
+
 > 按模块汇总：`lx-common-core` 25 / 6 类，`lx-common-web` 21 / 3 类，`lx-framework` 10 / 2 类，
 > `lx-module-system` 25 / 6 类，`lx-module-file` 4 / 1 类，`lx-module-job` 7 / 1 类，
 > `lx-module-generator` 18 / 3 类，`lx-module-cms` 93 / 13 类，`lx-module-member` 120 / 16 类，

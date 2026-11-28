@@ -41,5 +41,8 @@ public class FormField {
     /** user 字段是否多选；多选写 List&lt;String&gt;，单选写 String */
     private Boolean multiple;
 
+    /** 默认值（字符串），发起页初始化用；不影响校验 */
+    private String defaultValue;
+
     private List<FormOption> options;
 }

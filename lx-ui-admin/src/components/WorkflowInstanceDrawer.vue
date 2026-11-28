@@ -111,13 +111,14 @@ const actionText = (action) => {
     同意: t('page.workflow.actionApprove'),
     驳回: t('page.workflow.actionReject'),
     撤回: t('page.workflow.actionWithdraw'),
-    待办理: t('page.workflow.actionPending')
+    待办理: t('page.workflow.actionPending'),
+    未办理: t('page.workflow.actionUnhandled')
   }
   return map[action] || action
 }
 
 const actionType = (action) => {
-  const map = { 发起: 'info', 同意: 'success', 驳回: 'danger', 撤回: 'warning', 待办理: 'primary' }
+  const map = { 发起: 'info', 同意: 'success', 驳回: 'danger', 撤回: 'warning', 待办理: 'primary', 未办理: 'info' }
   return map[action] || 'info'
 }
 </script>

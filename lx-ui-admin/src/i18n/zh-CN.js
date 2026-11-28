@@ -1621,6 +1621,7 @@ export default {
       actionReject: "驳回",
       actionWithdraw: "撤回",
       actionPending: "待办理",
+      actionUnhandled: "未办理",
       form: {
         keywordPlaceholder: "按表单名称 / 标识搜索",
         hint: "字段的 key 就是流程变量名；改完要发布，新发起的单才用新版本。",

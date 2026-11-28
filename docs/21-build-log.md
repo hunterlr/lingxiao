@@ -6627,3 +6627,37 @@ admin / portal build 通过；check-i18n-keys、check-portal-i18n 均通过
 | 新增语言 | 需要改 \`pages:extend\` 前缀列表并重新构建门户 |
 | 分语言 sitemap | 目前单文件 + hreflang；第三语言出现时再拆索引 |
 | 时间 / 数字 / RTL | 未做 |
+
+
+## 71. 工作流第一刀：无表单审批闭环（2026-11-28）
+
+按 `docs/08` §13 施工，方案差异见 §13.8，完成记录见 `docs/13` §12.39。这里只记过程。
+
+**依赖与启动**
+
+- 依赖从 `flowable-spring-boot-starter-process` 改成 `flowable-spring`：starter 的自动装配在
+  `lx.module.modules.workflow.enabled=false` 时也会建引擎、建 `ACT_*`，跟模块契约冲突。
+- 自建 `SpringProcessEngineConfiguration`（共用主数据源与事务管理器）+ `ProcessEngineFactoryBean`。
+- 第一个启动失败：`flowable-spring` 带进 `liquibase-core`，Boot 自动装配去找
+  `db/changelog/db.changelog-master.yaml`。加 `spring.liquibase.enabled=false` 解决。
+- 第二个启动失败（关闭态）：`FlowableWorkflowEngine` 无条件装配，注入 `ProcessEngine` 失败。
+  引擎、适配器、两个 Service、三个 Controller 全部加 `@ConditionalOnProperty`。
+
+**实现取舍**
+
+- `wf_process_def` 抄一份部署信息（中文名 / 分类 / 启停 / 版本），列表页不查 `ACT_RE_*`，
+  也就不会有“引擎表里没有中文名”的问题。
+- 审批意见用 `ACT_HI_COMMENT`，不建 `wf_task_ext`；驳回与撤回靠删除实例的原因前缀
+  （`reject:` / `withdraw:`）区分，因为引擎只有“运行中 / 已结束”。
+- 审批人姓名随发起请求写进变量 `assigneeNames`，详情页不回查 `sys_user`——工作流模块
+  因此不依赖 system 模块，边界干净。
+- 内置示例只在“库里没有 demo_leave”时部署，避免每次重启多一个版本。
+
+**验证**
+
+- 开发库跑 `workflow-check.mjs` 23/23：发起、两级待办、同意、时间线、已办、驳回、撤回、
+  已办理不可撤回、别人的任务不进我的待办、按标题搜索、停用后不可发起。
+- 全新库关闭态：接口 404、菜单 0 条、无 `ACT_*` / `wf_*`、Flyway 最高 V45。
+- `mvn -o test` 346 项 / 58 类全绿；`lx-ui-admin` 的 `vite build` 通过。
+
+**没做**：浏览器点击走查（本环境没有浏览器工具）。页面交互需要人工过一遍。

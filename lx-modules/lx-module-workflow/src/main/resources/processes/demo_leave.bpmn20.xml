@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             targetNamespace="http://lingxiao.com/workflow">
+
+  <!-- 内置示例：两级审批。发起时传 approver / approver2（后台用户 ID）。 -->
+  <process id="demo_leave" name="示例：两级审批" isExecutable="true">
+    <startEvent id="start" name="发起"/>
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="firstApprove"/>
+
+    <userTask id="firstApprove" name="一级审批" flowable:assignee="${approver}"/>
+    <sequenceFlow id="flow2" sourceRef="firstApprove" targetRef="secondApprove"/>
+
+    <userTask id="secondApprove" name="二级审批" flowable:assignee="${approver2}"/>
+    <sequenceFlow id="flow3" sourceRef="secondApprove" targetRef="end"/>
+
+    <endEvent id="end" name="结束"/>
+  </process>
+</definitions>

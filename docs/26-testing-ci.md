@@ -68,12 +68,12 @@ mvn -B -ntp -DskipTests package
 
 ---
 
-## 3. 当前测试清单（340 项 / 56 个类，2026-11-28 实测）
+## 3. 当前测试清单（346 项 / 58 个类，2026-11-28 实测）
 
 > 按模块汇总：`lx-common-core` 25 / 6 类，`lx-common-web` 21 / 3 类，`lx-framework` 10 / 2 类，
 > `lx-module-system` 25 / 6 类，`lx-module-file` 4 / 1 类，`lx-module-job` 7 / 1 类，
 > `lx-module-generator` 18 / 3 类，`lx-module-cms` 93 / 13 类，`lx-module-member` 120 / 16 类，
-> `lx-module-i18n` 13 / 4 类，`lx-boot` 4 / 1 类。
+> `lx-module-i18n` 13 / 4 类，`lx-module-workflow` 6 / 2 类，`lx-boot` 4 / 1 类。
 > 新增测试后请同步本表与 README 里的数字（取自 `mvn test` 输出，不要手算）。
 
 | 模块 | 测试类 | 项数 | 锁住什么 |
@@ -98,6 +98,8 @@ mvn -B -ntp -DskipTests package
 | `lx-module-generator` | `JavaTypeResolverTest` | 5 | MySQL / PG / 达梦常见类型映射，未知类型回退 String |
 | `lx-module-generator` | `TextUtilsTest` | 8 | 注释折叠、Javadoc 截断、JS / HTML / Java / SQL 四类转义 |
 | `lx-boot` | `AppProfileTest` | 4 | 品牌名 trim、中英文名互相兜底、版本空值转空串 |
+| `lx-module-workflow` | `WfProcessServiceTest` | 4 | 有运行中实例拒绝删除、删除走部署级联、非 BPMN 文件拒绝、流程不存在 / 已停用报错 |
+| `lx-module-workflow` | `WfRuntimeServiceTest` | 2 | 发起时审批人 / 姓名映射 / 业务键入变量、缺审批人拒绝 |
 | `lx-framework` | `ModuleRegistryTest` | 6 | 基座模块永远启用、显式关闭 / 未配置按关闭、空 `module_code` 兼容、列表排序、列表与 `isEnabled` 一致 |
 | `lx-framework` | `ModuleMigrationLocationsTest` | 4 | system / file 固定参与、启用模块排序、目录不存在时跳过 |
 | `lx-module-system` | `StpInterfaceImplTest` | 5 | 非 platform 域为空、超管全权限、关闭模块权限过滤、无注册表全放行、空权限码 |

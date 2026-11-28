@@ -24,6 +24,11 @@ spring:
       maximum-pool-size: 10
       minimum-idle: 2
       connection-timeout: 30000
+  # 工作流模块把 liquibase-core 带进了 classpath（Flowable 自己建表用），
+  # 但本项目的迁移全走 Flyway，必须关掉 Boot 的 Liquibase 自动装配，
+  # 否则它会去找不存在的 db/changelog/db.changelog-master.yaml 直接启动失败。
+  liquibase:
+    enabled: false
   flyway:
     enabled: true
     # 迁移目录由 lx-framework 的 FlywayConfigurationCustomizer 按模块开关拼装：
@@ -162,6 +167,11 @@ lx:
         enabled: true
         name: 内容管理
         description: 站点 / 栏目 / 文章 / 标签 / 门户 API；关闭后 /api/admin/cms 与 /api/portal/cms 不加载
+      # 工作流（v1.5）：true = 装配 Flowable 引擎并执行 wf_* 迁移、自建 ACT_*；false = 接口 404、菜单不下发、ACT_* 不建
+      workflow:
+        enabled: false
+        name: 工作流
+        description: 流程定义 / 发起 / 待办 / 同意驳回 / 撤回；关闭后 /api/admin/workflow 不加载
       # 前台会员（v1.2）：true = 装配会员 Bean 并执行 mem_* 迁移；false = 接口 404、菜单不下发
       # 会员域与平台后台物理隔离：独立 Token（lx-member-token）、独立账号表 mem_user
       member:

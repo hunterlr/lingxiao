@@ -532,3 +532,34 @@ Flyway            全新库跑到 V47；关闭 workflow 时停在 V45，且无 A
 docs/21 追加、README 功能与接口）。完成后 git commit（不 push，除非明确要求），
 列出验收结果与遗留。
 ```
+
+### 13.8 落地记录（2026-11-28，已完成）
+
+与上一节方案的差异，都是踩出来才改的：
+
+| 方案 | 实际 | 原因 |
+|---|---|---|
+| `flowable-spring-boot-starter-process` | `flowable-spring` + 自建 `ProcessEngineFactoryBean` | starter 的自动装配在模块关闭时照样启动引擎并建 `ACT_*`，违背“关闭零副作用”；自建才能整个配置挂在 `lx.module.modules.workflow.enabled` 上 |
+| 未提 liquibase | `spring.liquibase.enabled=false` | `flowable-spring` 把 `liquibase-core` 带进 classpath，Boot 会自动装配并找 `db/changelog/db.changelog-master.yaml`，直接启动失败；本项目迁移只走 Flyway |
+| “Bean 随开关装配” | 引擎、`FlowableWorkflowEngine`、两个 Service、三个 Controller 全部加 `@ConditionalOnProperty` | 只给 Config 加条件不够：关闭态下适配器仍要注入 `ProcessEngine`，启动即失败 |
+
+实测结果：
+
+```text
+mvn -o test                     346 项 / 58 类，0 失败（新增 6 项，2 个测试类）
+Flyway                          开发库 V45 → V47；V46 建 wf_category / wf_process_def，V47 建 12 条菜单
+ACT_* 表                        30 张；未建 ACT_ID_*（disableIdmEngine）与 ACT_EVT_*（disableEventRegistry）
+内置示例                        demo_leave 两级审批，首次启用自动部署 v1，重启不重复部署
+workflow-check.mjs              23/23（发起 / 待办 / 同意 / 驳回 / 撤回 / 越权 / 停用 / 搜索）
+关闭态（全新库）                 接口 404、菜单 0 条、无 ACT_*/wf_* 表、Flyway 最高 V45
+后台构建                        vite build 通过
+```
+
+**已知限制**（都在方案里声明过，这里收紧口径）：
+
+- 没有在线设计器：只认上传 BPMN；改流程要重新部署，即新版本，旧实例按启动时版本跑完。
+- 没有表单：标题 / 说明 / 审批人由页面收集；业务字段接入要等 `wf_business` 那一刀。
+- 驳回即终止，不退回上一节点；撤回要求“没有任何节点办理过”。
+- 审批人是写死在 `${approver}` / `${approver2}` 变量里的具体用户，没有角色 / 部门 / 上级解析。
+- 前端只做了 `vite build` 与接口级验收，**没有做浏览器点击走查**（本环境无浏览器工具）；
+  页面交互（上传、弹窗、抽屉）需人工过一遍。

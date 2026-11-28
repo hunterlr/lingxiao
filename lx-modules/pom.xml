@@ -18,6 +18,7 @@
         lx-module-cms        内容管理（站点 / 栏目 / 文章 / 模型 / 单页 / 导航 / 区块 / 模板）
         lx-module-member     前台会员（注册 / 登录 / 个人中心 / 互动 / 评论 / 第三方登录）
         lx-module-i18n       多语言（数据库语言包 / 翻译工作台 / 发布回滚）
+        lx-module-workflow   工作流（Flowable 6.8：流程定义 / 发起 / 待办 / 审批）
 
       门户不在本聚合内：lx-ui-portal 是独立的 Nuxt3 工程，只调门户接口。
     -->
@@ -41,6 +42,7 @@
         <module>lx-module-cms</module>
         <module>lx-module-member</module>
         <module>lx-module-i18n</module>
+        <module>lx-module-workflow</module>
     </modules>
 
     <dependencies>

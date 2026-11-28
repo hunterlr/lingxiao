@@ -80,6 +80,10 @@
         </dependency>
         <dependency>
             <groupId>com.lingxiao</groupId>
+            <artifactId>lx-module-workflow</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.lingxiao</groupId>
             <artifactId>lx-module-demo</artifactId>
         </dependency>
 

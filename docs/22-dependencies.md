@@ -169,6 +169,7 @@
 | `aspectjweaver` | 1.9.7 | `@Log` 切面织入 |
 | `velocity-engine-core` | 2.3 | 代码生成模板引擎 |
 | `thumbnailator` | 0.4.8 | 图片缩略图/压缩 |
+| `flowable-spring` | 6.8.0 | 工作流引擎（模块关闭时引擎不装配；自带 liquibase-core，需关闭 Boot 的 Liquibase 自动装配） |
 
 ### 2.10 日志（6）
 

@@ -356,3 +356,179 @@ sequenceDiagram
 | P4-M3 | 动态表单、业务集成、CMS 审核 |
 | P4-M4 | 移动审批、催办、流程图、监控 |
 | P6 | 委托、代理、打印、实例迁移、历史归档 |
+
+---
+
+## 13. 第一刀施工方案（2026-11-28 定稿，可开工）
+
+目标：**先把「发起 → 待办 → 同意 / 驳回 → 完结」这条闭环跑通**，且模块可关、关闭即不建表不下发菜单。
+在线设计器、动态表单、会签 / 条件、CMS 审核接入都留到后面的刀。
+
+### 13.1 范围与不做
+
+| 做 | 不做（后续刀） |
+|---|---|
+| 流程定义：上传 BPMN XML、部署、列表 / 启停、删除；内置一个两级审批示例 | 在线 BPMN 设计器（bpmn-js） |
+| 发起：选流程 + 标题 + 说明 + 指定审批人（示例流程两级） | 动态表单 / 业务表单绑定 |
+| 我的待办 / 已办 / 我发起的（含进度时间线） | 会签、或签、条件分支、加签、转办、委托 |
+| 同意 / 驳回（带意见）；驳回即终止 | 退回上一节点、驳回后重新提交 |
+| 发起人撤回（下一节点未办理前） | 抄送、催办、超时提醒 |
+| 模块开关：关闭后接口 404、菜单不下发、引擎不装配 | 移动端（uni-app）、流程图渲染 |
+
+### 13.2 依赖与配置
+
+```xml
+<!-- lx-dependencies -->
+<flowable.version>6.8.0</flowable.version>
+<dependency>
+  <groupId>org.flowable</groupId>
+  <artifactId>flowable-spring-boot-starter-process</artifactId>
+  <version>${flowable.version}</version>
+</dependency>
+```
+
+```yaml
+flowable:
+  database-schema-update: true      # ACT_* 由引擎自建，Flyway 只管业务表
+  async-executor-activate: false    # 第一刀不用异步任务
+  history-level: audit
+  idm:
+    enabled: false                  # 不用 ACT_ID_*，用户/角色仍走 sys_*
+  check-process-definitions: false  # 关闭目录扫描，只认手工部署
+lx:
+  module:
+    modules:
+      workflow:
+        enabled: false              # 关闭时引擎不装配，ACT_* 不会建
+```
+
+- 与 Spring Boot 2.7.18 / JDK 8 官方兼容；固定 6.8.0，不用 7.x（7 要 JDK 17）。
+- 共用主数据源与事务管理器，不另开数据源；Flowable 表与业务表同库。
+- 首次构建需联网下载依赖（已确认 aliyun / Maven Central 均可访问）。
+
+### 13.3 数据与接口
+
+**业务表（`V46__workflow_schema.sql`，放 `db/migration/workflow/`）**
+
+| 表 | 说明 |
+|---|---|
+| `wf_category` | 流程分类：`category_key / name / sort / status`，后台列表分组用 |
+| `wf_process_def` | 部署缓存：`process_key / name / category_key / version / deployment_id / status / remark` |
+
+- 审批意见直接用 Flowable 的 `ACT_HI_COMMENT`（`TaskService.addComment`），不另建表。
+- `wf_business` / `wf_form*` / `wf_cc` / `wf_delegate` **第一刀不建**，等业务接入时再加。
+- 迁移 `V46__workflow_schema.sql`、`V47__workflow_menu.sql`（菜单 6000 段 + 权限码 + 超管授权，幂等写法同现有模块）。
+
+**SPI**
+
+```java
+public interface WorkflowEngine {
+    String start(StartProcessCmd cmd);                       // 返回 processInstanceId
+    void complete(String taskId, Long userId, String comment);
+    void reject(String taskId, Long userId, String comment);
+    void withdraw(String processInstanceId, Long userId);
+    PageResult<TaskVO> pageTodo(Long userId, TaskQuery query);
+    PageResult<TaskVO> pageDone(Long userId, TaskQuery query);
+    PageResult<InstanceVO> pageMine(Long userId, TaskQuery query);
+    InstanceDetailVO detail(String processInstanceId);
+}
+```
+
+第一刀只实现以上方法；`transfer` / `addSign` / `diagram` 等留到后续刀，接口先不写，避免空实现。
+
+**接口（`/api/admin/workflow/**`，权限码 `platform:workflow:*`）**
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/process/list` | 流程定义分页（按分类 / 关键字） |
+| POST | `/process/import` | 上传 `.bpmn20.xml`，部署并写 `wf_process_def` |
+| PUT | `/process/{id}/status` | 启停（停用后不可新发起，已运行实例不受影响） |
+| DELETE | `/process/{id}` | 只有没有运行中实例时允许删部署 |
+| POST | `/instance/start` | 发起：`processKey + title + remark + approver + approver2` |
+| GET | `/instance/mine` | 我发起的（状态 / 当前节点 / 时间线） |
+| GET | `/instance/{id}` | 详情：变量、任务历史、意见 |
+| PUT | `/instance/{id}/withdraw` | 撤回，仅发起人且下一节点未办理 |
+| GET | `/task/todo` | 我的待办 |
+| GET | `/task/done` | 我的已办 |
+| POST | `/task/{id}/complete` | 同意 + 意见 |
+| POST | `/task/{id}/reject` | 驳回 + 意见（终止流程） |
+
+**BPMN 约定（示例 `demo_leave.bpmn20.xml`）**
+
+- 两级 userTask，`flowable:assignee="${approver}"` / `${approver2}`，发起时传变量；
+- 流程 key `demo_leave`，名称「示例：两级审批」，模块启用且未部署时自动部署一次；
+- 变量 `title` / `remark` / `initiator`（发起人 userId）。
+
+### 13.4 后台页面
+
+| 菜单 | 页面 | 关键交互 |
+|---|---|---|
+| 工作流 → 流程定义 | `workflow/process/index.vue` | 列表、上传 BPMN、启停、删除；显示版本与部署时间 |
+| 工作流 → 我的待办 | `workflow/todo/index.vue` | 列表（标题 / 流程 / 发起人 / 到达时间）、办理弹窗（同意 / 驳回 + 意见） |
+| 工作流 → 我发起的 | `workflow/mine/index.vue` | 列表、进度抽屉（时间线：节点 / 办理人 / 意见 / 时间）、撤回 |
+| 工作流 → 我的已办 | `workflow/done/index.vue` | 列表 + 意见查看 |
+
+- 审批人选择复用 `/api/admin/system/user/list`，只列启用用户；
+- 所有按钮挂 `v-hasPerm`，后端 `@RequiresPermission` 双重校验；
+- 中英文案同步（`page.workflow.*` / `menu.workflow*`）。
+
+### 13.5 验收
+
+```text
+Flyway            全新库跑到 V47；关闭 workflow 时停在 V45，且无 ACT_* / wf_* 表
+模块关闭态        /api/admin/workflow/** 404，菜单不下发，日志无 Flowable 启动
+导入 + 发起       demo_leave 部署成功 -> 发起 -> 审批人待办 +1
+同意              实例 completed，发起人「我发起的」状态正确，时间线两条
+驳回              实例 rejected，发起人可见意见
+撤回              下一节点未办理时 canceled；已办理时返回明确错误
+越权              非审批人办理 403；非发起人撤回 403；停用流程不可发起
+单测              状态机与权限（mock SPI），预计 +8~10 项
+构建              mvn -o test 全绿；lx-ui-admin npm run build
+```
+
+### 13.6 风险与对策
+
+| 风险 | 对策 |
+|---|---|
+| 首次构建要下载约 40 个 Flowable jar | 已确认 aliyun / central 可达；`lx-dependencies` 固定 6.8.0 |
+| Flowable 自建 ACT_* 与 Flyway 冲突 | 引擎只管 ACT_*（`database-schema-update=true`），Flyway 只管 `wf_*`，互不扫描 |
+| 模块关闭后 ACT_* 残留 | 关闭时引擎不装配、不建表；已建的 ACT_* 保留（重新开启数据不丢），文档写明 |
+| 历史表增长快 | `history-level=audit`；第二刀加归档任务 |
+| 驳回语义被误解 | 第一刀“驳回即终止”，不自动退回上一节点，按钮文案写明 |
+| 审批人写死变量 | 第一刀用 `${approver}`；角色 / 部门审批人放第二刀 |
+
+### 13.7 下一窗口启动提示词
+
+```text
+在仓库 E:\java\lingxiao 实现工作流第一刀（无表单审批闭环）。先读 docs/08-workflow.md
+§13（方案与验收）、docs/06-modularity.md、AGENTS.md；不要重新设计选型。
+
+开工自检：
+1) git log -1 与 git status --porcelain：基线在 1f2afd4 之后、工作区干净；
+2) mvn -o -B -ntp test 全绿（340 项 / 56 类）再动手；
+3) 先输出方案并等确认：模块坐标与开关键、迁移编号（从 V46 起）、菜单与权限码、
+   页面路由、SPI 方法签名；确认后写代码。
+
+范围（只做这些）：
+- 新模块 lx-modules/lx-module-workflow，开关 lx.module.modules.workflow.enabled，默认关闭；
+- 依赖 flowable-spring-boot-starter-process 6.8.0（版本放 lx-dependencies），
+  flowable 配置按 §13.2：idm 关闭、异步执行器关闭、history-level=audit；
+- 迁移 V46 建 wf_category / wf_process_def（db/migration/workflow/），
+  V47 建菜单 6000 段与 platform:workflow:* 权限（幂等，写法同其它模块）；
+- 内置示例 BPMN demo_leave.bpmn20.xml（两级审批，${approver} / ${approver2}），
+  模块启用且未部署时自动部署一次；
+- 接口按 §13.3；页面按 §13.4（流程定义 / 我的待办 / 我发起的 / 我的已办）；
+- 驳回即终止；撤回仅发起人且下一节点未办理；停用流程不可发起。
+
+硬约束：
+- 业务代码只依赖 WorkflowEngine 接口，不直接注入 RuntimeService / TaskService；
+- 不建 wf_form* / wf_business / wf_cc，不改 CMS 与会员模块；
+- 不改历史迁移；菜单与权限 SQL 幂等；文案中英双份；
+- 关闭模块时 Bean 不装配、接口 404、菜单不下发、Flyway 跳过 workflow 目录。
+
+交付：代码 + 单测（状态机 / 权限，预计 +8~10 项）+ Flyway 实跑 +
+.local/workflow-check.mjs（导入 / 发起 / 同意 / 驳回 / 撤回 / 越权 / 关闭态）+
+后台 npm run build + 浏览器走查 + 文档（docs/08 落地小节、docs/13 §12 追加、
+docs/21 追加、README 功能与接口）。完成后 git commit（不 push，除非明确要求），
+列出验收结果与遗留。
+```

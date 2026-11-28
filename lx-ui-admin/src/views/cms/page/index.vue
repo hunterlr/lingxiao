@@ -64,6 +64,9 @@
               <el-button v-hasPerm="'platform:cms:page:edit'" link type="primary" @click="openEdit(row)">
                 {{ t('common.edit') }}
               </el-button>
+              <el-button v-hasPerm="'platform:cms:page:edit'" link type="primary" @click="openI18n(row)">
+                {{ t('page.cms.i18n.entry') }}
+              </el-button>
               <el-button v-hasPerm="'platform:cms:page:remove'" link type="danger" @click="handleDelete(row)">
                 {{ t('common.delete') }}
               </el-button>
@@ -183,6 +186,8 @@
         </div>
       </template>
     </el-dialog>
+
+    <CmsI18nDialog v-model="i18nVisible" owner-type="page" :owner-id="i18nOwnerId" :source="i18nSource" />
   </div>
 </template>
 
@@ -194,6 +199,7 @@ import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import RichEditor from '@/components/RichEditor.vue'
 import MediaPicker from '@/components/MediaPicker.vue'
 import CmsExtFields from '@/components/CmsExtFields.vue'
+import CmsI18nDialog from '@/components/CmsI18nDialog.vue'
 import {
   addPage,
   createPagePreviewTicket,
@@ -337,6 +343,28 @@ async function openAdd() {
   editingId.value = ''
   dialogVisible.value = true
   await loadPageModelFields(form.siteId)
+}
+
+/* ==================== 翻译（人工填写） ==================== */
+
+const i18nVisible = ref(false)
+const i18nOwnerId = ref('')
+const i18nSource = ref({ title: '', summary: '', content: '' })
+
+/** 打开翻译弹窗：取单页详情，作为“复制原文”的来源。 */
+async function openI18n(row) {
+  try {
+    const detail = await getPage(row.pageId)
+    i18nOwnerId.value = String(row.pageId)
+    i18nSource.value = {
+      title: detail?.title || row.title || '',
+      summary: detail?.summary || '',
+      content: detail?.content || ''
+    }
+    i18nVisible.value = true
+  } catch (e) {
+    ElMessage.error(t('page.cms.i18n.loadFailed'))
+  }
 }
 
 async function openEdit(row) {

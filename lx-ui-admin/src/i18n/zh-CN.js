@@ -781,7 +781,7 @@ export default {
         unpublishedSuccess: '已下线，门户回到默认语言',
         deleteConfirm: '确认删除该语言版本吗？删除后门户回到默认语言。',
         titleRequired: '请填写译文标题',
-        loadFailed: '读取文章详情失败，稍后重试'
+        loadFailed: '读取内容详情失败，稍后重试'
       },
       article: {
         title: '文章管理',

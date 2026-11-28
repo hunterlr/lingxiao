@@ -6623,7 +6623,7 @@ admin / portal build 通过；check-i18n-keys、check-portal-i18n 均通过
 
 | 项 | 说明 |
 |---|---|
-| 单页翻译入口 | 接口已通，后台页面按钮待补 |
+| 单页翻译入口 | 已补（2026-11-28，与文章共用 `CmsI18nDialog`） |
 | 新增语言 | 需要改 \`pages:extend\` 前缀列表并重新构建门户 |
 | 分语言 sitemap | 目前单文件 + hreflang；第三语言出现时再拆索引 |
 | 时间 / 数字 / RTL | 未做 |

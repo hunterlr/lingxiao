@@ -779,7 +779,7 @@ export default {
         unpublishedSuccess: 'Unpublished; the portal falls back to the default language',
         deleteConfirm: 'Delete this language version? The portal falls back to the default language.',
         titleRequired: 'Translation title is required',
-        loadFailed: 'Could not load the article detail'
+        loadFailed: 'Could not load the content detail'
       },
       article: {
         title: 'Articles',

@@ -563,3 +563,217 @@ workflow-check.mjs              23/23（发起 / 待办 / 同意 / 驳回 / 撤�
 - 审批人是写死在 `${approver}` / `${approver2}` 变量里的具体用户，没有角色 / 部门 / 上级解析。
 - 前端只做了 `vite build` 与接口级验收，**没有做浏览器点击走查**（本环境无浏览器工具）；
   页面交互（上传、弹窗、抽屉）需人工过一遍。
+---
+
+## 14. 第二刀方案：动态表单、会签与条件、CMS 审核接入（2026-11-28 草拟，待确认）
+
+第一刀把「发起 → 待办 → 同意 / 驳回 → 完结」跑通了，但只能填标题、说明和两个审批人。
+第二刀要解决“真能拿来办事”的三件事：**表单**、**多人审批与分支**、**业务单据接入**。
+
+### 14.1 切片：拆成三刀，每刀独立可验收
+
+| 刀 | 内容 | 依赖 | 验收标志 |
+|---|---|---|---|
+| B1 动态表单 | 表单定义 / 版本 / 渲染 / 服务端校验 / 与流程绑定 / 实例快照 | 无 | 发起一个“金额 + 事由 + 附件说明”的流程，必填和范围在后端也拦得住 |
+| B2 会签与条件 | 会签（比例通过）、或签（首人通过）、条件分支 | B1（字段即变量） | 同一个流程 3 人会签半数通过；金额 > 5000 走总经理节点 |
+| B3 CMS 审核接入 | `wf_business` 绑定、业务回调 SPI、文章“提交审核” | B1 + B2 | 文章提交审核 → 门户不可见 → 同意后上线 / 驳回回草稿 |
+
+**为什么这么切**：B2 的会签人、条件变量都来自表单字段，没有 B1 就只能写死；
+B3 的文章审核单需要表单承载“审核意见 + 期望发布时间”，且回调要判重（`wf_business`），
+放在最后能复用前两刀的产物，也避免一刀改三个模块。
+
+### 14.2 B1：动态表单
+
+**数据模型（`V48__workflow_form.sql`，`db/migration/workflow/`）**
+
+| 表 | 说明 |
+|---|---|
+| `wf_form` | 表单定义：`form_key`（唯一）/ `name` / `schema_json` / `version`（已发布版本，0=未发布）/ `status` |
+| `wf_form_version` | 发布快照：`(form_id, version)` 唯一，内容只增不改，历史实例按旧版本渲染 |
+| `wf_instance_form` | 实例表单快照：`process_instance_id` 唯一 + `form_key` + `form_version` + `data_json` |
+
+- `wf_process_def` 加一列 `form_key`（`ALTER TABLE`，可空）：部署时在导入弹窗里选“绑定表单”。
+- 字段不拆表：`schema_json` 就是唯一真源，后台不做按字段的 SQL 查询，拆 `wf_form_field` 只会增加同步成本。
+
+**Schema 契约（只做这些类型）**
+
+```json
+{
+  "fields": [
+    { "key": "amount",   "label": "金额", "type": "number",   "required": true, "min": 0, "max": 100000, "precision": 2 },
+    { "key": "reason",   "label": "事由", "type": "textarea", "required": true, "maxLength": 500 },
+    { "key": "expectAt", "label": "期望时间", "type": "date" },
+    { "key": "urgent",   "label": "是否加急", "type": "switch" },
+    { "key": "approvers","label": "会签人", "type": "user", "multiple": true, "required": true }
+  ]
+}
+```
+
+- 类型固定 9 种：`input / textarea / number / select / radio / date / datetime / switch / user`；
+  `select / radio` 带 `options:[{label,value}]`。
+- **不做**联动规则（`rules`）、字段权限矩阵、附件上传：联动一上就要表达式求值器，收益在第三刀才出现。
+- 字段 `key` 直接作为流程变量名——这是 B2 条件分支能工作的前提，文档和页面都写清楚。
+
+**校验**
+
+- 前端按 schema 生成 Element Plus 表单（`required / maxLength / min / max / pattern`），
+  统一组件 `WorkflowFormRenderer.vue`，发起页与办理详情共用。
+- 后端 `WfFormValidator` 用同一份 schema 再校验一次（必填、类型、范围、选项归属），**以后端为准**。
+- `user` 字段只校验非空与数量，不校验“用户是否存在”（工作流模块不依赖 system，边界干净）。
+
+**绑定与发起**
+
+- 导入 BPMN 时选表单；`wf_process_def.form_key` 为空表示无表单（第一刀的 demo_leave 也顺手绑一个示例表单）。
+- `GET /api/admin/workflow/instance/form?processKey=x` 返回 `{schema, formKey, formVersion}`。
+- `POST /instance/start` 请求体改为 `{processKey, title, remark, formData:{...}}`；
+  后端按 schema 校验 → 落 `wf_instance_form` 快照 → 校验值写进流程变量 → 启动实例（一个事务）。
+
+**接口与页面**
+
+| 接口 | 说明 |
+|---|---|
+| `GET /form/list` `GET /form/{id}` | 表单列表 / 详情（含草稿 schema） |
+| `POST /form` `PUT /form/{id}` | 新建 / 编辑草稿（已发布不可改，改就是新版本） |
+| `POST /form/{id}/publish` | 发布：`version+1`，写快照，`wf_form.version` 指向最新 |
+| `DELETE /form/{id}` | 没有任何流程定义引用、没有实例快照时允许删 |
+
+- 页面：工作流 → 表单管理（列表 + 抽屉编辑器：字段增删、类型、必填、长度 / 范围、选项、上下移动；右侧实时预览）。
+  **不做拖拽画布**，也不引 `form-create`：多一个重型依赖，只为省“加号点两下”的功夫，不划算。
+- 发起弹窗：选流程 → 拉 schema → 渲染 → 校验 → 提交；待办详情抽屉里只读展示表单值。
+
+### 14.3 B2：会签、或签、条件分支
+
+**变量约定（关键）**
+
+- 表单字段 `key` 原样进流程变量；`user` 多选字段写 `List<String>`（用户 ID），单选写 `String`。
+- 会签人字段固定叫 `approvers`，通过比例字段叫 `approveRatio`（0~1，默认 0.5）。
+- 审批人姓名用 `assigneeNames` 映射（第一刀已有），会签时把多人的名字一起写进去。
+
+**示例流程（随模块资源打包，启用时未部署则自动部署）**
+
+| key | 名称 | 形态 | 关键片段 |
+|---|---|---|---|
+| `demo_leave` | 示例：两级审批 | 串行（第一刀保留） | `assignee="${approver}"` / `"${approver2}"` |
+| `demo_countersign` | 示例：三人会签 | 多人，比例通过 | `collection="${approvers}" elementVariable="approver"`，`completionCondition="${nrOfCompletedInstances/nrOfInstances >= approveRatio}"` |
+| `demo_orsign` | 示例：或签 | 多人，首人通过 | 同上，`completionCondition="${nrOfCompletedInstances >= 1}"` |
+| `demo_amount` | 示例：金额分支 | 排他网关 | `${amount > 5000}` → 总经理；默认 → 主管 |
+
+- 或签里一旦有人同意，其余任务由引擎自动删除；有人驳回仍然整单终止（与第一刀语义一致）。
+- 条件分支不做可视化规则编辑器：表达式写在 BPMN 里，变量名必须和表单字段对齐。
+  **部署时不校验变量名**（做不到可靠静态校验），运行到网关未命中会报错——这条写进页面提示。
+
+**代码改动**
+
+- `StartProcessRequest` 去掉 `approver / approver2 / approverName / approver2Name`，统一走 `formData`；
+  审批人由表单的 `user` 字段提供。第一刀未上线，这里直接切，不保留兼容分支。
+- `WorkflowEngine.start` 的变量装配从“固定三个”改成“表单校验后的键值对 + 系统键（title / remark / initiator / assigneeNames）”。
+- 任务列表的“待办”天然按 assignee 查，会签下每个人各有一条，无需改查询。
+
+### 14.4 B3：CMS 审核接入
+
+**绑定表（`V49__workflow_business.sql`）**
+
+```sql
+CREATE TABLE wf_business (
+  id                  bigint      NOT NULL,
+  business_type       varchar(64) NOT NULL,   -- cms_article
+  business_id         bigint      NOT NULL,
+  process_instance_id varchar(64) DEFAULT NULL,
+  status              varchar(20) NOT NULL,   -- running / approved / rejected / canceled
+  create_by / create_time / update_time,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_business (business_type, business_id),
+  KEY idx_instance (process_instance_id)
+);
+```
+
+**回调 SPI（工作流模块定义，业务模块实现）**
+
+```java
+public interface WorkflowBusinessHandler {
+    String businessType();                                  // cms_article
+    String titleOf(String businessId);                       // 待办里显示的标题
+    void onStarted(String businessId, String processInstanceId);
+    void onFinished(String businessId, String result, String comment);  // approved / rejected
+    void onCanceled(String businessId, String reason);
+}
+```
+
+- 工作流模块只依赖接口；CMS 模块加 `lx-module-workflow` 的 `optional` 依赖实现 `CmsArticleAuditHandler`。
+- 工作流关闭时 CMS 的 Handler 照常装配但不被调用；`submit-audit` 接口先判开关，直接报“工作流模块未启用”。
+
+**CMS 侧改动**
+
+- 文章状态加 `4 = 审核中`（`char(1)` 不用改表结构）；门户所有查询只认 `1`，审核中天然不可见，**门户不用改**。
+- `cms_article` 加 `audit_comment varchar(500)` 与 `audit_time datetime(3)`（`V50__cms_article_audit.sql`）：
+  驳回原因要能回看，不能塞 `remark` 覆盖运营备注。
+- 新接口 `POST /api/admin/cms/article/{id}/submit-audit`（权限 `platform:cms:article:submit-audit`）：
+  仅 `0 草稿` / `2 已下线` 可提交 → 置 `4` → 启动 `cms_article_audit` 流程（`businessKey = cms_article:{id}`）→ 写 `wf_business`。
+- 审核通过：`onFinished(approved)` → `status=1`、写 `publishTime`（沿用 `CmsArticleService.publish` 的快照逻辑）；
+  驳回：`status=0`、`audit_comment=意见`、`audit_time=now`；撤回：`status=0`。
+- 后台文章列表加「提交审核」按钮与「审核中」标签；待办列表的标题从 `wf_business → Handler.titleOf` 取。
+
+**事务与幂等**
+
+- 提交审核、办理任务都在同一个事务里（Flowable 与业务共用 `PlatformTransactionManager`）：
+  回调抛异常 → 任务不完成、文章状态不变，不会出现“流程通过但内容没上线”。
+- `wf_business.status` 已终态则跳过回调（重复回调 / 重试都安全）；不做 MQ、不做重试队列。
+
+### 14.5 编号与权限占用
+
+| 对象 | 占用 |
+|---|---|
+| Flyway | V48 表单 / V49 业务绑定 / V50 CMS 审核字段与字典 |
+| 菜单 | 6050 表单管理（+ 6051~6055 按钮）、CMS 侧复用 3010 文章 + 新按钮权限 |
+| 权限码 | `platform:workflow:form:list|add|edit|publish|remove`、`platform:cms:article:submit-audit` |
+| 字典 | `cms_article_status` 增加 `4 = 审核中` |
+
+### 14.6 验收（按刀）
+
+```text
+B1  mvn test 新增校验器 / 版本 / 快照用例（约 +10）
+    表单发布 version+1、改已发布表单被拒、必填与范围服务端拒绝、实例快照不随表单改版变化
+B2  会签 3 人：2 人同意后完成；或签：1 人同意后其余任务消失；金额 6000 走总经理、3000 走主管
+    会签中一人驳回：整单 rejected，其余任务清理
+B3  文章提交审核 → 门户列表 / 详情 404 或不可见 → 同意后可见、publishTime 正确
+    驳回 → 回草稿 + audit_comment 落库；撤回 → 回草稿
+    重复回调不重复发布（wf_business 终态判重）
+    工作流关闭：submit-audit 报“模块未启用”，菜单不下发
+关闭态  全新库跑到 V47，无 wf_form / wf_business，ACT_* 不建
+```
+
+### 14.7 风险
+
+| 风险 | 对策 |
+|---|---|
+| 表单字段名与 BPMN 表达式不一致，运行到网关才炸 | 导入页展示变量清单；示例流程给出对照；错误信息带上变量名 |
+| 会签完成条件表达式写错（`nrOfCompletedInstances` 拼错） | 部署时引擎会做表达式语法校验；示例流程作为对照，文档贴出片段 |
+| CMS 状态 `4` 漏处理（回收站 / 定时发布 / 版本 / 统计） | V50 里把字典补上；逐个检查 `status` 分支，写进验收清单 |
+| 回调与任务同事务，CMS 抛异常导致审批办不掉 | 回调内只做状态更新与快照，不做外部 IO；异常向上抛，让审批人重试 |
+| `user` 字段不校验用户存在，可能选到已停用账号 | 前端只列启用用户；后端不查（边界），停用账号的待办仍可见，属可接受 |
+
+### 14.8 需要你确认的 5 件事
+
+1. **表单编辑器形态**：字段列表 + 抽屉（推荐）／纯 JSON 文本／拖拽画布（要引 `form-create`）。
+2. **是否直接切掉第一刀的 `approver/approver2` 入参**：推荐切（未上线，不留兼容分支）。
+3. **CMS 审核中状态**：新增 `4`（推荐）／复用草稿 + 标记字段。
+4. **会签默认通过比例**：0.5（推荐，页面可改）／全票。
+5. **驳回是否退回上一节点**：仍不做（推荐，维持“驳回即终止”）。
+
+### 14.9 B1 开工提示词（确认后使用）
+
+```text
+在 E:\java\lingxiao 实现工作流第二刀的 B1：动态表单。
+先读 docs/08-workflow.md §5、§14（方案与验收）、docs/06-modularity.md、AGENTS.md，
+基线在 1a08835 之后、工作区干净，mvn -o test 应为 346 项 / 58 类。
+
+范围：V48 建 wf_form / wf_form_version / wf_instance_form，wf_process_def 加 form_key；
+表单 CRUD + 发布（版本快照）；schema 9 种字段；WfFormValidator 服务端校验；
+发起改为 formData 并落实例快照；后台「表单管理」页面与发起弹窗渲染；
+示例表单绑定到 demo_leave。不做联动规则、字段权限矩阵、附件上传、拖拽画布。
+
+硬约束：不引新前端依赖；表单字段 key 即流程变量名；已发布表单不可改；
+发起与校验同一事务；迁移用 INSERT ... SELECT ... WHERE NOT EXISTS，不写 LIMIT；
+文案中英双份；单测覆盖校验器与版本快照。
+交付：代码 + 单测 + .local/wf-form-check.mjs + 后台构建 + 文档，commit 不 push。
+```

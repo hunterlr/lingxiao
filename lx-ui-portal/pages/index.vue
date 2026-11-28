@@ -33,9 +33,6 @@ useSeoMeta({
   ogType: 'website'
 })
 
-useHead({
-  link: [{ rel: 'canonical', href: siteUrl }]
-})
 </script>
 
 <template>

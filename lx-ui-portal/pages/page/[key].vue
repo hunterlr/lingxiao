@@ -27,9 +27,6 @@ useSeoMeta({
   ogUrl: () => `${siteUrl}/page/${encodeURIComponent(pageKey)}`
 })
 
-useHead({
-  link: [{ rel: 'canonical', href: `${siteUrl}/page/${encodeURIComponent(pageKey)}` }]
-})
 </script>
 
 <template>

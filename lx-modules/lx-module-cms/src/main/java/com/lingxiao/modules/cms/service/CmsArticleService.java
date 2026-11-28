@@ -80,6 +80,7 @@ public class CmsArticleService {
     private final CmsCategoryService categoryService;
     private final CmsModelService modelService;
     private final CmsContentExtService extService;
+    private final CmsContentI18nService i18nService;
 
     /** 每篇文章保留的版本数；Spring 注入，单测直接使用默认值 */
     @Value("${lx.cms.version-keep:30}")
@@ -332,6 +333,7 @@ public class CmsArticleService {
         articleTagMapper.deleteByArticleId(articleId);
         versionMapper.deleteByArticleId(articleId);
         extService.deleteByOwner("article", articleId);
+        i18nService.deleteByOwner("article", articleId);
         int removed = articleMapper.hardDeleteDeletedById(articleId);
         if (removed == 0) {
             throw new ServiceException(ErrorCode.NOT_FOUND, "回收站中不存在该文章");

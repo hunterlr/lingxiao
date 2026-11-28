@@ -72,7 +72,8 @@ class CmsArticleServiceTest {
         modelService = mock(CmsModelService.class);
         extService = mock(CmsContentExtService.class);
         service = new CmsArticleService(articleMapper, articleTagMapper, versionMapper,
-                categoryMapper, tagMapper, siteService, categoryService, modelService, extService);
+                categoryMapper, tagMapper, siteService, categoryService, modelService, extService,
+                mock(CmsContentI18nService.class));
 
         CmsModel builtIn = new CmsModel();
         builtIn.setModelId(100L);

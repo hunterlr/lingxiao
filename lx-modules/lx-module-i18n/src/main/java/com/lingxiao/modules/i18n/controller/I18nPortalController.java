@@ -2,9 +2,11 @@ package com.lingxiao.modules.i18n.controller;
 
 import com.lingxiao.common.core.domain.R;
 import com.lingxiao.modules.i18n.dto.PackVO;
+import com.lingxiao.modules.i18n.dto.PortalLangConfigVO;
 import com.lingxiao.modules.i18n.dto.PortalLanguageVO;
 import com.lingxiao.modules.i18n.dto.PortalPackVO;
 import com.lingxiao.modules.i18n.service.I18nPackService;
+import com.lingxiao.modules.i18n.service.PortalLangConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
@@ -34,6 +36,13 @@ import java.util.List;
 public class I18nPortalController {
 
     private final I18nPackService packService;
+    private final PortalLangConfigService langConfigService;
+
+    /** 门户语言配置：寻址方式、默认语言、可切换语言；门户用它生成 URL 与 hreflang。 */
+    @GetMapping("/config")
+    public R<PortalLangConfigVO> config() {
+        return R.ok(langConfigService.config());
+    }
 
     @GetMapping("/languages")
     public R<List<PortalLanguageVO>> languages() {

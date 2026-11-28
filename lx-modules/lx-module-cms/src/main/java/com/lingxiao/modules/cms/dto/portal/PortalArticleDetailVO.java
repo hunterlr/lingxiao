@@ -50,4 +50,7 @@ public class PortalArticleDetailVO {
 
     /** 模型扩展字段（图集 images 等） */
     private Map<String, Object> ext = new LinkedHashMap<>();
+
+    /** 当前语言是否有已发布译文；false 表示回退默认语言 */
+    private Boolean translated;
 }

@@ -37,9 +37,6 @@ useSeoMeta({
   ogUrl: () => `${siteUrl}/category/${encodeURIComponent(categoryKey)}`
 })
 
-useHead({
-  link: [{ rel: 'canonical', href: `${siteUrl}/category/${encodeURIComponent(categoryKey)}` }]
-})
 </script>
 
 <template>

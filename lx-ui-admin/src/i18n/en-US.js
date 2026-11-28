@@ -757,6 +757,30 @@ export default {
         nameRequired: 'Enter the tag name',
         deleteConfirm: 'Delete tag "{name}"?'
       },
+      i18n: {
+        entry: 'Translate',
+        title: 'Content translation (manual)',
+        language: 'Language',
+        source: 'Default-language content',
+        copy: 'Copy source',
+        copyHint: 'Fills the form as a starting point; saving keeps it a draft',
+        copied: 'Source copied — rewrite it in the target language',
+        draft: 'Draft',
+        published: 'Published',
+        empty: 'No translation for this language yet',
+        seoTitle: 'SEO title',
+        seoKeywords: 'SEO keywords',
+        seoDescription: 'SEO description',
+        saveDraft: 'Save draft',
+        saved: 'Draft saved; the portal still shows the default language',
+        publish: 'Publish',
+        publishedSuccess: 'Published; visible after switching language on the portal',
+        unpublish: 'Unpublish',
+        unpublishedSuccess: 'Unpublished; the portal falls back to the default language',
+        deleteConfirm: 'Delete this language version? The portal falls back to the default language.',
+        titleRequired: 'Translation title is required',
+        loadFailed: 'Could not load the article detail'
+      },
       article: {
         title: 'Articles',
         hint: 'New articles are always drafts. Publishing and taking offline are separate actions; editing never changes status.',
@@ -824,7 +848,7 @@ export default {
         changePublish: 'Publish',
         changeRollback: 'Rollback',
         changeRestore: 'Restore',
-        openPortalPreview: 'Portal preview'
+        openPortalPreview: 'Portal preview',
       },
       recycle: {
         title: 'Recycle bin',

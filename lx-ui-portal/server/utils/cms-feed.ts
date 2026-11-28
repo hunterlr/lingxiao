@@ -65,8 +65,46 @@ export async function portalGetOr<T>(
   }
 }
 
-/** XML 文本转义：标题、摘要、URL 都可能包含 & < > " '。 */
-export function escapeXml(value?: string | number | null): string {
+/** 门户语言配置（sitemap 的 hreflang 用）；读不到时按单语言处理。 */
+export interface FeedLangConfig {
+  mode: 'path' | 'query' | 'cookie'
+  defaultLang: string
+  defaultLangInPath: boolean
+  languages: Array<{ code: string; urlCode: string }>
+}
+
+export async function portalLangConfig(event: H3Event): Promise<FeedLangConfig> {
+  const { backendBase } = feedConfig(event)
+  try {
+    const response = await $fetch<{ code: number; data?: FeedLangConfig }>(
+      `${backendBase}/api/portal/i18n/config`
+    )
+    if (response?.code === 0 && response.data?.languages?.length) {
+      return response.data
+    }
+  } catch {
+    // i18n 模块关闭：退化为单语言
+  }
+  return {
+    mode: 'cookie',
+    defaultLang: 'zh-CN',
+    defaultLangInPath: false,
+    languages: [{ code: 'zh-CN', urlCode: 'zh-cn' }]
+  }
+}
+
+/** 某一语言下该路径的绝对地址。 */
+export function localizeUrl(config: FeedLangConfig, siteUrl: string, path: string, code: string): string {
+  const current = config.languages.find((item) => item.code === code)
+  if (!current || config.mode !== 'path') {
+    return `${siteUrl}${path}`
+  }
+  const isDefault = code === config.defaultLang
+  const prefix = isDefault && !config.defaultLangInPath ? '' : `/${current.urlCode}`
+  return `${siteUrl}${prefix}${path === '/' ? '/' : path}`
+}
+
+/** XML 文本转义：标题、摘要、URL 都可能包含 & < > " '。 */export function escapeXml(value?: string | number | null): string {
   if (value == null) return ''
   return String(value)
     .replace(/&/g, '&amp;')

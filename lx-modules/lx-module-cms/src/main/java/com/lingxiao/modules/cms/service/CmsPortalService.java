@@ -14,6 +14,7 @@ import com.lingxiao.modules.cms.dto.portal.PortalCategoryVO;
 import com.lingxiao.modules.cms.dto.portal.PortalSiteVO;
 import com.lingxiao.modules.cms.dto.portal.PortalTagVO;
 import com.lingxiao.modules.cms.entity.CmsArticle;
+import com.lingxiao.modules.cms.entity.CmsContentI18n;
 import com.lingxiao.modules.cms.entity.CmsCategory;
 import com.lingxiao.modules.cms.entity.CmsSite;
 import com.lingxiao.modules.cms.entity.CmsTag;
@@ -75,6 +76,7 @@ public class CmsPortalService {
     private final CmsArticleTagMapper articleTagMapper;
     private final CmsCategoryClosureMapper closureMapper;
     private final CmsContentExtService extService;
+    private final CmsContentI18nService i18nService;
 
     /** 启用站点列表，供门户做站点切换。 */
     public List<PortalSiteVO> sites() {
@@ -118,7 +120,8 @@ public class CmsPortalService {
      */
     public PageResult<PortalArticleSummaryVO> articles(String siteKey, long pageNum, long pageSize,
                                                        Long categoryId, String categoryKey,
-                                                       Long tagId, String tagKey, String keyword) {
+                                                       Long tagId, String tagKey, String keyword,
+                                                       String lang) {
         CmsSite site = siteService.detailByKey(siteKey);
         Long resolvedCategoryId = resolveCategoryId(site.getSiteId(), categoryId, categoryKey);
         Long resolvedTagId = resolveTagId(site.getSiteId(), tagId, tagKey);
@@ -155,25 +158,25 @@ public class CmsPortalService {
                 .orderByDesc(CmsArticle::getArticleId);
 
         Page<CmsArticle> result = articleMapper.selectPage(page, wrapper);
-        List<PortalArticleSummaryVO> records = toSummaries(site.getSiteId(), result.getRecords());
+        List<PortalArticleSummaryVO> records = toSummaries(site.getSiteId(), result.getRecords(), lang);
         return PageResult.of(result.getTotal(), result.getCurrent(), result.getSize(), records);
     }
 
     /** 门户搜索：与列表同一套规则，显式暴露给前端做“搜索页”。 */
     public PageResult<PortalArticleSummaryVO> search(String siteKey, long pageNum, long pageSize,
-                                                     String keyword) {
-        return articles(siteKey, pageNum, pageSize, null, null, null, null, keyword);
+                                                     String keyword, String lang) {
+        return articles(siteKey, pageNum, pageSize, null, null, null, null, keyword, lang);
     }
 
     /** 按 ID 取已发布文章；草稿 / 下线 / 其它站点一律按“不存在”处理。 */
-    public PortalArticleDetailVO article(String siteKey, Long articleId) {
+    public PortalArticleDetailVO article(String siteKey, Long articleId, String lang) {
         CmsSite site = siteService.detailByKey(siteKey);
         CmsArticle article = articleId == null ? null : articleMapper.selectById(articleId);
-        return toDetail(site, article);
+        return toDetail(site, article, lang);
     }
 
     /** 按 slug 取已发布文章；slug 站点内唯一。 */
-    public PortalArticleDetailVO articleBySlug(String siteKey, String slug) {
+    public PortalArticleDetailVO articleBySlug(String siteKey, String slug, String lang) {
         if (!StringUtils.hasText(slug)) {
             throw new ServiceException(ErrorCode.BAD_REQUEST, "slug 不能为空");
         }
@@ -182,7 +185,7 @@ public class CmsPortalService {
                 .eq(CmsArticle::getSiteId, site.getSiteId())
                 .eq(CmsArticle::getSlug, slug.trim())
                 .eq(CmsArticle::getStatus, CmsArticleService.STATUS_PUBLISHED));
-        return toDetail(site, article);
+        return toDetail(site, article, lang);
     }
 
     /**
@@ -191,7 +194,7 @@ public class CmsPortalService {
      * <p>用于会员收藏这类“只有文章 ID”的场景：只查摘要字段（排除正文），
      * 不累加阅读量，并按请求顺序返回；不可见或已删除的 ID 直接省略。</p>
      */
-    public List<PortalArticleSummaryVO> articleBatch(String siteKey, List<Long> ids) {
+    public List<PortalArticleSummaryVO> articleBatch(String siteKey, List<Long> ids, String lang) {
         CmsSite site = siteService.detailByKey(siteKey);
         if (ids == null || ids.isEmpty()) {
             return Collections.emptyList();
@@ -217,7 +220,7 @@ public class CmsPortalService {
                         + "JOIN cms_category ac ON ac.category_id = cc.ancestor_id "
                         + "WHERE cc.category_id = cms_article.category_id "
                         + "AND cc.depth > 0 AND ac.status = '1')"));
-        Map<Long, PortalArticleSummaryVO> byId = toSummaries(site.getSiteId(), articles).stream()
+        Map<Long, PortalArticleSummaryVO> byId = toSummaries(site.getSiteId(), articles, lang).stream()
                 .collect(Collectors.toMap(PortalArticleSummaryVO::getArticleId, item -> item, (a, b) -> a));
         return normalized.stream()
                 .map(byId::get)
@@ -227,7 +230,7 @@ public class CmsPortalService {
 
     // ==================== 内部方法 ====================
 
-    private PortalArticleDetailVO toDetail(CmsSite site, CmsArticle article) {
+    private PortalArticleDetailVO toDetail(CmsSite site, CmsArticle article, String lang) {
         if (article == null
                 || !Objects.equals(site.getSiteId(), article.getSiteId())
                 || !CmsArticleService.STATUS_PUBLISHED.equals(article.getStatus())) {
@@ -258,10 +261,26 @@ public class CmsPortalService {
         vo.setTemplate(CmsTemplates.resolveDetailTemplate(category.getTemplate()));
         vo.setTags(loadTags(site.getSiteId(), articleTagMapper.selectTagIds(article.getArticleId())));
         vo.setExt(extService.load("article", article.getArticleId()));
+        applyTranslation(vo, article.getArticleId(), lang);
         return vo;
     }
 
-    private List<PortalArticleSummaryVO> toSummaries(Long siteId, List<CmsArticle> articles) {
+    /** 有已发布译文就覆盖标题 / 摘要 / 正文；没有就回退默认语言并标记 translated=false。 */
+    private void applyTranslation(PortalArticleDetailVO vo, Long articleId, String lang) {
+        CmsContentI18n translation = i18nService.published(CmsContentI18nService.OWNER_ARTICLE, articleId, lang);
+        if (translation == null) {
+            vo.setTranslated(!StringUtils.hasText(lang));
+            return;
+        }
+        vo.setTitle(translation.getTitle());
+        vo.setSummary(translation.getSummary());
+        if (StringUtils.hasText(translation.getContent())) {
+            vo.setContent(HtmlSanitizer.clean(translation.getContent()));
+        }
+        vo.setTranslated(true);
+    }
+
+    private List<PortalArticleSummaryVO> toSummaries(Long siteId, List<CmsArticle> articles, String lang) {
         if (articles == null || articles.isEmpty()) {
             return Collections.emptyList();
         }
@@ -278,6 +297,8 @@ public class CmsPortalService {
         }
 
         Map<Long, List<PortalTagVO>> tagMap = loadTagsByArticle(siteId, articleIds);
+        Map<Long, CmsContentI18n> translations = i18nService.publishedMap(
+                CmsContentI18nService.OWNER_ARTICLE, articleIds, lang);
 
         List<PortalArticleSummaryVO> records = new ArrayList<>(articles.size());
         for (CmsArticle article : articles) {
@@ -298,6 +319,14 @@ public class CmsPortalService {
                 vo.setCategoryName(category.getCategoryName());
             }
             vo.setTags(tagMap.getOrDefault(article.getArticleId(), Collections.emptyList()));
+            CmsContentI18n translation = translations.get(article.getArticleId());
+            if (translation != null) {
+                vo.setTitle(translation.getTitle());
+                vo.setSummary(translation.getSummary());
+                vo.setTranslated(true);
+            } else {
+                vo.setTranslated(!StringUtils.hasText(lang));
+            }
             records.add(vo);
         }
         return records;

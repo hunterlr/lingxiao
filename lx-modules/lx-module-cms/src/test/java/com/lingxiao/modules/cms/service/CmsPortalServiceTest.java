@@ -59,7 +59,7 @@ class CmsPortalServiceTest {
         closureMapper = mock(CmsCategoryClosureMapper.class);
         extService = mock(CmsContentExtService.class);
         service = new CmsPortalService(siteService, categoryMapper, articleMapper,
-                tagMapper, articleTagMapper, closureMapper, extService);
+                tagMapper, articleTagMapper, closureMapper, extService, mock(CmsContentI18nService.class));
         when(siteService.detailByKey("main")).thenReturn(site(1L, "main"));
     }
 
@@ -69,7 +69,7 @@ class CmsPortalServiceTest {
         when(articleMapper.selectById(5L)).thenReturn(article(5L, 1L, 9L, CmsArticleService.STATUS_DRAFT));
 
         ServiceException error = catchThrowableOfType(
-                () -> service.article("main", 5L), ServiceException.class);
+                () -> service.article("main", 5L, null), ServiceException.class);
 
         assertThat(error).isNotNull();
         assertThat(error.getMessage()).contains("文章不存在");
@@ -83,7 +83,7 @@ class CmsPortalServiceTest {
                 .thenReturn(article(5L, 2L, 9L, CmsArticleService.STATUS_PUBLISHED));
 
         ServiceException error = catchThrowableOfType(
-                () -> service.article("main", 5L), ServiceException.class);
+                () -> service.article("main", 5L, null), ServiceException.class);
 
         assertThat(error).isNotNull();
         assertThat(error.getMessage()).contains("文章不存在");
@@ -99,7 +99,7 @@ class CmsPortalServiceTest {
         when(categoryMapper.selectById(9L)).thenReturn(category);
 
         ServiceException error = catchThrowableOfType(
-                () -> service.article("main", 5L), ServiceException.class);
+                () -> service.article("main", 5L, null), ServiceException.class);
 
         assertThat(error).isNotNull();
         assertThat(error.getMessage()).contains("文章不存在");
@@ -117,7 +117,7 @@ class CmsPortalServiceTest {
                 category(8L, 1L, 0L, "disabled-parent", "1", "0")));
 
         ServiceException error = catchThrowableOfType(
-                () -> service.article("main", 5L), ServiceException.class);
+                () -> service.article("main", 5L, null), ServiceException.class);
 
         assertThat(error).isNotNull();
         assertThat(error.getMessage()).contains("文章不存在");
@@ -138,7 +138,7 @@ class CmsPortalServiceTest {
                 tag(4L, 1L, "disabled", "1"),
                 tag(5L, 2L, "other-site", "0")));
 
-        PortalArticleDetailVO detail = service.article("main", 5L);
+        PortalArticleDetailVO detail = service.article("main", 5L, null);
 
         assertThat(detail.getContent()).contains("<p>正文</p>").doesNotContain("<script");
         assertThat(detail.getViewCount()).isEqualTo(8L);
@@ -175,7 +175,7 @@ class CmsPortalServiceTest {
     @DisplayName("slug 详情：空 slug 直接拒绝")
     void rejectsBlankSlug() {
         ServiceException error = catchThrowableOfType(
-                () -> service.articleBySlug("main", "  "), ServiceException.class);
+                () -> service.articleBySlug("main", "  ", null), ServiceException.class);
 
         assertThat(error).isNotNull();
         assertThat(error.getCode()).isEqualTo(ErrorCode.BAD_REQUEST.getCode());

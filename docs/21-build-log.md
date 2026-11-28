@@ -6569,3 +6569,61 @@ verify-ssr.mjs          15/15（中英各取登录 / 注册 / 找回 / 个人中
 |---|---|
 | CMS 内容翻译（刀 B） | 表与接口方案见 `docs/13` §12.34.4 |
 | URL 前缀 / hreflang / 分语言 sitemap（刀 C） | 方案见 §12.34，等 B 完成 |
+
+## 70. CMS 内容翻译与门户语言寻址（刀 B + C，2026-11-28）
+
+### 70.1 一句话结论
+
+文章 / 单页可以按语言人工维护译文，发布后才对外；门户用 \`/en/...\` 区分语言，
+默认语言不带前缀，切换语言保留当前页，canonical 与 hreflang 一起出。
+**没有机翻入口**：只有“复制原文”当起点，保存一律落草稿。
+
+### 70.2 代码落点
+
+| 层 | 文件 |
+|---|---|
+| 迁移 | \`V44__cms_content_i18n.sql\`、\`V45__i18n_portal_settings.sql\` |
+| 实体 / Mapper | \`CmsContentI18n\` / \`CmsContentI18nMapper\` |
+| DTO | \`CmsContentI18nVO\` / \`CmsContentI18nSaveRequest\`、\`PortalLangConfigVO\` |
+| 服务 | \`CmsContentI18nService\`、\`PortalLangConfigService\` |
+| 接口 | \`CmsArticleI18nController\`、\`CmsPageI18nController\`；门户 \`?lang=\`、\`/api/portal/i18n/config\` |
+| 后台 | \`CmsI18nDialog.vue\` + 文章列表「翻译」入口 + \`api/cmsI18n.js\` |
+| 门户 | \`usePortalI18n\`（配置 / 路径 / 切换）、\`middleware/lang.global.ts\`、\`nuxt.config.ts\` 的 \`pages:extend\` 前缀路由、layout 的 canonical/hreflang、\`sitemap.xml.ts\` |
+
+### 70.3 关键决策
+
+1. **默认语言不带前缀**：\`/article/1\` 是默认语言，\`/en/article/1\` 是其它语言；
+   \`/zh-cn/article/1\` 301 回无前缀，保证唯一 URL。
+2. **语言代码唯一来源**：后端 \`PortalLangConfigService.urlCode\` 出短码（en / zh-cn），
+   门户按配置生成与识别，不在前端写死映射。
+3. **译文只认已发布**：草稿 / 下线都回退默认语言，接口带 \`translated=false\`，页面不显示半截译文。
+4. **不接机翻**：没有 \`machine_translated\` 字段，避免“点一下生成并发布”这种不可控路径。
+5. **前缀路由在构建期生成**：\`pages:extend\` 复制一份带 \`/en\`、\`/zh-cn\` 的路由；
+   新增语言要改这里并重新构建门户，已写进限制。
+
+### 70.4 验证
+
+\`\`\`text
+mvn -o test          340 项 / 56 类，0 失败
+b-verify.mjs         21/21
+c-verify.mjs         13/13
+c-sitemap.mjs        5/5
+admin / portal build 通过；check-i18n-keys、check-portal-i18n 均通过
+\`\`\`
+
+### 70.5 踩坑
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| 发布英文后门户仍显示中文 | 门户 URL 用短码 \`en\`，库里存 \`en-US\`，查不到 | \`normalizeLang\` 把 \`en\`/\`zh\`/\`zh-cn\` 归一到完整 locale |
+| 首页直接 500，报 \`[nuxt] instance unavailable\` | 在 \`useHead(() => ...)\` 回调里调 \`useRuntimeConfig()\`，回调执行时已脱离 Nuxt 上下文 | 在 setup 顶部取一次 siteUrl，回调里只用变量 |
+| 页面 canonical 指错语言 | 页面各自写死 canonical，忽略语言前缀 | 删掉页面级 canonical，统一由 layout 按当前 path 生成 |
+
+### 70.6 遗留
+
+| 项 | 说明 |
+|---|---|
+| 单页翻译入口 | 接口已通，后台页面按钮待补 |
+| 新增语言 | 需要改 \`pages:extend\` 前缀列表并重新构建门户 |
+| 分语言 sitemap | 目前单文件 + hreflang；第三语言出现时再拆索引 |
+| 时间 / 数字 / RTL | 未做 |

@@ -759,6 +759,30 @@ export default {
         nameRequired: '请输入标签名称',
         deleteConfirm: '确认删除标签「{name}」吗？'
       },
+      i18n: {
+        entry: '翻译',
+        title: '内容翻译（人工填写）',
+        language: '语言',
+        source: '默认语言内容',
+        copy: '复制原文',
+        copyHint: '只复制到表单当起点，保存后仍是草稿',
+        copied: '已复制默认语言内容，请按目标语言改写',
+        draft: '草稿',
+        published: '已发布',
+        empty: '该语言还没有译文',
+        seoTitle: 'SEO 标题',
+        seoKeywords: 'SEO 关键词',
+        seoDescription: 'SEO 描述',
+        saveDraft: '保存草稿',
+        saved: '草稿已保存，门户仍显示默认语言',
+        publish: '发布',
+        publishedSuccess: '该语言已发布，门户切换后可见',
+        unpublish: '下线',
+        unpublishedSuccess: '已下线，门户回到默认语言',
+        deleteConfirm: '确认删除该语言版本吗？删除后门户回到默认语言。',
+        titleRequired: '请填写译文标题',
+        loadFailed: '读取文章详情失败，稍后重试'
+      },
       article: {
         title: '文章管理',
         hint: '新建文章一律为草稿；发布 / 下线单独操作，普通编辑不会改变状态。',
@@ -826,7 +850,7 @@ export default {
         changePublish: '发布',
         changeRollback: '回滚',
         changeRestore: '回收站恢复',
-        openPortalPreview: '门户预览'
+        openPortalPreview: '门户预览',
       },
       recycle: {
         title: '回收站',

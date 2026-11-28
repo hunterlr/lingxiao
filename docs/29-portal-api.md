@@ -317,5 +317,33 @@ If-None-Match: "9462...c1"
 - `ETag` 为发布版本 checksum，命中返回 `304`；`Cache-Control: public, max-age=5`；
 - 只读后台已发布译文，草稿、停用键、停用语言都不会下发。
 
-**门户前端本刀未接入**：`lx-ui-portal` 仍使用文件语言包；接入（首屏 SSR 注入、
-语言切换、`/{lang}/` 前缀与 hreflang）留给 P2.5 后半段。
+**门户已接入（2026-11-28）**：界面文案走 `/api/portal/i18n/{lang}/portal`，地址规则读
+`/api/portal/i18n/config`（path / query / cookie 三选一，默认 path）。详见 `docs/31` §10.5。
+
+---
+
+## 5. 内容多语言与语言配置（2026-11-28）
+
+### 5.1 语言配置
+
+`GET /api/portal/i18n/config` → `R<PortalLangConfigVO>`：
+
+| 字段 | 说明 |
+|---|---|
+| `mode` | `path` / `query` / `cookie`，门户据此生成与识别地址 |
+| `defaultLang` | 默认语言代码，不带前缀 |
+| `defaultLangInPath` | 默认语言是否也带前缀 |
+| `languages[]` | `code`（en-US）、`urlCode`（en）、`name`、`nativeName`、`direction`、`isDefault` |
+
+后台改参数 5 秒内生效，不需要重启或重新构建门户。
+
+### 5.2 内容语言参数
+
+文章列表 / 详情 / 搜索 / 批量摘要 / 单页接口接受 `?lang=`：
+
+- 传完整 locale（`en-US`）或短码（`en`）都可以，服务端归一；
+- 有**已发布**译文就覆盖 `title` / `summary` / `content`（单页还有 SEO 字段）；
+- 没有译文时回退默认语言，并在 VO 上标 `translated=false`，**不返回 404**；
+- 默认语言不传 `lang`，响应里 `translated=true`。
+
+> 草稿与已下线译文都不对外。译文由后台人工填写，没有机翻入口。

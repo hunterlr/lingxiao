@@ -374,5 +374,23 @@ SSR 首页                       <title> / description / canonical / hero 均存
 |---|---|
 | 公共页：首页 / 栏目 / 文章 / 搜索 / 标签 / 单页 / 预览 / 404 / 页头页脚 / 列表模板 | ✅ 已双语 |
 | 会员中心：登录 / 注册 / 找回密码 / 个人中心 / 消息中心 / 第三方回调 | ✅ 已双语（366 键） |
-| CMS 内容（文章 / 单页正文） | ⏳ 刀 B |
-| URL 前缀 / hreflang / 分语言 sitemap | ⏳ 刀 C |
+| CMS 内容（文章 / 单页正文） | ✅ 按语言维护，只读已发布译文（刀 B） |
+| URL 前缀 / hreflang / sitemap | ✅ path 模式已落地（刀 C） |
+
+### 10.5 语言寻址（刀 C）
+
+| 参数 | 取值 | 默认 |
+|---|---|---|
+| `portal.i18n.mode` | `path` / `query` / `cookie` | `path` |
+| `portal.i18n.defaultLang` | `zh-CN` / `en-US` | `zh-CN` |
+| `portal.i18n.defaultLangInPath` | `true` / `false` | `false` |
+| `portal.i18n.langs` | 逗号分隔 | `zh-CN,en-US` |
+
+- 门户启动读 `/api/portal/i18n/config`（5 秒缓存），据此生成地址与 hreflang；
+- `path` 模式：默认语言 `/article/1`，其它语言 `/en/article/1`；带默认语言前缀的地址
+  由全局中间件 301 归一；
+- 切换语言由 `setLang()` 换前缀（保留后续路径与查询串），cookie 只做记忆；
+- 内容语言：`contentLang` 只在非默认语言时传给 CMS 接口，避免把主表内容当成“缺翻译”；
+- canonical 指当前语言地址，hreflang 互指并带 `x-default`；sitemap 每个地址按语言各出一条、
+  用 `xhtml:link` 互指；
+- **限制**：路由前缀在构建期由 `pages:extend` 生成，新增语言要改 `nuxt.config.ts` 并重新构建门户。

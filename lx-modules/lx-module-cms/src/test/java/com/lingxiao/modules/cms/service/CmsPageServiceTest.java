@@ -40,7 +40,8 @@ class CmsPageServiceTest {
         modelService = mock(CmsModelService.class);
         extService = mock(CmsContentExtService.class);
         siteService = mock(CmsSiteService.class);
-        service = new CmsPageService(pageMapper, navItemMapper, modelService, extService, siteService);
+        service = new CmsPageService(pageMapper, navItemMapper, modelService, extService, siteService,
+                mock(CmsContentI18nService.class));
 
         CmsModel pageModel = new CmsModel();
         pageModel.setModelId(30L);

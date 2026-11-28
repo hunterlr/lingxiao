@@ -92,6 +92,8 @@ LingXiao is a **modular monolith** foundation for back-office systems. It is not
 - Admin language management, a translation workbench (drafts / CSV import-export / coverage / missing keys), pack publish and rollback
 - Drafts never reach production until published; rollback restores the snapshot; publish and rollback evict the cache immediately, other instances converge within 5 seconds
 - Public `/api/portal/i18n/**` with `ETag`; disabling the module removes the `i18n_*` tables, endpoints and menus
+- CMS content translated per language by hand: drafts stay private, unpublished languages fall back to the default; the admin "Translate" dialog copies the source as a starting point
+- Configurable language addressing: `path` (`/en/article/1`, default) / `query` / `cookie`, plus configurable default language and whether it appears in the path; path mode emits hreflang and a multilingual sitemap
 
 **Operations & tooling**
 

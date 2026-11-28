@@ -102,10 +102,10 @@ java -jar lx-boot/target/lingxiao.jar --lx.captcha.enabled=false
 
 | 对象 | 现状 |
 |---|---|
-| Flyway | V1~V43 |
+| Flyway | V1~V45 |
 | 菜单 ID | 系统管理 1xxx 起、监控 / 工具 2xxx、CMS 3000~3103、会员 4000~4062、多语言 5000~5032 |
 | 权限码 | `platform:system|monitor|tool|file|cms|member|i18n:*`，按钮级 `:add|edit|remove…` |
-| `sys_config.config_id` | 系统参数 1~10，会员参数 11~34（`mem.*`）；新增前查迁移脚本 |
+| `sys_config.config_id` | 系统参数 1~10，会员 11~34（`mem.*`），门户多语言 35~38（`portal.i18n.*`）；新增前查迁移脚本 |
 | 表前缀 | `sys_`（基座）/ `cms_` / `mem_` / `i18n_` |
 
 **代码与文案**

@@ -1098,7 +1098,7 @@ Flyway `V1~V42`；后台语言包自检 `missing=none`。
 | 1 | ~~v1.3 门户交付收口~~ | 缺口 A + B + C + D：打包带门户、门户进程脚本与 systemd、Nginx 门户 server、prod 配置显式模块开关、CI 加门户构建与语言包自检、快照刷到 V42 | ✅ **已完成（2026-11-27，见 §12.31）** | — |
 | 2 | ~~会员消息通知~~ | 站内信表、评论审核结果通知、门户未读角标 | ✅ **已完成（2026-11-27，见 §12.32）**，顺带修掉 sitemap 502 | — |
 | 3 | ~~会员资料收尾~~ | 门户头像上传接文件中心、会员会话管理（在线设备 / 踢下线） | ✅ **已完成（2026-11-27，见 §12.33）** | — |
-| 4 | 多语言后半段 | 门户前端接 `/api/portal/i18n/**` → CMS 内容翻译 → `/{lang}/` 前缀 + hreflang + 多语言 sitemap | 方案见 §12.34；**刀 A1（公共页文案）已完成**，A2（会员中心文案）与 B / C 待做 | 先设计后实现 |
+| 4 | ~~多语言后半段~~ | 门户前端接 `/api/portal/i18n/**` → CMS 内容翻译 → `/{lang}/` 前缀 + hreflang + 多语言 sitemap | ✅ **已完成（2026-11-27 ~ 11-28，见 §12.35 / §12.36 / §12.37）** | — |
 | 5 | 工作流 / 多库 / SaaS | P4、P2.5 多库、P6 | 都要先出方案与选型验证（`docs/08` / `14` / `10`），不适合直接写代码 | 强模型设计 |
 | — | 缓存策略 | — | §12.6 的触发信号目前都不满足，**不排期** | — |
 
@@ -1292,13 +1292,35 @@ member-profile-check.mjs          17/17
 | B CMS 内容翻译 | 文章 / 单页可维护多语言版本，逐语言发布 | 新表 `cms_content_i18n`（`owner_type` / `owner_id` / `lang` / `title` / `summary` / `content` / `seo_*` / `status`，唯一键三者）；后台“翻译”页；门户接口接受 `?lang=`，缺翻译回退默认语言并标记 `translated=false` | 刀 A（语言标识统一） |
 | C URL 前缀与 SEO | `/{lang}/` 路由、hreflang、分语言 sitemap | 默认语言不带前缀（`/` = zh-CN，`/en/` = 英文）；切换语言保留当前路径；`hreflang` 含 `x-default`；`sitemap.xml` 出索引，`sitemap-{lang}.xml` 分语言；canonical 指当前语言 | 刀 B（内容能按语言出） |
 
-#### 12.34.2 必须先定的三件事
+#### 12.34.2 必须先定的三件事（2026-11-27 定稿）
 
-| 决策 | 建议 | 影响 |
+| 决策 | 定稿 | 说明 |
 |---|---|---|
-| 默认语言带不带 URL 前缀 | **不带**（`/` 中文，`/en/` 英文） | 已有链接与搜索引擎收录不变；切换语言时要处理 301 与 canonical |
-| 语言代码用 `en` 还是 `en-US` | URL 用 `en`，内部映射 `en-US`（与 `i18n_language.locale` 对齐） | 避免 URL 里出现大小写与连字符；映射表放 i18n 模块 |
-| 内容翻译要不要机翻草稿 | **第一版不要**，只做人工翻译；机翻留到有术语表之后 | 机翻直接进草稿会污染审核与 SEO 质量判断 |
+| 默认语言带不带 URL 前缀 | **不带**（`/` = 默认语言，其它语言带前缀） | 已收录链接不变；切语言保留当前路径 |
+| 默认语言 | **可配置**，默认 `zh-CN`；做英文站时把默认语言改成 `en-US`，此时 `/` 是英文、`/zh-cn/` 是中文 | 后台「多语言 → 门户设置」可改，也可直接改 `sys_config` |
+| URL 语言码 | **短码**：`en` / `zh-cn`；内部仍映射完整 locale（`en-US` / `zh-CN`） | 映射集中在 `LangCodes`，只改一处 |
+| 语言寻址方式 | **后台参数 `portal.i18n.mode`**：`path`（默认）/ `query` / `cookie` | `path` 对 SEO 最好；`query` 兼容旧部署；`cookie` 是 A1 的行为 |
+| 内容翻译 | **纯人工填写，不接机器翻译** | 机翻标题 / 术语不可控，且低质机翻页拖累收录；第一版不留 `machine_translated` 字段 |
+
+对应四个参数（`sys_config`，config_id 35~38，见 `V45__i18n_portal_settings.sql`）：
+
+| 键 | 取值 | 默认 |
+|---|---|---|
+| `portal.i18n.mode` | `path` / `query` / `cookie` | `path` |
+| `portal.i18n.defaultLang` | 语言代码 | `zh-CN` |
+| `portal.i18n.defaultLangInPath` | `true` / `false` | `false` |
+| `portal.i18n.langs` | 逗号分隔 | `zh-CN,en-US` |
+
+#### 12.34.2.1 三种模式的行为
+
+| 模式 | 默认语言 URL | 其它语言 URL | canonical / hreflang | sitemap |
+|---|---|---|---|---|
+| `path` | `/article/1` | `/en/article/1` | 每页出完整 hreflang（含 `x-default`） | `sitemap.xml`（默认语言）+ `sitemap-en.xml` |
+| `query` | `/article/1` | `/article/1?lang=en` | canonical 指向默认语言，hreflang 只给默认语言 | 单语言 |
+| `cookie` | `/article/1` | `/article/1`（Cookie 决定） | 单语言 | 单语言 |
+
+切换模式会改变全站链接，后台保存时提示二次确认；从 `query` 切到 `path` 时
+`?lang=en` 301 到 `/en/...`。
 
 #### 12.34.3 刀 A 的落点与验收（推荐先做）
 
@@ -1393,3 +1415,43 @@ verify-ssr.mjs                       15/15
 这条已写进 `docs/21` §69.5，后续改造要照这个来。
 
 **下一步**：刀 B（CMS 内容翻译，`docs/13` §12.34.4）→ 刀 C（URL 前缀与 SEO）。
+
+
+### 12.37 刀 B + C：CMS 内容翻译与语言寻址（✅ 已完成，2026-11-28）
+
+**两刀一起做**：内容翻译（刀 B）需要门户带上 `lang`，而 `lang` 怎么进 URL 正是刀 C 的配置；
+先定地址规则再落数据，省掉一轮返工。
+
+**落地（后端）**：
+
+| 项 | 内容 |
+|---|---|
+| 迁移 | `V44__cms_content_i18n.sql`：`cms_content_i18n`（owner_type/owner_id/lang 唯一，status 草稿/已发布）；`V45__i18n_portal_settings.sql`：`portal.i18n.mode` 等 4 个参数（config 35~38） |
+| 服务 | `CmsContentI18nService`：保存草稿（正文白名单清洗）、发布 / 下线 / 删除、批量取已发布译文、彻底删除时清理 |
+| 后台接口 | `/api/admin/cms/article/{id}/i18n`、`/api/admin/cms/page/{id}/i18n`（列表 / 保存 / 发布 / 下线 / 删除），权限沿用 edit |
+| 门户接口 | 文章列表 / 详情 / 搜索 / 批量摘要 / 单页接受 `?lang=`，有已发布译文就覆盖标题 / 摘要 / 正文，没有就回退默认语言并在 VO 上标 `translated=false` |
+| 语言配置 | `GET /api/portal/i18n/config` 返回 mode / defaultLang / defaultLangInPath / languages（含 URL 短码），门户 5 秒缓存 |
+
+**落地（前端）**：
+
+| 项 | 内容 |
+|---|---|
+| 后台 | 文章列表加「翻译」按钮 → 语言切换 + 复制原文 + 保存草稿 / 发布 / 下线 / 删除；单页翻译接口已通，页面入口待补 |
+| 门户 | path 模式：`/en/article/1`；默认语言不带前缀；`/zh-cn/...` 301 到无前缀；切换语言保留当前路径；canonical 指当前语言；每页出 hreflang + x-default；sitemap 每地址按语言各出一条并互指 |
+| 回退 | 未发布的语言版本不对外；门户照常显示默认语言，接口标 `translated=false` |
+
+**验收（本机实跑）**：
+
+```text
+mvn -o test                      340 项 / 56 类，0 失败（新增 9 项翻译测试）
+Flyway                           开发库 V43 → V45，V44 / V45 各 0.0x 秒
+b-verify.mjs                     21/21（配置 / 草稿隔离 / 发布生效 / 列表 / 下线回退 / 后台列表）
+c-verify.mjs                     13/13（/en 前缀、html lang、canonical、hreflang、/zh-cn 301、/en 首页）
+c-sitemap.mjs                    5/5（xhtml 命名空间、两种语言地址、hreflang 互指、x-default）
+```
+
+**已知限制**：
+- 语言前缀固定 `en` / `zh-cn` 两种，新增语言要同时改 `nuxt.config.ts` 的 `pages:extend` 并重新构建门户；
+- 时间 / 数字本地化、RTL 未做；
+- sitemap 仍是单个文件（用 hreflang 区分语言），分语言 sitemap 索引留到真有第三语言时再做；
+- 单页翻译只有接口，后台入口待补（见 §12.29 待办池）。

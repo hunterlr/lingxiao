@@ -2,7 +2,7 @@
 
 > 本文回答两个问题：**哪些逻辑必须用单测锁住？没有数据库的机器上怎么自动验证？**
 >
-> 结论：v1.0 基线 + v1.1 CMS + v1.2 会员 + v1.3 / v1.4 的模型 / 模板 / 多语言共 **331 个单测（55 个测试类）**，
+> 结论：v1.0 基线 + v1.1 CMS + v1.2 会员 + v1.3 / v1.4 的模型 / 模板 / 多语言共 **340 个单测（56 个测试类）**，
 > 完全不依赖 MySQL / Redis，`mvn test` 一条命令跑完（JDK 8 本机约 30 秒）；
 > GitHub Actions 覆盖 JDK 8/11/17、后台构建 + 语言包自检、门户构建。
 
@@ -68,11 +68,11 @@ mvn -B -ntp -DskipTests package
 
 ---
 
-## 3. 当前测试清单（331 项 / 55 个类，2026-11-27 实测）
+## 3. 当前测试清单（340 项 / 56 个类，2026-11-28 实测）
 
 > 按模块汇总：`lx-common-core` 25 / 6 类，`lx-common-web` 21 / 3 类，`lx-framework` 10 / 2 类，
 > `lx-module-system` 25 / 6 类，`lx-module-file` 4 / 1 类，`lx-module-job` 7 / 1 类，
-> `lx-module-generator` 18 / 3 类，`lx-module-cms` 84 / 12 类，`lx-module-member` 120 / 16 类，
+> `lx-module-generator` 18 / 3 类，`lx-module-cms` 93 / 13 类，`lx-module-member` 120 / 16 类，
 > `lx-module-i18n` 13 / 4 类，`lx-boot` 4 / 1 类。
 > 新增测试后请同步本表与 README 里的数字（取自 `mvn test` 输出，不要手算）。
 
@@ -113,6 +113,7 @@ mvn -B -ntp -DskipTests package
 | `lx-module-cms` | `CmsPreviewTicketServiceTest` | 6 | 票据携带目标与过期时间、模板与目标类型不匹配拒绝、无效 / 过期 / 已使用拒绝、原子抢占 |
 | `lx-module-cms` | `CmsPortalContentServiceTest` | 8 | 单页未发布按不存在、导航目标停用整项不下发且栏目链接固定 `/category/{key}`、预览不校验发布状态、详情模板推导 |
 | `lx-module-cms` | `CmsTemplatesTest` | 6 | 主题 / 栏目 / 单页模板白名单与回退、详情模板由列表模板推导、预览模板按目标类型限制前缀、三组选项互不重叠 |
+| `lx-module-cms` | `CmsContentI18nServiceTest` | 9 | 保存落草稿、`en` 归一 `en-US`、正文白名单清洗、空标题拒绝、发布幂等、门户只认已发布、批量映射、彻底删除清理 |
 | `lx-module-member` | `MemberUserServiceTest` | 22 | 注册落 `mem_user` 与默认等级 / 渠道、未勾协议拒绝、重名拒绝、登录清零失败计数、密码错误累计、锁定、找回密码静默与验证码一次性、停用 / 删除踢会话 |
 | `lx-module-member` | `MemberPasswordPolicyTest` | 5 | 缺失配置回退 basic、basic 拒绝弱密码、strong 要求四类字符、off 放行、非法值回退 basic |
 | `lx-module-member` | `MemberCaptchaServiceTest` | 7 | 图片与 key 生成、5 分钟有效、一次性、场景隔离、总闸关闭不生成、参数关闭不生成、非法场景拒绝 |
@@ -134,10 +135,10 @@ mvn -B -ntp -DskipTests package
 | `lx-module-i18n` | `I18nPackServiceTest` | 2 | 发布生成新版本 / 快照 / 校验和，回滚按快照恢复译文并切换当前版本 |
 | `lx-module-i18n` | `I18nCsvCodecTest` | 4 | 解析 BOM / 引号 / 逗号 / 换行，引号内换行不拆行，未闭合引号按格式错误处理 |
 
-合计：**Tests run: 331, Failures: 0, Errors: 0, Skipped: 0**（2026-11-27 在 JDK 8 上 `mvn -o test` 实测）。
+合计：**Tests run: 340, Failures: 0, Errors: 0, Skipped: 0**（2026-11-27 在 JDK 8 上 `mvn -o test` 实测）。
 
 > JDK 11 上一次有记录的全量基线是 2026-11-22 的 205 项；之后新增的 126 项只在本地 JDK 8 跑过，
-> JDK 11 / 17 由 CI 矩阵覆盖。历史基线：324（11-27 站内消息）、312（11-27 门户收口）、257、244（11-23），
+> JDK 11 / 17 由 CI 矩阵覆盖。历史基线：331、324（11-27）、312（11-27 门户收口）、257、244（11-23），
 > 232、218、205（11-22），182、156、148、141、134、126、112（11-22），99（11-21），66（11-15）。
 
 ---

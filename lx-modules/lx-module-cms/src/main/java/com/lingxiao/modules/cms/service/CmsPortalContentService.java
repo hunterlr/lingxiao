@@ -16,6 +16,7 @@ import com.lingxiao.modules.cms.dto.portal.PortalPageVO;
 import com.lingxiao.modules.cms.dto.portal.PortalPreviewVO;
 import com.lingxiao.modules.cms.dto.portal.PortalTagVO;
 import com.lingxiao.modules.cms.entity.CmsArticle;
+import com.lingxiao.modules.cms.entity.CmsContentI18n;
 import com.lingxiao.modules.cms.entity.CmsBanner;
 import com.lingxiao.modules.cms.entity.CmsBlock;
 import com.lingxiao.modules.cms.entity.CmsCategory;
@@ -79,9 +80,10 @@ public class CmsPortalContentService {
     private final CmsArticleTagMapper articleTagMapper;
     private final CmsContentExtService extService;
     private final CmsPreviewTicketService previewTicketService;
+    private final CmsContentI18nService i18nService;
 
     /** 已发布单页；草稿 / 下线 / 其它站点一律 404。 */
-    public PortalPageVO page(String siteKey, String pageKey) {
+    public PortalPageVO page(String siteKey, String pageKey, String lang) {
         CmsSite site = siteService.detailByKey(siteKey);
         CmsPage page = pageMapper.selectOne(new LambdaQueryWrapper<CmsPage>()
                 .eq(CmsPage::getSiteId, site.getSiteId())
@@ -90,7 +92,28 @@ public class CmsPortalContentService {
         if (page == null) {
             throw ServiceException.keyed(ErrorCode.NOT_FOUND, "cms.page.notfound");
         }
-        return toPageVO(page);
+        PortalPageVO vo = toPageVO(page);
+        CmsContentI18n translation = i18nService.published(CmsContentI18nService.OWNER_PAGE, page.getPageId(), lang);
+        if (translation == null) {
+            vo.setTranslated(!StringUtils.hasText(lang));
+            return vo;
+        }
+        vo.setTitle(translation.getTitle());
+        vo.setSummary(translation.getSummary());
+        if (StringUtils.hasText(translation.getContent())) {
+            vo.setContent(HtmlSanitizer.clean(translation.getContent()));
+        }
+        if (StringUtils.hasText(translation.getSeoTitle())) {
+            vo.setSeoTitle(translation.getSeoTitle());
+        }
+        if (StringUtils.hasText(translation.getSeoKeywords())) {
+            vo.setSeoKeywords(translation.getSeoKeywords());
+        }
+        if (StringUtils.hasText(translation.getSeoDescription())) {
+            vo.setSeoDescription(translation.getSeoDescription());
+        }
+        vo.setTranslated(true);
+        return vo;
     }
 
     /**

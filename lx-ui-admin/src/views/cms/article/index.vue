@@ -104,6 +104,9 @@
               <el-button v-hasPerm="'platform:cms:article:edit'" link type="primary" @click="openEdit(row)">
                 {{ t('common.edit') }}
               </el-button>
+              <el-button v-hasPerm="'platform:cms:article:edit'" link type="primary" @click="openI18n(row)">
+                {{ t('page.cms.i18n.entry') }}
+              </el-button>
               <el-button
                 v-hasPerm="'platform:cms:article:version'"
                 link
@@ -169,6 +172,7 @@
         />
       </div>
     </div>
+
 
     <el-dialog
       v-model="dialogVisible"
@@ -272,6 +276,9 @@
       </template>
     </el-dialog>
 
+    <CmsI18nDialog v-model="i18nVisible" owner-type="article" :owner-id="i18nOwnerId" :source="i18nSource" />
+
+
     <el-dialog
       v-model="scheduleVisible"
       :title="t('page.cms.article.scheduleTitle')"
@@ -370,6 +377,7 @@
       </div>
     </el-drawer>
 
+
     <el-dialog
       v-model="versionDetailVisible"
       :title="t('page.cms.article.versionDetailTitle', { no: versionDetail ? versionDetail.versionNo : '' })"
@@ -447,6 +455,7 @@ import { Delete, Plus, Refresh, Search } from '@element-plus/icons-vue'
 import RichEditor from '@/components/RichEditor.vue'
 import MediaPicker from '@/components/MediaPicker.vue'
 import CmsExtFields from '@/components/CmsExtFields.vue'
+import CmsI18nDialog from '@/components/CmsI18nDialog.vue'
 import {
   addArticle,
   cancelScheduleArticle,
@@ -597,6 +606,28 @@ onMounted(async () => {
 
 /* ==================== 新增 / 编辑 ==================== */
 const dialogVisible = ref(false)
+
+/* ==================== 翻译（人工填写） ==================== */
+
+const i18nVisible = ref(false)
+const i18nOwnerId = ref('')
+const i18nSource = ref({ title: '', summary: '', content: '' })
+
+/** 打开翻译弹窗：先取详情，把默认语言内容作为“复制原文”的来源。 */
+async function openI18n(row) {
+  try {
+    const detail = await getArticle(row.articleId)
+    i18nOwnerId.value = String(row.articleId)
+    i18nSource.value = {
+      title: detail?.title || row.title || '',
+      summary: detail?.summary || row.summary || '',
+      content: detail?.content || ''
+    }
+    i18nVisible.value = true
+  } catch (e) {
+    ElMessage.error(t('page.cms.i18n.loadFailed'))
+  }
+}
 const dialogLoading = ref(false)
 const saving = ref(false)
 const isEdit = ref(false)

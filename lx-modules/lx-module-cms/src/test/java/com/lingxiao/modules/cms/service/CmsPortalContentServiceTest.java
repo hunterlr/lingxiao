@@ -72,7 +72,7 @@ class CmsPortalContentServiceTest {
         previewTicketService = mock(CmsPreviewTicketService.class);
         service = new CmsPortalContentService(siteService, pageMapper, navMapper,
                 navItemMapper, blockMapper, bannerMapper, categoryMapper, articleMapper,
-                mock(CmsTagMapper.class), articleTagMapper, extService, previewTicketService);
+                mock(CmsTagMapper.class), articleTagMapper, extService, previewTicketService, mock(CmsContentI18nService.class));
 
         CmsSite site = new CmsSite();
         site.setSiteId(1L);
@@ -87,7 +87,7 @@ class CmsPortalContentServiceTest {
         when(pageMapper.selectOne(any())).thenReturn(null);
 
         ServiceException error = catchThrowableOfType(
-                () -> service.page("main", "about"), ServiceException.class);
+                () -> service.page("main", "about", null), ServiceException.class);
 
         assertThat(error.getMessageKey()).isEqualTo("cms.page.notfound");
     }
@@ -106,7 +106,7 @@ class CmsPortalContentServiceTest {
         ext.put("contact", "hello@example.com");
         when(extService.load("page", 50L)).thenReturn(ext);
 
-        PortalPageVO vo = service.page("main", "about");
+        PortalPageVO vo = service.page("main", "about", null);
 
         assertThat(vo.getContent()).contains("<p>介绍</p>").doesNotContain("<script");
         assertThat(vo.getExt()).containsEntry("contact", "hello@example.com");

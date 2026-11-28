@@ -41,4 +41,7 @@ public class PortalArticleSummaryVO {
     private String categoryName;
 
     private List<PortalTagVO> tags = new ArrayList<>();
+
+    /** 当前语言是否有已发布译文；false 表示回退默认语言 */
+    private Boolean translated;
 }

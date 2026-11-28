@@ -28,6 +28,7 @@ interface ApiEnvelope<T> {
  */
 export function usePortalApi() {
   const config = useRuntimeConfig()
+  const { contentLang } = usePortalI18n()
   const siteKey = config.public.siteKey
   const requestFetch = useRequestFetch()
   const base = `/api/portal/cms/sites/${encodeURIComponent(siteKey)}`
@@ -59,19 +60,19 @@ export function usePortalApi() {
     fetchCategories: () => request<PortalCategory[]>('/categories'),
     fetchTags: () => request<PortalTag[]>('/tags'),
     fetchArticles: (query: ArticleQuery = {}) =>
-      request<PageResult<PortalArticleSummary>>('/articles', query as Record<string, unknown>),
+      request<PageResult<PortalArticleSummary>>('/articles', { ...query, lang: contentLang.value }),
     fetchArticle: (articleId: string | number) =>
-      request<PortalArticleDetail>(`/articles/${encodeURIComponent(String(articleId))}`),
+      request<PortalArticleDetail>(`/articles/${encodeURIComponent(String(articleId))}`, { lang: contentLang.value }),
     fetchArticleBySlug: (slug: string) =>
-      request<PortalArticleDetail>(`/articles/by-slug/${encodeURIComponent(slug)}`),
+      request<PortalArticleDetail>(`/articles/by-slug/${encodeURIComponent(slug)}`, { lang: contentLang.value }),
     fetchArticleBatch: (ids: Array<string | number>) => {
       if (!ids.length) return Promise.resolve<PortalArticleSummary[]>([])
-      return request<PortalArticleSummary[]>('/articles/batch', { ids: ids.join(',') })
+      return request<PortalArticleSummary[]>('/articles/batch', { ids: ids.join(','), lang: contentLang.value })
     },
     search: (query: ArticleQuery = {}) =>
-      request<PageResult<PortalArticleSummary>>('/search', query as Record<string, unknown>),
+      request<PageResult<PortalArticleSummary>>('/search', { ...query, lang: contentLang.value }),
     fetchPage: (pageKey: string) =>
-      request<PortalPage>(`/pages/${encodeURIComponent(pageKey)}`),
+      request<PortalPage>(`/pages/${encodeURIComponent(pageKey)}`, { lang: contentLang.value }),
     fetchNav: (navKey: string) =>
       request<PortalNav>(`/navs/${encodeURIComponent(navKey)}`),
     fetchBlock: (blockKey: string) =>

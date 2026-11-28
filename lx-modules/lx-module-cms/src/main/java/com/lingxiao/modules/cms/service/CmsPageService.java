@@ -46,6 +46,7 @@ public class CmsPageService {
     private final CmsModelService modelService;
     private final CmsContentExtService extService;
     private final CmsSiteService siteService;
+    private final CmsContentI18nService i18nService;
 
     public PageResult<CmsPage> page(long pageNum, long pageSize, Long siteId,
                                     String keyword, String status) {
@@ -151,6 +152,7 @@ public class CmsPageService {
         }
         pageMapper.hardDeleteById(pageId);
         extService.deleteByOwner("page", pageId);
+        i18nService.deleteByOwner("page", pageId);
     }
 
     public CmsPage mustGet(Long pageId) {

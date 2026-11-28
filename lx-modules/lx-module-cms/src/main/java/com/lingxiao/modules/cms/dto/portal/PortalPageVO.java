@@ -42,4 +42,7 @@ public class PortalPageVO {
     private LocalDateTime publishTime;
 
     private Map<String, Object> ext = new LinkedHashMap<>();
+
+    /** 当前语言是否有已发布译文；false 表示回退默认语言 */
+    private Boolean translated;
 }

@@ -224,12 +224,11 @@ useHead(() => {
         dateModified: current.publishTime || undefined,
         author: current.authorName ? { '@type': 'Person', name: current.authorName } : undefined,
         image: absoluteCover.value ? [absoluteCover.value] : undefined,
-        mainEntityOfPage: `${siteUrl}/article/${articleId}`
+        mainEntityOfPage: `${siteUrl}${route.path}`
       }).replace(/</g, '\\u003c')
     : ''
 
   return {
-    link: [{ rel: 'canonical', href: `${siteUrl}/article/${articleId}` }],
     script: jsonLd
       ? [{ type: 'application/ld+json', innerHTML: jsonLd }]
       : []

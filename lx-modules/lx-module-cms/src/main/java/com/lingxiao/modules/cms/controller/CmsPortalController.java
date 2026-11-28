@@ -84,15 +84,17 @@ public class CmsPortalController {
             @RequestParam(required = false) String categoryKey,
             @RequestParam(required = false) Long tagId,
             @RequestParam(required = false) String tagKey,
-            @RequestParam(required = false) String keyword) {
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String lang) {
         return R.ok(portalService.articles(siteKey, pageNum, pageSize,
-                categoryId, categoryKey, tagId, tagKey, keyword));
+                categoryId, categoryKey, tagId, tagKey, keyword, lang));
     }
 
     @GetMapping("/sites/{siteKey}/articles/{articleId}")
     public R<PortalArticleDetailVO> article(@PathVariable String siteKey,
-                                            @PathVariable Long articleId) {
-        return R.ok(portalService.article(siteKey, articleId));
+                                            @PathVariable Long articleId,
+                                            @RequestParam(required = false) String lang) {
+        return R.ok(portalService.article(siteKey, articleId, lang));
     }
 
     /**
@@ -103,15 +105,17 @@ public class CmsPortalController {
      */
     @GetMapping("/sites/{siteKey}/articles/batch")
     public R<List<PortalArticleSummaryVO>> articleBatch(@PathVariable String siteKey,
-                                                        @RequestParam List<Long> ids) {
-        return R.ok(portalService.articleBatch(siteKey, ids));
+                                                        @RequestParam List<Long> ids,
+                                                        @RequestParam(required = false) String lang) {
+        return R.ok(portalService.articleBatch(siteKey, ids, lang));
     }
 
     /** 按 slug 取详情；适合做门户的静态化 / 伪静态 URL。 */
     @GetMapping("/sites/{siteKey}/articles/by-slug/{slug}")
     public R<PortalArticleDetailVO> articleBySlug(@PathVariable String siteKey,
-                                                  @PathVariable String slug) {
-        return R.ok(portalService.articleBySlug(siteKey, slug));
+                                                  @PathVariable String slug,
+                                                  @RequestParam(required = false) String lang) {
+        return R.ok(portalService.articleBySlug(siteKey, slug, lang));
     }
 
     /** 搜索：标题 / 摘要关键字；只搜已发布文章。 */
@@ -120,15 +124,17 @@ public class CmsPortalController {
             @PathVariable String siteKey,
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "10") long pageSize,
-            @RequestParam(required = false) String keyword) {
-        return R.ok(portalService.search(siteKey, pageNum, pageSize, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String lang) {
+        return R.ok(portalService.search(siteKey, pageNum, pageSize, keyword, lang));
     }
 
     /* ==================== 单页 / 导航 / 区块 / 轮播 ==================== */
 
     @GetMapping("/sites/{siteKey}/pages/{pageKey}")
-    public R<PortalPageVO> page(@PathVariable String siteKey, @PathVariable String pageKey) {
-        return R.ok(contentService.page(siteKey, pageKey));
+    public R<PortalPageVO> page(@PathVariable String siteKey, @PathVariable String pageKey,
+                                @RequestParam(required = false) String lang) {
+        return R.ok(contentService.page(siteKey, pageKey, lang));
     }
 
     @GetMapping("/sites/{siteKey}/navs/{navKey}")

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 const route = useRoute()
+const portalSiteUrl = String(useRuntimeConfig().public.siteUrl || '').replace(/\/$/, '')
 const api = usePortalApi()
 const { profile, isLoggedIn, ensureProfile, unreadCount, refreshUnread } = useMemberAuth()
-const { t, lang, loadPack, setLang, languages } = usePortalI18n()
+const { t, lang, applyLangFromUrl, loadPack, setLang, languages, config: langConfig } = usePortalI18n()
 
 const { data: site } = await useAsyncData('portal-site', api.fetchSite)
 const { data: categories } = await useAsyncData('portal-categories', api.fetchCategories)
@@ -14,8 +15,10 @@ await ensureProfile()
 if (isLoggedIn.value) {
   await refreshUnread()
 }
-// 文案：先拉后台已发布语言包，失败回落内置字典
+// 文案：先按 URL / Cookie 定语言，再拉后台已发布语言包（失败回落内置字典）
+await applyLangFromUrl()
 await loadPack()
+watch(lang, () => loadPack())
 // 客户端登录 / 退出后同步角标，避免要刷新整页才出现
 onMounted(() => {
   if (isLoggedIn.value) refreshUnread()
@@ -63,11 +66,48 @@ function submitSearch() {
   return navigateTo({ path: '/search', query: { keyword: text } })
 }
 
-useHead(() => ({
-  titleTemplate: (titleChunk) =>
-    titleChunk ? `${titleChunk} · ${siteName.value}` : site.value?.seoTitle || siteName.value,
-  htmlAttrs: { 'data-theme': theme.value, lang: lang.value }
-}))
+useHead(() => {
+  const pathWithoutLang = stripLangPrefix(route.path)
+  const links = [{ rel: 'canonical', href: `${portalSiteUrl}${route.path === '/' ? '/' : route.path}` }]
+
+  // path 模式：每页出完整 hreflang（含 x-default），保证多语言互相指向
+  if (langConfig.value.mode === 'path') {
+    for (const item of langConfig.value.languages) {
+      const isDefault = item.code === langConfig.value.defaultLang
+      const prefix = isDefault && !langConfig.value.defaultLangInPath ? '' : `/${item.urlCode}`
+      links.push({
+        rel: 'alternate',
+        hreflang: item.code,
+        href: `${portalSiteUrl}${prefix}${pathWithoutLang === '/' ? '/' : pathWithoutLang}`
+      })
+      if (isDefault) {
+        links.push({
+          rel: 'alternate',
+          hreflang: 'x-default',
+          href: `${portalSiteUrl}${prefix}${pathWithoutLang === '/' ? '/' : pathWithoutLang}`
+        })
+      }
+    }
+  }
+
+  return {
+    titleTemplate: (titleChunk) =>
+      titleChunk ? `${titleChunk} · ${siteName.value}` : site.value?.seoTitle || siteName.value,
+    htmlAttrs: { 'data-theme': theme.value, lang: lang.value },
+    link: links
+  }
+})
+
+/** 去掉 URL 里的语言前缀，供 hreflang 拼另一种语言地址。 */
+function stripLangPrefix(path: string): string {
+  const segments = String(path || '/').split('/').filter(Boolean)
+  if (!segments.length) return '/'
+  const first = segments[0].toLowerCase()
+  const hit = langConfig.value.languages.some((item) => item.urlCode.toLowerCase() === first)
+  if (!hit) return path
+  const rest = segments.slice(1).join('/')
+  return rest ? `/${rest}` : '/'
+}
 
 useSeoMeta({
   description: () => site.value?.seoDescription || '',
